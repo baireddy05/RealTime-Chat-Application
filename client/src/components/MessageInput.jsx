@@ -24,7 +24,6 @@ import {
   Timer,
   Calendar,
   Lock,
-  Unlock,
   Bot,
   Sparkles,
 } from "lucide-react";
@@ -112,8 +111,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setEditingMessage,
     disappearingTimer,
     setDisappearingTimer,
-    isE2eeEnabled,
-    toggleE2ee,
   } = useChatStore();
   const { authUser, socket } = useAuthStore();
 
@@ -896,13 +893,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             <span>Ask @pulse</span>
           </button>
         </div>
-
-        {isE2eeEnabled && (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 animate-fadeIn">
-            <Lock size={10} />
-            <span>End-to-End Encrypted</span>
-          </div>
-        )}
       </div>
 
       {/* Voice Recording Bar UI */}
@@ -995,8 +985,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               placeholder={
                 scheduledFor
                   ? "Schedule a message..."
-                  : isE2eeEnabled
-                  ? "🔒 End-to-End Encrypted message..."
                   : disappearingTimer
                   ? `Ephemeral message (${disappearingTimer}s)...`
                   : editingMessage
@@ -1007,25 +995,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               onChange={handleTextChange}
             />
 
-            {/* In-capsule controls: E2EE Toggle, Disappearing Timer & Schedule Button */}
+            {/* In-capsule controls: Disappearing Timer & Schedule Button */}
             <div className="absolute right-2 flex items-center gap-0.5">
-              {/* E2EE Toggle Button */}
-              <button
-                type="button"
-                onClick={toggleE2ee}
-                className={`p-1.5 rounded-full transition-all duration-200 flex items-center gap-0.5 ${
-                  isE2eeEnabled
-                    ? "text-emerald-400 bg-emerald-500/20 shadow-sm border border-emerald-500/35"
-                    : "text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
-                }`}
-                title={
-                  isE2eeEnabled
-                    ? "End-to-End Encryption Enabled (AES-GCM 256-bit)"
-                    : "Enable End-to-End Encryption"
-                }
-              >
-                {isE2eeEnabled ? <Lock size={14} className="text-emerald-400" /> : <Unlock size={14} />}
-              </button>
 
               {/* Timer button */}
               <button

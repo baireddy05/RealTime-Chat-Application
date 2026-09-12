@@ -112,11 +112,12 @@ export function isEncryptedMessage(text) {
  */
 export function getConversationKey(chatTarget, currentUserId) {
   if (!chatTarget) return "pulse-default-vault";
-  if (chatTarget.name && chatTarget.name.startsWith("#")) {
+  const targetId = chatTarget.id || chatTarget._id;
+  if (chatTarget.type === "room" || (chatTarget.name && chatTarget.name.startsWith("#"))) {
     // Room channel
-    return `pulse-room-key-${chatTarget._id}`;
+    return `pulse-room-key-${targetId}`;
   }
   // 1:1 direct message: sort both user IDs alphabetically so both users arrive at identical key
-  const ids = [String(currentUserId), String(chatTarget._id)].sort();
+  const ids = [String(currentUserId), String(targetId)].sort();
   return `pulse-dm-key-${ids[0]}-${ids[1]}`;
 }

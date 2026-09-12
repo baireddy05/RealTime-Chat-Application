@@ -23,7 +23,6 @@ const ThreadDrawer = ({ onClose }) => {
     threadReplies,
     isThreadLoading,
     sendThreadReply,
-    isE2eeEnabled,
     selectedChat,
   } = useChatStore();
 
@@ -136,12 +135,6 @@ const ThreadDrawer = ({ onClose }) => {
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30">
                         <Bot size={10} />
                         Pulse AI
-                      </span>
-                    )}
-                    {activeThreadMessage.isEncrypted && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                        <Lock size={10} />
-                        E2EE
                       </span>
                     )}
                   </div>
@@ -276,16 +269,6 @@ const ThreadDrawer = ({ onClose }) => {
                         </span>
                       )}
 
-                      {reply.isEncrypted && (
-                        <span
-                          className={`inline-flex items-center gap-0.5 text-[9px] ${
-                            isMe ? "text-emerald-200" : "text-emerald-400"
-                          }`}
-                        >
-                          <Lock size={9} /> E2EE
-                        </span>
-                      )}
-
                       <span className="text-[10px] opacity-75">
                         {new Date(reply.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -357,12 +340,10 @@ const ThreadDrawer = ({ onClose }) => {
               Ask @pulse in thread
             </button>
 
-            {isE2eeEnabled && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                <Lock size={10} />
-                E2EE active
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+              <Lock size={10} />
+              End-to-end encrypted
+            </span>
           </div>
 
           <form onSubmit={handleSend} className="flex items-center gap-2">

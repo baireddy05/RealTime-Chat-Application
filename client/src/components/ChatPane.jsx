@@ -720,10 +720,10 @@ const ChatPane = ({ onBack }) => {
 
       {/* Messages */}
       <div ref={messagesContainerRef} onScroll={handleContainerScroll} className="flex-1 overflow-y-auto p-3 md:p-6">
-        <div className="flex justify-center my-3">
-          <div className="bg-[var(--glass-surface)] backdrop-blur-xl border border-[var(--glass-border)] rounded-full px-3.5 py-1.5 text-[10px] text-theme-muted flex items-center gap-2 shadow-sm">
-            <Lock size={10} className="text-accent-primary" />
-            <span>End-to-end encrypted</span>
+        <div className="flex justify-center my-3 px-4">
+          <div className="bg-[var(--glass-surface)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl px-4 py-2 text-[11px] text-theme-muted flex items-center gap-2 max-w-md text-center shadow-sm">
+            <Lock size={12} className="text-emerald-400 flex-shrink-0" />
+            <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
           </div>
         </div>
         <div className="flex justify-center my-2">
@@ -786,12 +786,6 @@ const ChatPane = ({ onBack }) => {
                             <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500/25 to-teal-500/25 text-emerald-400 border border-emerald-500/35 mb-1.5 shadow-sm">
                               <Bot size={11} />
                               <span>Pulse AI</span>
-                            </div>
-                          )}
-                          {message.isEncrypted && !message.isDeleted && (
-                            <div className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mb-1.5 shadow-sm">
-                              <Lock size={10} />
-                              <span>E2EE Encrypted</span>
                             </div>
                           )}
                           {message.isPinned && !message.isDeleted && (

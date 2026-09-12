@@ -323,9 +323,10 @@ export const sendMessage = async (req, res) => {
     }
 
     // Check for @pulse AI Companion mention
-    if (text && !isScheduled) {
+    const aiQueryText = req.body.aiPrompt || text;
+    if (aiQueryText && !isScheduled) {
       handleAiMention({
-        text,
+        text: aiQueryText,
         roomId,
         receiverId,
         senderUser: req.user,

@@ -308,7 +308,7 @@ const Sidebar = ({ onChatSelect, onOpenProfile }) => {
                         {last ? (
                           <>
                             {last.senderId?.username ? `${last.senderId.username}: ` : ""}
-                            {last.text || (last.image ? "📷 Photo" : last.file ? `📎 ${last.file.name}` : last.audio ? "🎤 Voice" : "Attachment")}
+                            {last.decryptedText || (last.text?.startsWith("[e2ee]:") ? "🔒 Encrypted Message" : last.text) || (last.image ? "📷 Photo" : last.file ? `📎 ${last.file.name}` : last.audio ? "🎤 Voice" : "Attachment")}
                           </>
                         ) : (
                           room.description || "Channel chat"
@@ -378,7 +378,7 @@ const Sidebar = ({ onChatSelect, onOpenProfile }) => {
                               <CheckCheck size={12} className={hasUnread ? "text-accent-primary font-bold" : "text-accent-primary"} />
                               <span>
                                 {last
-                                  ? (last.text || (last.image ? "📷 Photo" : last.file ? `📎 ${last.file.name}` : last.audio ? "🎤 Voice Note" : "Attachment"))
+                                  ? (last.decryptedText || (last.text?.startsWith("[e2ee]:") ? "🔒 Encrypted Message" : last.text) || (last.image ? "📷 Photo" : last.file ? `📎 ${last.file.name}` : last.audio ? "🎤 Voice Note" : "Attachment"))
                                   : (friend.status || "Available")}
                               </span>
                             </p>

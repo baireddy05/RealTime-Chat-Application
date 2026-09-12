@@ -81,10 +81,10 @@ export const useChatStore = create((set, get) => ({
   isThreadOpen: false,
   isThreadLoading: false,
 
-  // Feature 5: Client-Side E2EE
-  isE2eeEnabled: false,
-  toggleE2ee: () => set((state) => ({ isE2eeEnabled: !state.isE2eeEnabled })),
-  setIsE2eeEnabled: (val) => set({ isE2eeEnabled: val }),
+  // Feature 5: End-to-End Encryption (Default on like WhatsApp)
+  isE2eeEnabled: true,
+  toggleE2ee: () => {},
+  setIsE2eeEnabled: () => {},
 
   openThread: (message) => {
     set({ activeThreadMessage: message, isThreadOpen: true, threadReplies: [] });
@@ -106,10 +106,20 @@ export const useChatStore = create((set, get) => ({
       const res = await axiosInstance.get("/chat/users");
       const unread = { ...get().unreadCounts };
       const last = { ...get().lastMessages };
-      res.data.forEach((u) => {
+      const authUser = useAuthStore.getState().authUser;
+
+      await Promise.all(res.data.map(async (u) => {
         if (u.unreadCount !== undefined) unread[u._id] = u.unreadCount;
-        if (u.lastMessage) last[u._id] = u.lastMessage;
-      });
+        if (u.lastMessage) {
+          let lastMsg = u.lastMessage;
+          if (lastMsg.isEncrypted || isEncryptedMessage(lastMsg.text)) {
+            const key = getConversationKey({ id: u._id, type: "user" }, authUser?._id);
+            const dec = await decryptMessage(lastMsg.text, key);
+            lastMsg = { ...lastMsg, decryptedText: dec };
+          }
+          last[u._id] = lastMsg;
+        }
+      }));
       set({ users: res.data, unreadCounts: unread, lastMessages: last });
     } catch (error) {
       console.error(error);
@@ -124,10 +134,20 @@ export const useChatStore = create((set, get) => ({
       const res = await axiosInstance.get("/chat/rooms");
       const unread = { ...get().unreadCounts };
       const last = { ...get().lastMessages };
-      res.data.forEach((r) => {
+      const authUser = useAuthStore.getState().authUser;
+
+      await Promise.all(res.data.map(async (r) => {
         if (r.unreadCount !== undefined) unread[r._id] = r.unreadCount;
-        if (r.lastMessage) last[r._id] = r.lastMessage;
-      });
+        if (r.lastMessage) {
+          let lastMsg = r.lastMessage;
+          if (lastMsg.isEncrypted || isEncryptedMessage(lastMsg.text)) {
+            const key = getConversationKey({ id: r._id, type: "room" }, authUser?._id);
+            const dec = await decryptMessage(lastMsg.text, key);
+            lastMsg = { ...lastMsg, decryptedText: dec };
+          }
+          last[r._id] = lastMsg;
+        }
+      }));
       set({ rooms: res.data, unreadCounts: unread, lastMessages: last });
     } catch (error) {
       console.error(error);
@@ -207,24 +227,27 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendThreadReply: async (replyData) => {
-    const { activeThreadMessage, selectedChat, isE2eeEnabled } = get();
+    const { activeThreadMessage, selectedChat } = get();
     if (!activeThreadMessage || !selectedChat) return { success: false };
 
     try {
       const authUser = useAuthStore.getState().authUser;
       let textToSend = replyData.text || "";
-      const shouldEncrypt = replyData.isEncrypted ?? isE2eeEnabled;
       const originalText = textToSend;
+      let isEncrypted = false;
 
-      if (shouldEncrypt && textToSend) {
+      // Encrypt all outgoing message text by default like WhatsApp
+      if (textToSend) {
         const key = getConversationKey(selectedChat, authUser?._id);
         textToSend = await encryptMessage(textToSend, key);
+        isEncrypted = true;
       }
 
       const payload = {
         ...replyData,
         text: textToSend,
-        isEncrypted: Boolean(shouldEncrypt),
+        isEncrypted,
+        aiPrompt: originalText,
         parentMessageId: activeThreadMessage._id,
       };
 
@@ -236,7 +259,7 @@ export const useChatStore = create((set, get) => ({
       const res = await axiosInstance.post(endpoint, payload);
       const returnedMessage = {
         ...res.data,
-        decryptedText: shouldEncrypt ? originalText : res.data.text,
+        decryptedText: originalText,
       };
 
       set((state) => {
@@ -291,25 +314,28 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
-    const { selectedChat, messages, replyingTo, disappearingTimer, isE2eeEnabled } = get();
+    const { selectedChat, messages, replyingTo, disappearingTimer } = get();
     if (!selectedChat) return;
 
     set({ isSending: true });
     try {
       const authUser = useAuthStore.getState().authUser;
       let textToSend = messageData.text || "";
-      const shouldEncrypt = messageData.isEncrypted ?? isE2eeEnabled;
       const originalText = textToSend;
+      let isEncrypted = false;
 
-      if (shouldEncrypt && textToSend) {
+      // Encrypt all outgoing message text by default like WhatsApp
+      if (textToSend) {
         const key = getConversationKey(selectedChat, authUser?._id);
         textToSend = await encryptMessage(textToSend, key);
+        isEncrypted = true;
       }
 
       const payload = {
         ...messageData,
         text: textToSend,
-        isEncrypted: Boolean(shouldEncrypt),
+        isEncrypted,
+        aiPrompt: originalText,
         expiresIn: messageData.expiresIn !== undefined ? messageData.expiresIn : (disappearingTimer || undefined),
         replyTo: messageData.replyTo !== undefined ? messageData.replyTo : (replyingTo ? {
           messageId: replyingTo._id,
@@ -329,7 +355,7 @@ export const useChatStore = create((set, get) => ({
 
       const msgDataWithDecrypted = {
         ...res.data,
-        decryptedText: shouldEncrypt ? originalText : res.data.text,
+        decryptedText: originalText,
       };
 
       if (res.data.isScheduled) {
@@ -359,10 +385,16 @@ export const useChatStore = create((set, get) => ({
 
   editMessage: async (messageId, text) => {
     try {
-      const res = await axiosInstance.put(`/chat/message/${messageId}`, { text });
-      const { messages, editingMessage } = get();
+      const { selectedChat, messages, editingMessage } = get();
+      const authUser = useAuthStore.getState().authUser;
+      let textToSend = text;
+      if (textToSend) {
+        const key = getConversationKey(selectedChat, authUser?._id);
+        textToSend = await encryptMessage(textToSend, key);
+      }
+      const res = await axiosInstance.put(`/chat/message/${messageId}`, { text: textToSend });
       const updated = messages.map((m) =>
-        m._id === messageId ? { ...m, text: res.data.text, isEdited: true, updatedAt: res.data.updatedAt } : m
+        m._id === messageId ? { ...m, text: res.data.text, decryptedText: text, isEdited: true, updatedAt: res.data.updatedAt } : m
       );
       set({
         messages: updated,
@@ -460,7 +492,10 @@ export const useChatStore = create((set, get) => ({
         (processedMessage.senderId?._id === selectedChat.id || processedMessage.senderId === selectedChat.id || processedMessage.receiverId === selectedChat.id);
 
       if (isRoomMsg || isUserMsg) {
-        set({ messages: [...get().messages, processedMessage] });
+        set((state) => {
+          const exists = state.messages.some((m) => m._id === processedMessage._id);
+          return { messages: exists ? state.messages : [...state.messages, processedMessage] };
+        });
         get().markMessagesAsRead(selectedChat.id, selectedChat.type);
 
         const senderId = processedMessage.senderId?._id || processedMessage.senderId;
@@ -541,6 +576,29 @@ export const useChatStore = create((set, get) => ({
           : m
       );
       set({ messages: updated });
+    });
+
+    // Real-time message edited
+    socket.on("messageEdited", async (payload) => {
+      const { selectedChat, messages, threadReplies } = get();
+      const myId = useAuthStore.getState().authUser?._id;
+      let textDecrypted = payload.text;
+      if (isEncryptedMessage(payload.text)) {
+        const key = getConversationKey(selectedChat, myId);
+        textDecrypted = await decryptMessage(payload.text, key);
+      }
+      set({
+        messages: messages.map((m) =>
+          m._id === payload.messageId
+            ? { ...m, text: payload.text, decryptedText: textDecrypted, isEdited: true, updatedAt: payload.updatedAt }
+            : m
+        ),
+        threadReplies: threadReplies.map((r) =>
+          r._id === payload.messageId
+            ? { ...r, text: payload.text, decryptedText: textDecrypted, isEdited: true, updatedAt: payload.updatedAt }
+            : r
+        ),
+      });
     });
 
     // Real-time room updates (name, avatar, description, members, admins)
