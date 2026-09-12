@@ -1,0 +1,171 @@
+import { useState } from "react";
+import { Check, Copy, Code2, Terminal } from "lucide-react";
+
+export const CodeSnippetBlock = ({ code, language }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const detectedLang = language?.trim() || "code";
+
+  return (
+    <div className="my-2 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-slate-950/80 shadow-glass text-left w-full font-mono text-[12px]">
+      {/* Code Header Bar */}
+      <div className="px-3.5 py-1.5 bg-[var(--glass-surface)]/70 border-b border-[var(--glass-border)] flex items-center justify-between">
+        <div className="flex items-center gap-2 text-theme-muted">
+          <Terminal size={12} className="text-accent-primary" />
+          <span className="text-[11px] font-semibold tracking-wider uppercase text-accent-primary/90">
+            {detectedLang}
+          </span>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--glass-hover)] hover:bg-accent-primary/20 text-theme-muted hover:text-accent-primary transition-all active:scale-95"
+          title="Copy Code"
+        >
+          {copied ? (
+            <>
+              <Check size={11} className="text-emerald-400" />
+              <span className="text-emerald-400">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy size={11} />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Code Content */}
+      <pre className="p-3.5 overflow-x-auto text-emerald-300 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
+  if (!text) return null;
+
+  // Split text by markdown code blocks: ```lang ... ```
+  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({
+        type: "text",
+        content: text.substring(lastIndex, match.index),
+      });
+    }
+    parts.push({
+      type: "code",
+      language: match[1],
+      code: match[2].trimEnd(),
+    });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({
+      type: "text",
+      content: text.substring(lastIndex),
+    });
+  }
+
+  // Render normal text with links, inline code and search highlight
+  const renderInlineText = (str) => {
+    // Split by inline code `...`
+    const inlineParts = str.split(/(`[^`]+`)/g);
+
+    return inlineParts.map((sub, i) => {
+      if (sub.startsWith("`") && sub.endsWith("`") && sub.length > 2) {
+        const inlineCode = sub.slice(1, -1);
+        return (
+          <code
+            key={i}
+            className="px-1.5 py-0.5 mx-0.5 rounded-md bg-black/25 text-amber-300 font-mono text-[11px] border border-white/10"
+          >
+            {inlineCode}
+          </code>
+        );
+      }
+
+      // Format URLs in sub
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urlParts = sub.split(urlRegex);
+
+      return urlParts.map((urlSub, j) => {
+        if (urlSub.match(urlRegex)) {
+          return (
+            <a
+              key={j}
+              href={urlSub}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`underline underline-offset-2 break-all ${
+                isMine ? "text-white font-medium hover:text-amber-200" : "text-accent-primary hover:underline font-medium"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {urlSub}
+            </a>
+          );
+        }
+
+        // Search match highlight
+        if (searchQuery && searchQuery.trim()) {
+          const trimmed = searchQuery.trim();
+          const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const searchRegex = new RegExp(`(${escaped})`, "gi");
+          const matchParts = urlSub.split(searchRegex);
+
+          return matchParts.map((m, k) =>
+            m.toLowerCase() === trimmed.toLowerCase() ? (
+              <mark
+                key={k}
+                className={
+                  isMine
+                    ? "bg-amber-300 text-slate-950 font-bold px-0.5 rounded"
+                    : "bg-amber-200 text-amber-950 font-bold px-0.5 rounded"
+                }
+              >
+                {m}
+              </mark>
+            ) : (
+              m
+            )
+          );
+        }
+
+        return urlSub;
+      });
+    });
+  };
+
+  return (
+    <div className="space-y-1 select-text">
+      {parts.map((part, idx) => {
+        if (part.type === "code") {
+          return (
+            <CodeSnippetBlock
+              key={idx}
+              code={part.code}
+              language={part.language}
+            />
+          );
+        }
+        return <span key={idx}>{renderInlineText(part.content)}</span>;
+      })}
+    </div>
+  );
+};
+
+export default FormattedMessageText;
