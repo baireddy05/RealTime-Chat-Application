@@ -26,140 +26,143 @@ const MessageInfoModal = ({ message, onClose }) => {
   const displayText = message.decryptedText || message.text;
   const readers = receipts?.readBy || [];
   const senderName = message.senderId?.username || "You";
+  const formattedTime = new Date(message.createdAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const formattedDate = new Date(message.createdAt).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4 animate-fadeIn select-none overflow-y-auto"
     >
       <section
         onClick={(e) => e.stopPropagation()}
-        className="relative overflow-hidden rounded-xl bg-surface-container-low/90 backdrop-blur-2xl p-space-lg shadow-2xl border border-outline/10 text-on-surface max-w-xl w-full animate-scaleIn my-8"
+        className="relative overflow-hidden rounded-3xl bg-[#121117]/95 backdrop-blur-3xl p-6 shadow-2xl border border-white/10 text-white max-w-md w-full animate-scaleIn my-8"
       >
-        {/* Specular line */}
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-tertiary/40 to-transparent pointer-events-none" />
-
-        {/* Modal Header */}
-        <div className="flex flex-wrap items-center justify-between gap-space-sm pb-space-sm mb-space-md border-b border-outline/10">
-          <div className="flex items-center gap-space-sm">
-            <span className="material-symbols-outlined text-tertiary text-xl">lock</span>
-            <span className="font-headline-md text-headline-md text-on-surface font-semibold text-base sm:text-lg">
-              E2EE Message Audit &amp; Receipts
-            </span>
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-bold text-base text-white tracking-tight">Message info</h3>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="px-space-sm py-0.5 rounded-full bg-tertiary/20 text-tertiary font-label-mono text-xs font-semibold">
-              Verified Zero-Knowledge
-            </span>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-full bg-surface-container-high hover:bg-surface-variant text-on-surface-variant hover:text-on-surface transition-colors"
-            >
-              <span className="material-symbols-outlined text-base">close</span>
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+            title="Close"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
         </div>
 
-        {/* Inspected Message Snippet */}
-        <div className="p-space-md rounded-xl bg-surface-container/60 mb-space-md flex flex-col gap-space-xs shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] border border-white/5">
-          <div className="flex justify-between items-center text-outline font-label-mono text-xs">
-            <span>Author: {senderName}</span>
-            <span>Sent: {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        {/* Message Bubble Preview */}
+        <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 mb-4 shadow-inner">
+          <div className="flex items-center justify-between text-zinc-400 text-xs mb-1.5 font-medium">
+            <span>{senderName}</span>
+            <span className="font-mono text-[11px]">{formattedDate}, {formattedTime}</span>
           </div>
 
-          <div className="p-space-sm rounded-lg bg-surface-container-high/80 text-on-surface font-body-md text-sm my-1 leading-relaxed">
+          <div className="text-sm text-white leading-relaxed">
             {displayText ? (
               displayText
             ) : message.image ? (
-              <span className="text-secondary font-medium">📷 Image Attachment</span>
+              <span className="text-zinc-300 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">image</span>
+                <span>Photo</span>
+              </span>
             ) : message.audio ? (
-              <span className="text-secondary font-medium">🎤 Voice Note</span>
+              <span className="text-zinc-300 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">mic</span>
+                <span>Voice message</span>
+              </span>
             ) : message.file ? (
-              <span className="text-secondary font-medium">📎 {message.file.name}</span>
+              <span className="text-zinc-300 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">attach_file</span>
+                <span>{message.file.name || "Attachment"}</span>
+              </span>
             ) : (
-              <span className="text-outline italic">Encrypted payload</span>
+              <span className="text-zinc-400 italic">Encrypted message</span>
             )}
-          </div>
-
-          <div className="flex items-center justify-between text-outline font-label-mono text-xs pt-space-xs">
-            <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-xs text-secondary">fingerprint</span>
-              <span>SHA-256: {message._id?.slice(-8).toUpperCase()}...E2EE</span>
-            </span>
-            <span className="text-tertiary font-semibold">
-              {readers.length > 0 ? `${readers.length} Confirmed Read` : "Delivered to Mesh"}
-            </span>
           </div>
         </div>
 
-        {/* Read Receipts Timeline Grid */}
+        {/* Delivery & Read Receipts */}
         {isLoading ? (
-          <div className="py-8 flex flex-col items-center justify-center gap-2 text-outline">
-            <span className="material-symbols-outlined animate-spin text-tertiary text-2xl">sync</span>
-            <span className="text-xs font-label-mono">Querying mesh receipts...</span>
+          <div className="py-8 flex flex-col items-center justify-center gap-2 text-zinc-400">
+            <span className="material-symbols-outlined animate-spin text-white text-xl">sync</span>
+            <span className="text-xs">Loading info...</span>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md mb-4">
-              {/* Delivery Stage 1 */}
-              <div className="p-space-sm rounded-xl bg-surface-container/40 flex items-center justify-between border border-white/5">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-8 h-8 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center font-bold text-sm">
-                    ✓
-                  </div>
-                  <div>
-                    <div className="font-title-sm text-xs font-semibold text-on-surface">Delivered to Edge Server</div>
-                    <div className="font-label-mono text-[10px] text-outline">Pulse Relay Cluster</div>
+          <div className="space-y-3">
+            {/* Read Status */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-white text-black flex items-center justify-center shadow-sm">
+                  <span className="material-symbols-outlined text-base font-bold">done_all</span>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-white">Read</div>
+                  <div className="text-[11px] text-zinc-400">
+                    {readers.length > 0
+                      ? `${readers.length} ${readers.length === 1 ? "person" : "people"}`
+                      : "Not read yet"}
                   </div>
                 </div>
-                <span className="font-label-mono text-xs text-secondary">
-                  {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
               </div>
-
-              {/* Delivery Stage 2: Read Status */}
-              <div className="p-space-sm rounded-xl bg-surface-container/40 flex items-center justify-between border border-white/5">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-8 h-8 rounded-full bg-tertiary-container/30 text-tertiary flex items-center justify-center font-bold text-sm">
-                    ✓✓
-                  </div>
-                  <div>
-                    <div className="font-title-sm text-xs font-semibold text-on-surface">Distributed Mesh Read</div>
-                    <div className="font-label-mono text-[10px] text-tertiary">
-                      {readers.length > 0 ? `${readers.length} peers decrypted` : "Awaiting recipient"}
-                    </div>
-                  </div>
-                </div>
-                <span className="font-label-mono text-xs text-tertiary">
-                  {readers.length > 0 ? "Read" : "Sent"}
-                </span>
-              </div>
+              <span className="text-xs font-mono text-zinc-400">
+                {readers.length > 0 ? formattedTime : "—"}
+              </span>
             </div>
 
-            {/* List of confirmed readers */}
+            {/* Delivered Status */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-white/10 text-zinc-300 flex items-center justify-center border border-white/10">
+                  <span className="material-symbols-outlined text-base">done_all</span>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-white">Delivered</div>
+                  <div className="text-[11px] text-zinc-400">Delivered to recipient</div>
+                </div>
+              </div>
+              <span className="text-xs font-mono text-zinc-400">
+                {formattedTime}
+              </span>
+            </div>
+
+            {/* Read by List (for Group chats) */}
             {readers.length > 0 && (
-              <div className="p-3 rounded-xl bg-surface-container/30 border border-white/5">
-                <span className="font-label-caps text-[10px] uppercase text-outline font-bold tracking-wider block mb-2">
-                  Confirmed Readers ({readers.length})
+              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/10">
+                <span className="text-[10px] uppercase text-zinc-400 font-bold tracking-wider block mb-2">
+                  Read by ({readers.length})
                 </span>
-                <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                <div className="flex flex-col gap-2 max-h-36 overflow-y-auto custom-scrollbar pr-1">
                   {readers.map((user) => (
-                    <div key={user._id || user} className="flex items-center justify-between text-xs py-1">
-                      <div className="flex items-center gap-2">
+                    <div key={user._id || user} className="flex items-center justify-between text-xs py-1 border-b border-white/5 last:border-0">
+                      <div className="flex items-center gap-2.5">
                         <img
-                          src={user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=8083ff&color=ffffff`}
+                          src={
+                            user.profilePic ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=27272a&color=ffffff&bold=true`
+                          }
                           alt={user.username}
-                          className="w-6 h-6 rounded-full object-cover"
+                          className="w-7 h-7 rounded-full object-cover border border-white/10"
                         />
-                        <span className="font-medium text-on-surface">{user.username || "Recipient"}</span>
+                        <span className="font-semibold text-white">{user.username || "Member"}</span>
                       </div>
-                      <span className="text-secondary font-label-mono text-[11px]">Decrypted</span>
+                      <span className="text-zinc-400 text-[11px] flex items-center gap-1 font-mono">
+                        <span className="material-symbols-outlined text-xs text-white">done_all</span>
+                        <span>Read</span>
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </section>
     </div>

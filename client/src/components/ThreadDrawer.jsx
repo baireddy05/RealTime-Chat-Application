@@ -302,14 +302,6 @@ const ThreadDrawer = ({ onClose }) => {
 
         {/* Thread Reply Composer */}
         <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--glass-surface)]/90 backdrop-blur-xl flex-shrink-0">
-          {/* Security Badge */}
-          <div className="flex items-center justify-end mb-2 px-1">
-            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-              <Lock size={10} />
-              End-to-end encrypted
-            </span>
-          </div>
-
           <form onSubmit={handleSend} className="flex items-center gap-2">
             <div className="flex-1 relative flex items-center">
               <input

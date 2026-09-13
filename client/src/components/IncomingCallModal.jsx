@@ -41,13 +41,9 @@ const IncomingCallModal = () => {
         <h3 className="text-xl font-bold capitalize tracking-tight text-theme-main mb-1">
           {peerUser?.name || peerUser?.username}
         </h3>
-        <p className="text-xs text-accent-primary font-medium flex items-center gap-1.5 justify-center mb-1">
+        <p className="text-xs text-accent-primary font-medium flex items-center gap-1.5 justify-center mb-6">
           {callType === "video" ? <Video size={14} /> : <Phone size={14} />}
           <span>Incoming {callType === "video" ? "Video" : "Voice"} Call...</span>
-        </p>
-        <p className="text-[11px] text-theme-muted flex items-center gap-1 justify-center mb-6">
-          <ShieldCheck size={12} className="text-emerald-400" />
-          <span>End-to-end encrypted</span>
         </p>
 
         {/* Action Buttons */}

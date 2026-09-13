@@ -35,15 +35,14 @@ const seedDB = async () => {
     const createdUsers = await User.insertMany(usersData);
     console.log("Users seeded successfully");
 
-    // Create 3 Public Rooms
+    // Create Public Groups
     const roomsData = [
-      { name: "#general", description: "General discussions" },
-      { name: "#announcements", description: "Important updates" },
-      { name: "#dev-hangout", description: "Talk about code" },
+      { name: "General Community", description: "General discussions & community" },
+      { name: "Project Team", description: "Project planning and updates" },
     ];
 
     const createdRooms = await Room.insertMany(roomsData);
-    console.log("Rooms seeded successfully");
+    console.log("Groups seeded successfully");
 
     // Create Messages
     const messagesData = [];

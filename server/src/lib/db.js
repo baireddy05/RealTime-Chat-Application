@@ -32,9 +32,7 @@ const seedInitialData = async () => {
       }
 
       const roomsData = [
-        { name: "#general", description: "General discussions" },
-        { name: "#announcements", description: "Important updates" },
-        { name: "#dev-hangout", description: "Talk about code" },
+        { name: "General Group", description: "General discussions & community" },
       ];
       const createdRooms = await Room.insertMany(roomsData);
 
@@ -43,7 +41,7 @@ const seedInitialData = async () => {
         await Message.create({
           senderId: createdUsers[i % 2]._id,
           roomId: createdRooms[0]._id,
-          text: `Welcome to Pulse #general channel! Message #${i + 1}`,
+          text: `Welcome to Pulse General Group! Message #${i + 1}`,
         });
       }
       console.log("[Database] Initial data seeded successfully.");

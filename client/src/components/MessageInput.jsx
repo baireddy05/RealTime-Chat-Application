@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
+import { emitPulseShockwave } from "../lib/pulseShockwave";
 
 const COMMON_EMOJIS = [
   "😀", "😂", "😍", "🔥", "👍", "❤️", "🎉", "🚀", 
@@ -88,6 +89,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const attachBtnRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
+  const inputRef = useRef(null);
+  const sendBtnRef = useRef(null);
 
   const {
     sendMessage,
@@ -171,26 +174,31 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     const val = e.target.value;
     setText(val);
 
-    if (!socket || !selectedChat) return;
+    try {
+      if (!socket || !selectedChat) return;
 
-    socket.emit("typing", {
-      targetId: selectedChat.id,
-      targetType: selectedChat.type,
-      username: authUser.username,
-    });
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      socket.emit("stopTyping", {
+      socket.emit("typing", {
         targetId: selectedChat.id,
         targetType: selectedChat.type,
-        username: authUser?.username,
+        username: authUser?.username || "User",
       });
-    }, 2000);
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        try {
+          socket.emit("stopTyping", {
+            targetId: selectedChat.id,
+            targetType: selectedChat.type,
+            username: authUser?.username || "User",
+          });
+        } catch {}
+      }, 2000);
+    } catch {}
   };
 
   const handleEmojiSelect = (emoji) => {
     setText((prev) => prev + emoji);
+    if (inputRef.current) emitPulseShockwave(inputRef.current);
   };
 
   const handleImageChange = (e) => {
@@ -416,6 +424,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     const currentDoc = documentFile;
     const currentSchedule = scheduledFor;
     const currentReply = replyingTo;
+
+    if (sendBtnRef.current) {
+      emitPulseShockwave(sendBtnRef.current);
+    } else if (inputRef.current) {
+      emitPulseShockwave(inputRef.current);
+    }
     
     setText("");
     removeImage();
@@ -890,8 +904,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             {/* Text Input Field */}
             <div className="flex-1 flex items-center px-2 min-w-0 relative">
               <input
+                ref={inputRef}
                 type="text"
                 className="w-full bg-transparent text-white placeholder:text-zinc-500 text-sm focus:outline-none"
+                style={{ color: "#ffffff", caretColor: "#ffffff" }}
                 placeholder={
                   scheduledFor
                     ? "Schedule a message..."
@@ -955,10 +971,11 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
               {/* Primary Monochromatic Send Button */}
               <button
+                ref={sendBtnRef}
                 type="submit"
                 disabled={!hasContent && !editingMessage}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-[#0d0c11] shadow-lg hover:scale-105 active:scale-95 transition-all mr-0.5 disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
-                title="Send encrypted message"
+                title="Send message"
               >
                 {isSending || isUploading ? (
                   <Loader size={17} className="animate-spin text-black" />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Users, Loader, Check, Hash } from "lucide-react";
+import { X, Users, Loader, Check } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
 
@@ -24,15 +24,18 @@ const CreateGroupModal = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Please enter a channel name");
+      setError("Please enter a group name");
       return;
     }
 
     setIsLoading(true);
     setError("");
 
+    // Clean name: remove any leading # so groups are WhatsApp style
+    const cleanName = name.trim().replace(/^#+/, "");
+
     const res = await createRoom({
-      name: name.trim(),
+      name: cleanName,
       description: description.trim(),
       memberIds: selectedMembers,
     });
@@ -49,93 +52,93 @@ const CreateGroupModal = ({ onClose }) => {
       });
       onClose();
     } else {
-      setError(res.error || "Failed to create channel");
+      setError(res.error || "Failed to create group");
     }
   };
 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl w-full max-w-md overflow-hidden shadow-glass animate-scaleIn text-theme-main"
+        className="bg-[#121117]/90 backdrop-blur-2xl border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-white"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--glass-border)] bg-[var(--glass-hover)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-accent-primary flex items-center justify-center text-white shadow-md shadow-accent-primary/25">
-              <Users size={18} />
+            <div className="w-10 h-10 rounded-2xl bg-white text-black flex items-center justify-center font-bold shadow-md">
+              <Users size={20} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm text-theme-main">New Channel</h3>
-              <p className="text-[11px] text-theme-muted">Create a collaborative space</p>
+              <h3 className="font-semibold text-sm text-white">New Group</h3>
+              <p className="text-[11px] text-zinc-400">Add group name and select participants</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
+            className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-500 text-xs font-medium animate-fadeIn">
+            <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium animate-fadeIn">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-[11px] font-medium text-theme-muted mb-1.5 uppercase tracking-wider">
-              Channel Name *
+            <label className="block text-[11px] font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+              Group Subject *
             </label>
             <div className="relative flex items-center">
-              <span className="absolute left-3 text-accent-primary font-bold">
-                <Hash size={15} />
+              <span className="absolute left-3.5 text-zinc-400">
+                <Users size={16} />
               </span>
               <input
                 type="text"
-                placeholder="e.g. design-squad"
+                placeholder="e.g. Design Team, Family, Weekend Trip"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
-                className="w-full glass-input rounded-2xl pl-9 pr-3 py-2 text-xs text-theme-main placeholder-theme-muted/40 border border-[var(--glass-border)] focus:outline-none focus:border-accent-primary transition-all"
+                className="w-full glass-input rounded-2xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 border border-white/10 focus:outline-none focus:border-white transition-all bg-white/5"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-theme-muted mb-1.5 uppercase tracking-wider">
-              Topic / Purpose
+            <label className="block text-[11px] font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">
+              Group Description (Optional)
             </label>
             <textarea
-              placeholder="What is this channel for?"
+              placeholder="What is this group about?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full glass-input rounded-2xl px-3 py-2 text-xs text-theme-main placeholder-theme-muted/40 border border-[var(--glass-border)] focus:outline-none focus:border-accent-primary transition-all resize-none"
+              className="w-full glass-input rounded-2xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 border border-white/10 focus:outline-none focus:border-white transition-all resize-none bg-white/5"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-[11px] font-medium text-theme-muted uppercase tracking-wider">
-                Select Members ({selectedMembers.length})
+              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                Select Participants ({selectedMembers.length})
               </label>
-              <span className="text-[11px] text-theme-muted/60">
-                {friends.length} friend{friends.length === 1 ? "" : "s"}
+              <span className="text-[11px] text-zinc-500">
+                {friends.length} contact{friends.length === 1 ? "" : "s"}
               </span>
             </div>
 
-            <div className="max-h-44 overflow-y-auto space-y-1 rounded-2xl bg-[var(--glass-surface)] p-2 border border-[var(--glass-border)]">
+            <div className="max-h-44 overflow-y-auto space-y-1 rounded-2xl bg-white/[0.03] p-2 border border-white/10 custom-scrollbar">
               {friends.length === 0 ? (
-                <div className="py-6 text-center text-xs text-theme-muted">
-                  No friends found to invite.
+                <div className="py-6 text-center text-xs text-zinc-500">
+                  No contacts found to add. Add contacts first.
                 </div>
               ) : (
                 friends.map((friend) => {
@@ -146,37 +149,37 @@ const CreateGroupModal = ({ onClose }) => {
                       onClick={() => toggleMember(friend._id)}
                       className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-colors ${
                         isChecked
-                          ? "bg-accent-primary/20 border border-accent-primary/40 text-theme-main"
-                          : "hover:bg-[var(--glass-hover)] text-theme-main"
+                          ? "bg-white/15 border border-white/20 text-white"
+                          : "hover:bg-white/5 text-zinc-300"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <img
                           src={
                             friend.profilePic ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username || "User")}&background=2563eb&color=ffffff`
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username || "User")}&background=27272a&color=ffffff`
                           }
                           alt={friend.username}
-                          className="w-7 h-7 rounded-full object-cover border border-[var(--glass-border)]"
+                          className="w-8 h-8 rounded-full object-cover border border-white/10"
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-medium truncate text-theme-main">
+                          <p className="text-xs font-semibold truncate text-white">
                             {friend.username}
                           </p>
-                          <p className="text-[10px] text-theme-muted truncate">
-                            {friend.status || "Active"}
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {friend.status || "Available"}
                           </p>
                         </div>
                       </div>
 
                       <div
-                        className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all ${
+                        className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
                           isChecked
-                            ? "bg-accent-primary border-accent-primary text-white shadow-sm"
-                            : "border-[var(--glass-border)] bg-[var(--glass-hover)]"
+                            ? "bg-white border-white text-black font-bold shadow-sm"
+                            : "border-white/20 bg-white/5"
                         }`}
                       >
-                        {isChecked && <Check size={10} strokeWidth={3} />}
+                        {isChecked && <Check size={12} strokeWidth={3} />}
                       </div>
                     </div>
                   );
@@ -189,17 +192,17 @@ const CreateGroupModal = ({ onClose }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading || !name.trim()}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-medium text-white bg-accent-primary hover:bg-accent-primary/80 shadow-md shadow-accent-primary/25 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-black bg-white hover:bg-zinc-200 shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
             >
-              {isLoading ? <Loader size={13} className="animate-spin text-white" /> : <Users size={13} />}
-              <span>Create Channel</span>
+              {isLoading ? <Loader size={14} className="animate-spin text-black" /> : <Users size={14} />}
+              <span>Create Group</span>
             </button>
           </div>
         </form>

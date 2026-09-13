@@ -34,69 +34,75 @@ const AddFriendModal = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4 animate-fadeIn select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl w-full max-w-md overflow-hidden shadow-glass animate-scaleIn text-theme-main flex flex-col max-h-[80vh]"
+        className="bg-[#121117]/95 backdrop-blur-3xl border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-white flex flex-col max-h-[82vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--glass-border)] bg-[var(--glass-hover)] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.03] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-accent-primary flex items-center justify-center text-white shadow-md shadow-accent-primary/25">
+            <div className="w-9 h-9 rounded-2xl bg-white text-black flex items-center justify-center font-bold shadow-md">
               <UserPlus size={18} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm text-theme-main">Add Friend</h3>
-              <p className="text-[11px] text-theme-muted">Search by username to connect</p>
+              <h3 className="font-bold text-sm text-white tracking-tight">Add Contact</h3>
+              <p className="text-[11px] text-zinc-400">Search by username to connect</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
+            className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="p-4 border-b border-[var(--glass-border)] shrink-0">
+        {/* Search Bar */}
+        <div className="p-4 border-b border-white/10 shrink-0">
           <div className="relative flex items-center">
-            <Search size={14} className="absolute left-3 text-theme-muted/50" />
+            <Search size={14} className="absolute left-3.5 text-zinc-500" />
             <input
               type="text"
-              placeholder="Search username..."
+              placeholder="Search username or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
-              className="w-full glass-input rounded-2xl pl-9 pr-8 py-2 text-xs text-theme-main placeholder-theme-muted/40 border border-[var(--glass-border)] focus:outline-none focus:border-accent-primary transition-all"
+              className="w-full bg-white/[0.04] border border-white/10 rounded-2xl pl-10 pr-9 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white transition-all shadow-inner"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 text-theme-muted/60 hover:text-theme-main">
-                <X size={13} />
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 text-zinc-400 hover:text-white"
+              >
+                <X size={14} />
               </button>
             )}
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 bg-[var(--glass-surface)]">
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           {isSearching ? (
-            <div className="flex justify-center p-10"><Loader className="animate-spin text-accent-primary size-6" /></div>
+            <div className="flex justify-center p-10">
+              <Loader className="animate-spin text-white size-6" />
+            </div>
           ) : searchQuery.trim().length === 0 ? (
             <div className="text-center py-12 px-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--glass-hover)] border border-[var(--glass-border)] flex items-center justify-center mx-auto mb-3">
-                <Search size={20} className="text-theme-muted/50" />
+              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 text-zinc-400">
+                <Search size={20} />
               </div>
-              <p className="text-[12px] text-theme-muted/60 font-medium">Type a username to start searching</p>
+              <p className="text-xs text-zinc-400 font-medium">Type a username to start searching</p>
             </div>
           ) : searchResults.length === 0 ? (
             <div className="text-center py-12 px-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--glass-hover)] border border-[var(--glass-border)] flex items-center justify-center mx-auto mb-3">
-                <UserPlus size={20} className="text-theme-muted/30" />
+              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 text-zinc-500">
+                <UserPlus size={20} />
               </div>
-              <p className="text-[12px] text-theme-muted/80 font-medium mb-1">No users found</p>
-              <p className="text-[11px] text-theme-muted/50">Could not find a user with username "{searchQuery}"</p>
+              <p className="text-xs text-zinc-300 font-semibold mb-1">No users found</p>
+              <p className="text-[11px] text-zinc-500">Could not find a user with username "{searchQuery}"</p>
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -108,27 +114,49 @@ const AddFriendModal = ({ onClose }) => {
                 if (isSelf) return null;
 
                 return (
-                  <div key={user._id} className="flex items-center justify-between p-3 rounded-2xl border border-[var(--glass-border)] hover:bg-[var(--glass-hover)] transition-all bg-[var(--glass-heavy)]">
+                  <div
+                    key={user._id}
+                    className="flex items-center justify-between p-3 rounded-2xl border border-white/10 hover:bg-white/5 transition-all bg-white/[0.03]"
+                  >
                     <div className="flex items-center gap-3 min-w-0">
-                      <img src={user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=8083ff&color=ffffff`}
-                        alt={user.username} className="w-10 h-10 rounded-full object-cover border border-[var(--glass-border)] shadow-sm" />
+                      <img
+                        src={
+                          user.profilePic ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=27272a&color=ffffff&bold=true`
+                        }
+                        alt={user.username}
+                        className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-sm"
+                      />
                       <div className="min-w-0">
-                        <p className="text-[13px] font-medium text-theme-main truncate">{user.username}</p>
-                        <p className="text-[11px] text-theme-muted truncate">{user.status || "Available"}</p>
+                        <p className="text-xs font-semibold text-white truncate">{user.username}</p>
+                        <p className="text-[10px] text-zinc-400 truncate">{user.status || "Available"}</p>
                       </div>
                     </div>
                     <div>
                       {isFriend ? (
-                        <span className="text-[11px] font-medium text-status-online bg-status-online/15 px-3 py-1.5 rounded-xl border border-status-online/20">Friend</span>
+                        <span className="text-[11px] font-bold text-black bg-white px-3 py-1 rounded-full shadow-sm">
+                          Contact
+                        </span>
                       ) : isPendingOut ? (
-                        <span className="text-[11px] font-medium text-accent-secondary bg-accent-secondary/15 border border-accent-secondary/30 px-3 py-1.5 rounded-xl">Sent Request</span>
+                        <span className="text-[11px] font-medium text-zinc-400 bg-white/10 border border-white/10 px-3 py-1 rounded-full">
+                          Sent
+                        </span>
                       ) : isPendingIn ? (
-                        <span className="text-[11px] font-medium text-accent-primary bg-accent-primary/15 border border-accent-primary/20 px-3 py-1.5 rounded-xl">Requested</span>
+                        <span className="text-[11px] font-medium text-zinc-200 bg-white/20 border border-white/20 px-3 py-1 rounded-full">
+                          Requested
+                        </span>
                       ) : (
-                        <button onClick={() => handleSendRequest(user._id)} disabled={actionLoadingId === user._id}
-                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-primary hover:bg-accent-primary/85 text-white font-medium text-[12px] shadow-sm shadow-accent-primary/20 transition-all active:scale-[0.97] disabled:opacity-50 cursor-pointer">
-                          {actionLoadingId === user._id ? <Loader size={12} className="animate-spin text-white" /> : <UserPlus size={12} className="text-white" />}
-                          <span className="text-white font-medium">Add</span>
+                        <button
+                          onClick={() => handleSendRequest(user._id)}
+                          disabled={actionLoadingId === user._id}
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-black font-bold text-xs shadow-sm hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          {actionLoadingId === user._id ? (
+                            <Loader size={12} className="animate-spin text-black" />
+                          ) : (
+                            <UserPlus size={12} className="text-black" />
+                          )}
+                          <span>Add</span>
                         </button>
                       )}
                     </div>

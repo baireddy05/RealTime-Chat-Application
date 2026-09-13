@@ -62,7 +62,7 @@ const ChatHeader = memo(() => (
   <div className="pt-6 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
     <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--glass-heavy)] text-zinc-400 text-[11px] max-w-md text-center border border-[var(--glass-border)] shadow-sm">
       <span className="material-symbols-outlined text-zinc-300 text-sm">lock</span>
-      <span>End-to-end encrypted with zero-knowledge keys.</span>
+      <span>Messages and calls are end-to-end encrypted.</span>
     </div>
     <div className="my-1.5">
       <span className="px-3 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono text-[10px] tracking-wider uppercase border border-white/10">
@@ -290,13 +290,9 @@ const ChatPane = ({ onBack }) => {
             <MessageCircle size={40} />
           </div>
           <h2 className="text-2xl font-semibold text-theme-main mb-2 tracking-tight">Pulse Messenger</h2>
-          <p className="text-[13px] text-theme-muted leading-relaxed mb-8">
-            Select a conversation to start messaging with end-to-end encryption.
+          <p className="text-[13px] text-theme-muted leading-relaxed mb-4">
+            Select a conversation to start messaging.
           </p>
-          <div className="flex items-center gap-2 text-[11px] text-theme-muted bg-[var(--glass-surface)] border border-[var(--glass-border)] px-4 py-2 rounded-xl shadow-glass">
-            <Lock size={12} className="text-accent-primary" />
-            <span>End-to-end encrypted</span>
-          </div>
         </div>
       </div>
     );
@@ -535,7 +531,7 @@ const ChatPane = ({ onBack }) => {
           )}
           {selectedChat.type === "room" ? (
             <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-white text-[#0d0c11] font-bold shrink-0 shadow-md">
-              <span className="text-lg">#</span>
+              <span className="material-symbols-outlined text-xl">groups</span>
             </div>
           ) : (
             <div className="relative shrink-0">
@@ -552,21 +548,17 @@ const ChatPane = ({ onBack }) => {
               <h2 className="text-white font-semibold truncate text-base sm:text-lg tracking-tight">
                 {selectedChat.name.replace(/^#/, "")}
               </h2>
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono text-[10px] border border-white/5">
-                <span className="material-symbols-outlined text-xs">verified_user</span>
-                <span>E2EE</span>
-              </span>
             </div>
             <div className="flex items-center gap-1.5 text-zinc-400 text-xs truncate">
               <span className="text-zinc-500 font-bold">•</span>
               <span className="truncate">
                 {selectedChat.type === "room"
-                  ? `${selectedChat.members?.length || 1} online • Channel`
+                  ? `${selectedChat.members?.length || 1} participants • Group`
                   : activeTypers.length > 0
                   ? "typing..."
                   : isUserOnline
-                  ? "Active now"
-                  : "Offline"}
+                  ? "online"
+                  : "offline"}
               </span>
             </div>
           </div>
@@ -956,6 +948,10 @@ const ChatPane = ({ onBack }) => {
                               : isMine
                               ? "border border-white/40 shadow-sm"
                               : ""
+                          } ${
+                            message.isOptimistic || (isMine && index === currentList.length - 1 && (Date.now() - new Date(message.createdAt).getTime() < 3500))
+                              ? "animate-outgoing-glide"
+                              : ""
                           }`}
                         >
                           {!isMine && selectedChat.type === "room" && !message.isDeleted && !isSameSenderAsPrev && (
@@ -1039,9 +1035,13 @@ const ChatPane = ({ onBack }) => {
                                     {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}
                                     <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                     {isMine && !message.isDeleted && (
-                                      <span className={`material-symbols-outlined text-sm ${isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"}`}>
-                                        done_all
-                                      </span>
+                                      message.isOptimistic ? (
+                                        <Clock size={11} className="text-[#52505b] animate-pulse" />
+                                      ) : (
+                                        <span className={`material-symbols-outlined text-sm ${isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"}`}>
+                                          done_all
+                                        </span>
+                                      )
                                     )}
                                   </div>
                                 </div>
@@ -1059,7 +1059,11 @@ const ChatPane = ({ onBack }) => {
                                     {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                   </span>
                                   {isMine && !message.isDeleted && (
-                                    <CheckCheck size={13} className={isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"} />
+                                    message.isOptimistic ? (
+                                      <Clock size={11} className="text-[#52505b] animate-pulse" />
+                                    ) : (
+                                      <CheckCheck size={13} className={isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"} />
+                                    )
                                   )}
                                 </div>
                               )}
@@ -1137,18 +1141,6 @@ const ChatPane = ({ onBack }) => {
                                   >
                                     <Reply size={14} className="text-theme-muted" />
                                     <span>Reply</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      openThread(message);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                                  >
-                                    <MessageSquare size={14} className="text-theme-muted" />
-                                    <span>Reply in Thread</span>
                                   </button>
 
                                   <button

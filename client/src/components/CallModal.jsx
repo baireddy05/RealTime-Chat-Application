@@ -93,21 +93,16 @@ const CallModal = () => {
                 {callType === "video" ? "HD Video" : "Voice"}
               </span>
             </h3>
-            <p className="text-[11px] text-theme-muted flex items-center gap-1">
-              <ShieldCheck size={12} className="text-emerald-400" />
-              <span>End-to-end encrypted call</span>
+            <p className="text-[11px] text-theme-muted">
+              {isConnected ? "Connected" : "Calling..."}
             </p>
           </div>
         </div>
 
-        {/* Status / Duration / Encryption Ribbon (Stitch Specification) */}
+        {/* Status / Duration */}
         <div className="flex items-center gap-2">
           <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-variant font-mono text-[10.5px] text-secondary font-semibold border border-[var(--glass-border)]">
             1080p 60fps
-          </span>
-          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-container/30 text-tertiary font-mono text-[10.5px] border border-tertiary/20">
-            <ShieldCheck size={12} />
-            <span>DTLS-SRTP E2EE</span>
           </span>
           <div className="px-3.5 py-1 rounded-full bg-[var(--glass-surface)] border border-[var(--glass-border)] shadow-sm">
             <span className="text-xs font-mono font-medium tracking-wide">

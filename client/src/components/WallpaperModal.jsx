@@ -31,44 +31,47 @@ const WallpaperModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-2xl animate-fadeIn select-none"
+    >
       <div
-        className="w-full max-w-lg bg-[var(--glass-heavy)] border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn smooth-gpu"
+        className="w-full max-w-lg bg-[#121117]/95 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[var(--glass-border)] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-white text-black flex items-center justify-center font-bold shadow-md">
               <Palette size={18} />
             </div>
             <div>
-              <h3 className="text-[15px] font-semibold text-theme-main">Chat Wallpaper</h3>
-              <p className="text-[12px] text-theme-muted">
+              <h3 className="font-bold text-sm text-white tracking-tight">Chat Wallpaper</h3>
+              <p className="text-[11px] text-zinc-400">
                 {selectedChat ? `Customizing for ${selectedChat.name}` : "Global Chat Backdrop"}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main transition-colors"
+            className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
         {/* Preset Cards Grid */}
-        <div className="p-6 overflow-y-auto space-y-4">
-          <div className="flex items-center justify-between text-[12px] text-theme-muted mb-1">
-            <span>Liquid Glass Gradient Presets</span>
+        <div className="p-6 overflow-y-auto space-y-4 custom-scrollbar">
+          <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
+            <span>Atmospheric Wallpaper Presets</span>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={applyGlobally}
                 onChange={(e) => setApplyGlobally(e.target.checked)}
-                className="rounded border-[var(--glass-border)] accent-accent-primary"
+                className="rounded border-white/20 accent-white"
               />
-              <span className="text-theme-main text-[11px] font-medium">Apply to all chats</span>
+              <span className="text-white text-[11px] font-medium">Apply to all chats</span>
             </label>
           </div>
 
@@ -81,8 +84,8 @@ const WallpaperModal = ({ isOpen, onClose }) => {
                   onClick={() => handleSelect(preset.id)}
                   className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-28 relative overflow-hidden group active:scale-[0.98] ${
                     isSelected
-                      ? "border-accent-primary ring-2 ring-accent-primary/30 bg-accent-primary/10 shadow-lg"
-                      : "border-[var(--glass-border)] hover:border-accent-primary/50 bg-[var(--glass-surface)]"
+                      ? "border-white ring-2 ring-white/30 bg-white/10 shadow-lg"
+                      : "border-white/10 hover:border-white/30 bg-white/[0.03]"
                   }`}
                 >
                   <div
@@ -90,14 +93,14 @@ const WallpaperModal = ({ isOpen, onClose }) => {
                     style={{ background: preset.previewGradient }}
                   />
                   <div className="relative z-10 flex justify-between items-start">
-                    <span className="text-[13px] font-semibold text-theme-main">{preset.name}</span>
+                    <span className="text-xs font-semibold text-white">{preset.name}</span>
                     {isSelected && (
-                      <div className="w-5 h-5 rounded-full bg-accent-primary text-white flex items-center justify-center shadow">
+                      <div className="w-5 h-5 rounded-full bg-white text-black flex items-center justify-center shadow font-bold">
                         <Check size={12} strokeWidth={3} />
                       </div>
                     )}
                   </div>
-                  <p className="relative z-10 text-[11px] text-theme-muted/80 line-clamp-2">
+                  <p className="relative z-10 text-[11px] text-zinc-400 line-clamp-2">
                     {preset.description}
                   </p>
                 </div>
@@ -106,10 +109,10 @@ const WallpaperModal = ({ isOpen, onClose }) => {
           </div>
 
           {/* Custom Image URL */}
-          <div className="pt-2 border-t border-[var(--glass-border)]">
-            <label className="block text-[12px] font-medium text-theme-main mb-1.5 flex items-center gap-1.5">
-              <ImageIcon size={13} className="text-accent-primary" />
-              <span>Or Custom Background Image URL</span>
+          <div className="pt-3 border-t border-white/10">
+            <label className="block text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
+              <ImageIcon size={14} className="text-white" />
+              <span>Or Custom Image URL</span>
             </label>
             <div className="flex gap-2">
               <input
@@ -117,12 +120,12 @@ const WallpaperModal = ({ isOpen, onClose }) => {
                 placeholder="https://images.unsplash.com/photo-..."
                 value={customUrl}
                 onChange={(e) => setCustomUrl(e.target.value)}
-                className="flex-1 glass-input rounded-xl px-3.5 py-2 text-[12px] text-theme-main border border-[var(--glass-border)] focus:outline-none focus:border-accent-primary transition-all"
+                className="flex-1 bg-white/[0.04] border border-white/10 rounded-2xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white transition-all shadow-inner"
               />
               <button
                 onClick={handleCustomApply}
                 disabled={!customUrl.trim()}
-                className="px-4 py-2 rounded-xl bg-accent-primary text-white text-[12px] font-medium hover:bg-accent-primary/90 disabled:opacity-50 transition-all"
+                className="px-5 py-2 rounded-full bg-white text-black font-bold text-xs hover:bg-zinc-200 disabled:opacity-40 transition-all shadow-md active:scale-95"
               >
                 Apply
               </button>
@@ -131,10 +134,10 @@ const WallpaperModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-[var(--glass-border)] flex justify-end">
+        <div className="px-6 py-3.5 border-t border-white/10 flex justify-end bg-white/[0.02]">
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-accent-primary text-white text-[13px] font-medium hover:bg-accent-primary/90 transition-all shadow-md active:scale-95"
+            className="px-6 py-2 rounded-full bg-white text-black text-xs font-bold hover:bg-zinc-200 transition-all shadow-md active:scale-95"
           >
             Done
           </button>

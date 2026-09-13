@@ -84,10 +84,20 @@ export const useFriendStore = create((set, get) => ({
         searchResults: updatedResults,
         outgoingRequests: [...outgoingRequests, res.data],
       });
+      get().getFriendRequests();
       return { success: true };
     } catch (error) {
       console.error("Error sending friend request:", error);
-      return { success: false, message: error.response?.data?.message || "Failed to send request" };
+      const msg = error.response?.data?.message || "Failed to send request";
+      if (msg.includes("already pending") || msg.includes("already friends")) {
+        const { searchResults } = get();
+        const updatedResults = searchResults.map((u) =>
+          u._id === targetUserId ? { ...u, relationship: msg.includes("already friends") ? "friend" : "pending_outgoing" } : u
+        );
+        set({ searchResults: updatedResults });
+        get().getFriendRequests();
+      }
+      return { success: false, message: msg };
     }
   },
 

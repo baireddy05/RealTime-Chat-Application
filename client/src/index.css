@@ -51,16 +51,16 @@
   --status-online-rgb: 255 255 255;
   --status-offline-rgb: 107 103 117;
 
-  /* Specific Glass Layer Opacities: Whole Foreground with 20% Transparency (80% opacity) */
-  --glass-panel: rgba(18, 17, 23, 0.80);
-  --glass-sidebar: rgba(18, 17, 23, 0.80);
-  --glass-chat: rgba(15, 14, 20, 0.80);
-  --glass-header: rgba(18, 17, 23, 0.80);
-  --glass-heavy: rgba(26, 25, 33, 0.80);
-  --glass-input: rgba(24, 23, 30, 0.80);
-  --glass-hover: rgba(255, 255, 255, 0.06);
-  --glass-active: rgba(255, 255, 255, 0.10);
-  --modal-backdrop: rgba(18, 17, 23, 0.85);
+  /* Specific Glass Layer Opacities: Real Liquid-Glass Refraction */
+  --glass-panel: rgba(14, 13, 19, 0.70);
+  --glass-sidebar: rgba(14, 13, 19, 0.70);
+  --glass-chat: rgba(12, 11, 16, 0.68);
+  --glass-header: rgba(14, 13, 19, 0.74);
+  --glass-heavy: rgba(20, 19, 26, 0.75);
+  --glass-input: rgba(22, 21, 28, 0.75);
+  --glass-hover: rgba(255, 255, 255, 0.08);
+  --glass-active: rgba(255, 255, 255, 0.12);
+  --modal-backdrop: rgba(10, 9, 14, 0.82);
 
   /* Liquid Glass Pill Active / Inactive (Matching Reference White Pill) */
   --pill-active-bg: #ffffff;
@@ -415,60 +415,117 @@
     to   { opacity: 1; transform: scale(1) translateY(0); }
   }
 
-  @keyframes bgPulseGlow1 {
-    0%, 100% {
-      transform: translate(-50%, -50%) scale(0.85);
-      opacity: 0.16;
-    }
-    50% {
-      transform: translate(-50%, -50%) scale(1.3);
-      opacity: 0.42;
-    }
-  }
-
-  @keyframes bgPulseGlow2 {
-    0%, 100% {
-      transform: translate(-50%, -50%) scale(1.25);
-      opacity: 0.10;
-    }
-    50% {
-      transform: translate(-50%, -50%) scale(0.8);
-      opacity: 0.35;
-    }
-  }
-
-  @keyframes bgPulseWave {
+  /* ── Single Liquid Glass Typing Wave (Slow, Graceful & Single Wave) ── */
+  @keyframes singleTypingWave {
     0% {
-      transform: translate(-50%, -50%) scale(0.4);
-      opacity: 0.45;
+      transform: scale(0.04);
+      opacity: 0.95;
     }
-    50% {
-      opacity: 0.20;
+    35% {
+      opacity: 0.65;
     }
     100% {
-      transform: translate(-50%, -50%) scale(1.8);
+      transform: scale(2.4);
       opacity: 0;
     }
   }
 
-  .animate-bg-pulse-1 {
-    animation: bgPulseGlow1 6s ease-in-out infinite;
+  .animate-single-typing-wave {
+    animation: singleTypingWave 2.0s cubic-bezier(0.12, 0.85, 0.22, 1) forwards;
+    transform-origin: center center;
+    will-change: transform, opacity;
   }
 
-  .animate-bg-pulse-2 {
-    animation: bgPulseGlow2 8s ease-in-out infinite;
+  /* ── Expanding Home Logo Pulse Animation (Radiating strictly from the logo across UI Background) ── */
+  @keyframes homeLogoPulseWave {
+    0% {
+      transform: scale(0.12);
+      opacity: 0.85;
+    }
+    45% {
+      opacity: 0.35;
+    }
+    100% {
+      transform: scale(3.8);
+      opacity: 0;
+    }
   }
 
-  .animate-bg-pulse-wave-1 {
-    animation: bgPulseWave 6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  @keyframes homeLogoGlowBreath {
+    0%, 100% {
+      transform: scale(0.85);
+      opacity: 0.18;
+    }
+    50% {
+      transform: scale(1.25);
+      opacity: 0.45;
+    }
   }
 
-  .animate-bg-pulse-wave-2 {
-    animation: bgPulseWave 6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite 2s;
+  .animate-home-logo-wave-1 {
+    animation: homeLogoPulseWave 6.5s cubic-bezier(0.15, 0.85, 0.25, 1) infinite;
+    transform-origin: center center;
+    will-change: transform, opacity;
   }
 
-  .animate-bg-pulse-wave-3 {
-    animation: bgPulseWave 6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite 4s;
+  .animate-home-logo-wave-2 {
+    animation: homeLogoPulseWave 6.5s cubic-bezier(0.15, 0.85, 0.25, 1) infinite 2.15s;
+    transform-origin: center center;
+    will-change: transform, opacity;
+  }
+
+  .animate-home-logo-wave-3 {
+    animation: homeLogoPulseWave 6.5s cubic-bezier(0.15, 0.85, 0.25, 1) infinite 4.3s;
+    transform-origin: center center;
+    will-change: transform, opacity;
+  }
+
+  .animate-home-logo-breath {
+    animation: homeLogoGlowBreath 6.5s ease-in-out infinite;
+    transform-origin: center center;
+    will-change: transform, opacity;
+  }
+
+  /* ── Smooth Message Box to Chat Transition Animations ── */
+  @keyframes outgoingBubbleGlide {
+    0% {
+      opacity: 0;
+      transform: translateY(28px) scale(0.92);
+      filter: blur(2px);
+    }
+    60% {
+      opacity: 0.95;
+      transform: translateY(-2px) scale(1.01);
+      filter: blur(0px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0px);
+    }
+  }
+
+  @keyframes incomingBubbleGlide {
+    0% {
+      opacity: 0;
+      transform: translateY(14px) scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-outgoing-glide {
+    animation: outgoingBubbleGlide 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: right bottom;
+    will-change: transform, opacity;
+  }
+
+  .animate-incoming-glide {
+    animation: incomingBubbleGlide 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: left bottom;
+    will-change: transform, opacity;
   }
 
   .interactive-btn {

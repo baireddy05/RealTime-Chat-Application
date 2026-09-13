@@ -318,10 +318,12 @@ export const useChatStore = create((set, get) => ({
     if (isSending) return; // Prevent concurrent sends at store level
 
     set({ isSending: true });
+    const authUser = useAuthStore.getState().authUser;
+    let textToSend = messageData.text || "";
+    const originalText = textToSend;
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
     try {
-      const authUser = useAuthStore.getState().authUser;
-      let textToSend = messageData.text || "";
-      const originalText = textToSend;
       let isEncrypted = false;
 
       // Encrypt all outgoing message text by default like WhatsApp
@@ -348,6 +350,40 @@ export const useChatStore = create((set, get) => ({
       if (selectedChat.type === "room") {
         payload.roomId = selectedChat.id;
       }
+
+      // Optimistic Message: Immediately add to chat stream for smooth zero-latency transition
+      if (!messageData.scheduledFor) {
+        const optimisticMsg = {
+          _id: tempId,
+          tempId,
+          text: textToSend,
+          decryptedText: originalText,
+          senderId: {
+            _id: authUser._id,
+            username: authUser.username,
+            profilePic: authUser.profilePic,
+          },
+          image: messageData.image || null,
+          file: messageData.file || null,
+          audio: messageData.audio || null,
+          createdAt: new Date().toISOString(),
+          replyTo: payload.replyTo || null,
+          isOptimistic: true,
+          status: "sending",
+          reactions: [],
+        };
+
+        set((state) => ({
+          messages: [...state.messages, optimisticMsg],
+          lastMessages: {
+            ...state.lastMessages,
+            [selectedChat.id]: optimisticMsg,
+          },
+          replyingTo: null,
+        }));
+        soundManager.playSendSound();
+        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+      }
         
       const endpoint = `/chat/send/${selectedChat.type === "user" ? selectedChat.id : ""}`;
       const res = await axiosInstance.post(endpoint, payload);
@@ -359,14 +395,25 @@ export const useChatStore = create((set, get) => ({
 
       if (res.data.isScheduled) {
         set((state) => ({
+          messages: state.messages.filter((m) => m._id !== tempId),
           scheduledMessages: [...state.scheduledMessages, msgDataWithDecrypted],
           replyingTo: null,
         }));
       } else {
         set((state) => {
-          const alreadyExists = state.messages.some((m) => m._id === msgDataWithDecrypted._id);
+          let replaced = false;
+          const updated = state.messages.map((m) => {
+            if (m._id === tempId || (m.isOptimistic && m.tempId === tempId)) {
+              replaced = true;
+              return msgDataWithDecrypted;
+            }
+            return m;
+          });
+          const alreadyExists = updated.some((m) => m._id === msgDataWithDecrypted._id);
           return {
-            messages: alreadyExists ? state.messages : [...state.messages, msgDataWithDecrypted],
+            messages: alreadyExists
+              ? (replaced ? updated : updated.filter((m) => m._id !== tempId))
+              : [...updated.filter((m) => m._id !== tempId), msgDataWithDecrypted],
             lastMessages: {
               ...state.lastMessages,
               [selectedChat.id]: msgDataWithDecrypted,
@@ -374,11 +421,14 @@ export const useChatStore = create((set, get) => ({
             replyingTo: null,
           };
         });
-        soundManager.playSendSound();
       }
       return { success: true, data: msgDataWithDecrypted };
     } catch (error) {
-      console.error(error);
+      console.error("Error sending message:", error);
+      // Remove optimistic placeholder on failure
+      set((state) => ({
+        messages: state.messages.filter((m) => m._id !== tempId),
+      }));
       return { success: false, error: error.message };
     } finally {
       set({ isSending: false });

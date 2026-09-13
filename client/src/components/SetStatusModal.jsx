@@ -14,7 +14,7 @@ const STATUS_PRESETS = [
 
 const SetStatusModal = ({ onClose }) => {
   const { authUser, updateProfile } = useAuthStore();
-  const [statusText, setStatusText] = useState(authUser?.status || "Building Liquid Glass UI");
+  const [statusText, setStatusText] = useState(authUser?.status || "Available");
   const [selectedEmoji, setSelectedEmoji] = useState("💻");
   const [selectedTitle, setSelectedTitle] = useState("Coding");
   const [isSaving, setIsSaving] = useState(false);
@@ -41,11 +41,11 @@ const SetStatusModal = ({ onClose }) => {
   };
 
   const handleClear = async () => {
-    setStatusText("Online");
+    setStatusText("Available");
     setSelectedEmoji("⚡");
     setSelectedTitle("Active");
     try {
-      await updateProfile({ status: "⚡ Active: Online" });
+      await updateProfile({ status: "⚡ Active: Available" });
       onClose();
     } catch (err) {
       console.error("Failed to clear status:", err);
@@ -55,33 +55,32 @@ const SetStatusModal = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4 animate-fadeIn select-none overflow-y-auto"
     >
       <section
         onClick={(e) => e.stopPropagation()}
-        className="relative overflow-hidden rounded-xl bg-surface-container/90 backdrop-blur-2xl p-6 sm:p-gutter-lg shadow-2xl border border-outline/10 text-on-surface max-w-2xl w-full animate-scaleIn my-8"
+        className="relative overflow-hidden rounded-3xl bg-[#121117]/95 backdrop-blur-3xl p-6 sm:p-7 shadow-2xl border border-white/10 text-white max-w-2xl w-full animate-scaleIn my-8"
       >
-        {/* Optical Specular Highlight Line inside Card */}
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
-        <div className="absolute -top-32 -left-32 w-64 h-64 bg-primary-container/20 rounded-full blur-3xl pointer-events-none" />
+        {/* Specular Highlight */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-outline/10">
-          <div className="flex items-center gap-space-md">
-            <div className="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center text-secondary shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
-              <span className="material-symbols-outlined">sentiment_satisfied</span>
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white text-black flex items-center justify-center font-bold shadow-md">
+              <span className="material-symbols-outlined text-xl">sentiment_satisfied</span>
             </div>
             <div>
-              <div className="flex items-center gap-space-xs">
+              <div className="flex items-center gap-1.5">
                 <span className="text-xs">✨</span>
-                <span className="font-label-caps text-[10px] uppercase text-secondary font-bold tracking-wider">Presence State</span>
+                <span className="text-[10px] uppercase text-zinc-400 font-bold tracking-wider">Presence State</span>
               </div>
-              <h3 className="font-headline-md text-headline-md font-semibold text-on-surface text-lg sm:text-xl">Set Status Mood</h3>
+              <h3 className="font-bold text-lg sm:text-xl text-white tracking-tight">Set Status Mood</h3>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-surface-container-high hover:bg-surface-variant text-on-surface-variant hover:text-on-surface transition-colors"
+            className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
             title="Close Modal"
             type="button"
           >
@@ -90,48 +89,48 @@ const SetStatusModal = ({ onClose }) => {
         </div>
 
         {/* Avatar Preview with Live Status Pill */}
-        <div className="flex flex-wrap items-center justify-between gap-space-md p-space-md rounded-xl bg-surface-container-low/80 backdrop-blur-xl mb-4 border border-outline/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]">
-          <div className="flex items-center gap-space-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-xl mb-4 border border-white/10">
+          <div className="flex items-center gap-3">
             <div className="relative">
               <img
-                className="w-12 h-12 rounded-2xl object-cover shadow-md"
+                className="w-12 h-12 rounded-2xl object-cover border border-white/10 shadow-md"
                 alt="Avatar"
                 src={
                   authUser?.profilePic ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=8083ff&color=ffffff`
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=27272a&color=ffffff`
                 }
               />
-              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-tertiary ring-2 ring-surface-container-low" />
+              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-white ring-2 ring-[#121117]" />
             </div>
             <div>
-              <div className="font-title-sm text-sm font-semibold text-on-surface">{authUser?.username}</div>
-              <div className="font-label-mono text-xs text-outline">{authUser?.email || "verified client"}</div>
+              <div className="text-sm font-semibold text-white">{authUser?.username}</div>
+              <div className="text-xs text-zinc-400 font-mono">{authUser?.email || "verified client"}</div>
             </div>
           </div>
 
           {/* Live Status Pill Preview */}
-          <div className="flex items-center gap-space-sm px-space-md py-space-sm rounded-full bg-surface-variant text-on-surface shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)]">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/10 text-white shadow-sm">
             <span className="text-base">{selectedEmoji}</span>
-            <span className="font-body-md text-xs sm:text-sm text-on-surface font-medium max-w-[160px] truncate">
-              {selectedTitle}: {statusText || "Active"}
+            <span className="text-xs sm:text-sm text-white font-medium max-w-[160px] truncate">
+              {selectedTitle}: {statusText || "Available"}
             </span>
-            <span className="font-label-mono text-[10px] text-secondary font-semibold ml-space-xs">LIVE</span>
+            <span className="text-[10px] text-zinc-400 font-mono font-bold ml-1">LIVE</span>
           </div>
         </div>
 
         {/* Custom Status Input with Character Counter */}
         <div className="mb-5">
-          <div className="flex justify-between items-center mb-space-xs">
-            <label className="font-label-caps text-[10px] uppercase text-on-surface-variant font-bold tracking-wider" htmlFor="custom-status">
+          <div className="flex justify-between items-center mb-1.5">
+            <label className="text-[10px] uppercase text-zinc-400 font-bold tracking-wider" htmlFor="custom-status">
               Custom Broadcast Status
             </label>
-            <span className="font-label-mono text-xs text-secondary">{statusText.length} / 60</span>
+            <span className="font-mono text-xs text-zinc-500">{statusText.length} / 60</span>
           </div>
           <div className="relative flex items-center">
             <span className="absolute left-3 text-base">💭</span>
             <input
               id="custom-status"
-              className="w-full pl-10 pr-20 py-2.5 rounded-xl bg-surface-container-lowest/80 text-on-surface placeholder:text-outline font-body-md text-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] border border-outline/10"
+              className="w-full pl-10 pr-20 py-2.5 rounded-2xl bg-white/[0.04] text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:border-white border border-white/10 shadow-inner"
               maxLength={60}
               type="text"
               value={statusText}
@@ -145,7 +144,7 @@ const SetStatusModal = ({ onClose }) => {
               <button
                 type="button"
                 onClick={() => setStatusText("")}
-                className="absolute right-3 text-outline hover:text-on-surface text-[11px] font-label-mono uppercase tracking-wider"
+                className="absolute right-3 text-zinc-400 hover:text-white text-[11px] font-mono uppercase tracking-wider"
               >
                 Clear
               </button>
@@ -153,9 +152,9 @@ const SetStatusModal = ({ onClose }) => {
           </div>
         </div>
 
-        {/* 8 Preset Mood Cards Grid (Stitch Specification) */}
+        {/* 8 Preset Mood Cards Grid */}
         <div className="mb-6">
-          <div className="font-label-caps text-[10px] uppercase text-outline mb-2 font-bold tracking-wider">
+          <div className="text-[10px] uppercase text-zinc-400 mb-2 font-bold tracking-wider">
             Select Ambient Preset
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -166,25 +165,25 @@ const SetStatusModal = ({ onClose }) => {
                   key={preset.title}
                   type="button"
                   onClick={() => handleSelectPreset(preset)}
-                  className={`text-left p-3 rounded-xl transition-all flex flex-col justify-between gap-1.5 border ${
+                  className={`text-left p-3 rounded-2xl transition-all flex flex-col justify-between gap-1.5 border ${
                     isSelected
-                      ? "bg-primary-container/20 text-on-surface border-primary ring-1 ring-primary shadow-lg"
-                      : "bg-surface-container-low/70 hover:bg-surface-container-high/80 text-on-surface border-outline/10 shadow-sm"
+                      ? "bg-white/15 text-white border-white/30 ring-1 ring-white/40 shadow-lg"
+                      : "bg-white/[0.03] hover:bg-white/[0.07] text-zinc-300 hover:text-white border-white/10 shadow-sm"
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-xl p-1.5 rounded-lg bg-surface-container-highest shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]">
+                    <span className="text-xl p-1.5 rounded-xl bg-white/5 border border-white/10">
                       {preset.emoji}
                     </span>
-                    <span className={`material-symbols-outlined text-base ${isSelected ? "text-primary" : "text-outline"}`}>
+                    <span className={`material-symbols-outlined text-base ${isSelected ? "text-white" : "text-zinc-600"}`}>
                       {isSelected ? "check_circle" : "radio_button_unchecked"}
                     </span>
                   </div>
                   <div>
-                    <div className={`font-title-sm text-xs font-semibold ${isSelected ? "text-primary" : "text-on-surface"}`}>
+                    <div className={`text-xs font-semibold ${isSelected ? "text-white" : "text-zinc-200"}`}>
                       {preset.title}
                     </div>
-                    <div className="font-label-mono text-[10px] text-on-surface-variant line-clamp-1">
+                    <div className="font-mono text-[10px] text-zinc-400 line-clamp-1">
                       {preset.desc}
                     </div>
                   </div>
@@ -195,21 +194,21 @@ const SetStatusModal = ({ onClose }) => {
         </div>
 
         {/* Action Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-space-md pt-4 border-t border-outline/10">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/10">
           <button
             type="button"
             onClick={handleClear}
-            className="flex items-center gap-space-xs px-space-md py-space-xs rounded-full bg-surface-container-high/60 text-outline hover:text-error hover:bg-error-container/20 transition-colors font-title-sm text-xs"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 border border-white/10 transition-colors text-xs font-medium"
           >
             <span className="material-symbols-outlined text-sm">delete_sweep</span>
             <span>Clear Status</span>
           </button>
 
-          <div className="flex items-center gap-space-sm ml-auto">
+          <div className="flex items-center gap-2.5 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-full text-on-surface-variant hover:text-on-surface transition-colors font-title-sm text-xs"
+              className="px-5 py-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 border border-white/10 transition-colors text-xs font-semibold"
             >
               Cancel
             </button>
@@ -217,7 +216,7 @@ const SetStatusModal = ({ onClose }) => {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-6 py-2 rounded-full bg-gradient-to-r from-primary-container via-primary to-secondary text-on-primary-container font-semibold shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_16px_rgba(99,102,241,0.3)] hover:opacity-90 active:scale-95 transition-all font-title-sm text-xs disabled:opacity-50"
+              className="px-6 py-2.5 rounded-full bg-white text-black font-bold hover:bg-zinc-200 active:scale-95 shadow-md transition-all text-xs disabled:opacity-50"
             >
               {isSaving ? "Saving..." : "Save Status"}
             </button>
