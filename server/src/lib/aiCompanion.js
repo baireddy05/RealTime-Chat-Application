@@ -77,7 +77,7 @@ export const handleAiMention = async ({ text, roomId, receiverId, senderUser, pa
       } 
       // 2. Translation
       else if (lowerPrompt.startsWith("translate")) {
-        const parts = prompt.replace(/^translate\s*/i, "").split(/[:\-]/);
+        const parts = prompt.replace(/^translate\s*/i, "").split(/[:-]/);
         const targetLang = parts[0]?.trim() || "Spanish";
         const contentToTranslate = parts.slice(1).join(":").trim() || "Hello, how are you?";
         

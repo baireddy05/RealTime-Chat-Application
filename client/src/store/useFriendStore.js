@@ -144,6 +144,8 @@ export const useFriendStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
 
+    get().unsubscribeFromFriendEvents();
+
     socket.on("newFriendRequest", (request) => {
       const { incomingRequests } = get();
       if (!incomingRequests.some((r) => r._id === request._id)) {
@@ -164,6 +166,18 @@ export const useFriendStore = create((set, get) => ({
       const { friends } = get();
       set({ friends: friends.filter((f) => f._id !== userId) });
     });
+
+    socket.on("userUpdated", (updatedUser) => {
+      if (!updatedUser?._id) return;
+      const { friends } = get();
+      set({
+        friends: friends.map((f) => (f._id === updatedUser._id ? { ...f, ...updatedUser } : f)),
+      });
+      const authUser = useAuthStore.getState().authUser;
+      if (authUser && authUser._id === updatedUser._id) {
+        useAuthStore.setState({ authUser: { ...authUser, ...updatedUser } });
+      }
+    });
   },
 
   unsubscribeFromFriendEvents: () => {
@@ -172,5 +186,6 @@ export const useFriendStore = create((set, get) => ({
     socket.off("newFriendRequest");
     socket.off("friendRequestAccepted");
     socket.off("friendRemoved");
+    socket.off("userUpdated");
   },
 }));

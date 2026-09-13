@@ -5,13 +5,12 @@ import { getReceiverSocketId, io } from "../lib/socket.js";
 // Get logged in user's friends
 export const getFriends = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate(
-      "friends",
-      "username email profilePic status bio"
-    );
+    const user = await User.findById(req.user._id)
+      .populate("friends", "username email profilePic status bio")
+      .lean();
     // Deduplicate friends (in case of legacy duplicates in the array)
     const seen = new Set();
-    const uniqueFriends = (user.friends || []).filter((f) => {
+    const uniqueFriends = (user?.friends || []).filter((f) => {
       const id = f._id.toString();
       if (seen.has(id)) return false;
       seen.add(id);
@@ -32,12 +31,16 @@ export const getFriendRequests = async (req, res) => {
     const incoming = await FriendRequest.find({
       receiver: userId,
       status: "pending",
-    }).populate("sender", "username email profilePic status bio");
+    })
+      .populate("sender", "username email profilePic status bio")
+      .lean();
 
     const outgoing = await FriendRequest.find({
       sender: userId,
       status: "pending",
-    }).populate("receiver", "username email profilePic status bio");
+    })
+      .populate("receiver", "username email profilePic status bio")
+      .lean();
 
     res.status(200).json({ incoming, outgoing });
   } catch (error) {
@@ -62,16 +65,17 @@ export const searchUsers = async (req, res) => {
       $or: [{ username: searchRegex }, { email: searchRegex }],
     })
       .select("username email profilePic status bio friends")
-      .limit(15);
+      .limit(15)
+      .lean();
 
-    const currentUser = await User.findById(currentUserId);
+    const currentUser = await User.findById(currentUserId).select("friends").lean();
     const existingRequests = await FriendRequest.find({
       $or: [
         { sender: currentUserId, receiver: { $in: foundUsers.map((u) => u._id) } },
         { receiver: currentUserId, sender: { $in: foundUsers.map((u) => u._id) } },
       ],
       status: "pending",
-    });
+    }).lean();
 
     const results = foundUsers.map((user) => {
       let relationship = "none";
@@ -188,9 +192,8 @@ export const acceptFriendRequest = async (req, res) => {
     const updatedSender = await User.findById(friendRequest.sender).select("username email profilePic status bio");
     const updatedReceiver = await User.findById(currentUserId).select("username email profilePic status bio");
 
-    // Real-time socket notification to both parties
+    // Real-time socket notification to sender
     const senderSocketId = getReceiverSocketId(friendRequest.sender.toString());
-    const receiverSocketId = getReceiverSocketId(currentUserId.toString());
 
     // Only notify the original sender — the acceptor (receiver) already
     // updates their own state from the HTTP response, so emitting to them

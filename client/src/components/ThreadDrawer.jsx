@@ -5,10 +5,6 @@ import {
   Send,
   Loader,
   Lock,
-  Bot,
-  Sparkles,
-  Paperclip,
-  Smile,
   FileText,
   Download,
 } from "lucide-react";
@@ -47,8 +43,7 @@ const ThreadDrawer = ({ onClose }) => {
   const parentSender = activeThreadMessage.senderId?.username || "Pulse User";
   const parentAvatar =
     activeThreadMessage.senderId?.profilePic ||
-    "https://api.dicebear.com/7.x/bottts/svg?seed=" + parentSender;
-  const isParentAi = activeThreadMessage.isAiResponse || parentSender === "Pulse AI";
+    "https://api.dicebear.com/7.x/bottts/svg?seed=" + encodeURIComponent(parentSender);
 
   const handleSend = async (e) => {
     e?.preventDefault();
@@ -70,11 +65,6 @@ const ThreadDrawer = ({ onClose }) => {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const insertPulseMention = () => {
-    setReplyText((prev) => (prev ? `${prev} @pulse ` : "@pulse "));
-    inputRef.current?.focus();
   };
 
   return (
@@ -131,12 +121,6 @@ const ThreadDrawer = ({ onClose }) => {
                     <span className="text-xs font-semibold text-accent-primary">
                       {parentSender}
                     </span>
-                    {isParentAi && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30">
-                        <Bot size={10} />
-                        Pulse AI
-                      </span>
-                    )}
                   </div>
                   <span className="text-[10px] text-theme-muted flex-shrink-0">
                     {new Date(activeThreadMessage.createdAt).toLocaleTimeString([], {
@@ -221,10 +205,9 @@ const ThreadDrawer = ({ onClose }) => {
             threadReplies.map((reply) => {
               const replySender = reply.senderId?.username || "Pulse User";
               const isMe = (reply.senderId?._id || reply.senderId) === authUser?._id;
-              const isReplyAi = reply.isAiResponse || replySender === "Pulse AI";
               const avatar =
                 reply.senderId?.profilePic ||
-                "https://api.dicebear.com/7.x/bottts/svg?seed=" + replySender;
+                "https://api.dicebear.com/7.x/bottts/svg?seed=" + encodeURIComponent(replySender);
 
               return (
                 <div
@@ -241,8 +224,6 @@ const ThreadDrawer = ({ onClose }) => {
                     className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
                       isMe
                         ? "bg-accent-primary text-white rounded-tr-sm"
-                        : isReplyAi
-                        ? "bg-gradient-to-br from-emerald-500/10 via-[var(--glass-surface)] to-teal-500/10 border border-emerald-500/30 text-theme-main rounded-tl-sm"
                         : "bg-[var(--glass-surface)] border border-[var(--glass-border)] text-theme-main rounded-tl-sm"
                     }`}
                   >
@@ -255,19 +236,11 @@ const ThreadDrawer = ({ onClose }) => {
                         className={`font-semibold text-[11px] ${
                           isMe
                             ? "text-white"
-                            : isReplyAi
-                            ? "text-emerald-400 font-bold"
                             : "text-accent-primary"
                         }`}
                       >
                         {isMe ? "You" : replySender}
                       </span>
-
-                      {isReplyAi && (
-                        <span className="inline-flex items-center gap-0.5 px-1 rounded-full text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          <Bot size={9} /> AI
-                        </span>
-                      )}
 
                       <span className="text-[10px] opacity-75">
                         {new Date(reply.createdAt).toLocaleTimeString([], {
@@ -329,17 +302,8 @@ const ThreadDrawer = ({ onClose }) => {
 
         {/* Thread Reply Composer */}
         <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--glass-surface)]/90 backdrop-blur-xl flex-shrink-0">
-          {/* Quick AI & Security Badges */}
-          <div className="flex items-center justify-between mb-2 px-1">
-            <button
-              type="button"
-              onClick={insertPulseMention}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors"
-            >
-              <Sparkles size={10} />
-              Ask @pulse in thread
-            </button>
-
+          {/* Security Badge */}
+          <div className="flex items-center justify-end mb-2 px-1">
             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
               <Lock size={10} />
               End-to-end encrypted

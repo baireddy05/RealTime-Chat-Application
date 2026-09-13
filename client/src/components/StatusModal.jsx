@@ -58,7 +58,7 @@ const StatusModal = ({ onClose }) => {
           user: authUser?.username || "You",
           avatar:
             authUser?.profilePic ||
-            `https://ui-avatars.com/api/?name=${authUser?.username || "User"}&background=2563eb&color=ffffff`,
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`,
           stories: myStories,
         }
       : networkPersons[activeViewer.personIndex]
@@ -431,7 +431,7 @@ const StatusModal = ({ onClose }) => {
                       <img
                         src={
                           authUser?.profilePic ||
-                          `https://ui-avatars.com/api/?name=${authUser?.username || "User"}&background=2563eb&color=ffffff`
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`
                         }
                         alt="My Status"
                         className="w-10 h-10 rounded-full object-cover ring-2 ring-accent-primary p-0.5"
@@ -463,7 +463,7 @@ const StatusModal = ({ onClose }) => {
                     <img
                       src={
                         authUser?.profilePic ||
-                        `https://ui-avatars.com/api/?name=${authUser?.username || "User"}&background=2563eb&color=ffffff`
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`
                       }
                       alt="My Avatar"
                       className="w-10 h-10 rounded-full object-cover border border-[var(--glass-border)]"

@@ -2,7 +2,6 @@ import Message from "../models/Message.model.js";
 import User from "../models/User.model.js";
 import Room from "../models/Room.model.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
-import { handleAiMention } from "../lib/aiCompanion.js";
 
 export const getUsersForSidebar = async (req, res) => {
   try {
@@ -51,21 +50,22 @@ export const getRooms = async (req, res) => {
     const rooms = await Room.find()
       .populate("members", "username profilePic status")
       .populate("createdBy", "username profilePic")
-      .populate("admins", "username profilePic");
+      .populate("admins", "username profilePic")
+      .lean();
 
     const roomsWithMeta = await Promise.all(
-      rooms.map(async (r) => {
-        const roomObj = r.toObject();
+      rooms.map(async (roomObj) => {
         const lastMsg = await Message.findOne({
-          roomId: r._id,
+          roomId: roomObj._id,
           isScheduled: { $ne: true },
         })
           .sort({ createdAt: -1 })
           .populate("senderId", "username")
-          .select("text image file audio createdAt senderId isDeleted");
+          .select("text image file audio createdAt senderId isDeleted")
+          .lean();
 
         const unreadCount = await Message.countDocuments({
-          roomId: r._id,
+          roomId: roomObj._id,
           senderId: { $ne: loggedInUserId },
           readBy: { $ne: loggedInUserId },
           isDeleted: false,
@@ -141,10 +141,9 @@ export const getMessages = async (req, res) => {
     };
 
     if (type === "room") {
-      const messages = await Message.find({ roomId: id, ...baseFilter }).populate(
-        "senderId",
-        "username profilePic"
-      );
+      const messages = await Message.find({ roomId: id, ...baseFilter })
+        .populate("senderId", "username profilePic")
+        .lean();
       return res.status(200).json(messages);
     } else {
       const messages = await Message.find({
@@ -153,7 +152,9 @@ export const getMessages = async (req, res) => {
           { senderId: myId, receiverId: id },
           { senderId: id, receiverId: myId },
         ],
-      }).populate("senderId", "username profilePic");
+      })
+        .populate("senderId", "username profilePic")
+        .lean();
       return res.status(200).json(messages);
     }
   } catch (error) {
@@ -320,18 +321,6 @@ export const sendMessage = async (req, res) => {
           if (sSocket) io.to(sSocket).emit("threadUpdated", threadPayload);
         }
       }
-    }
-
-    // Check for @pulse AI Companion mention
-    const aiQueryText = req.body.aiPrompt || text;
-    if (aiQueryText && !isScheduled) {
-      handleAiMention({
-        text: aiQueryText,
-        roomId,
-        receiverId,
-        senderUser: req.user,
-        parentMessageId,
-      });
     }
 
     res.status(201).json(newMessage);
@@ -613,7 +602,9 @@ export const getStarredMessages = async (req, res) => {
       ];
     }
 
-    const starredMessages = await Message.find(filter).populate("senderId", "username profilePic");
+    const starredMessages = await Message.find(filter)
+      .populate("senderId", "username profilePic")
+      .lean();
     res.status(200).json(starredMessages);
   } catch (error) {
     console.error("Error in getStarredMessages controller:", error.message);
@@ -656,7 +647,7 @@ export const previewLink = async (req, res) => {
       image,
       siteName,
     });
-  } catch (error) {
+  } catch {
     res.status(200).json({
       url: req.query.url,
       title: new URL(req.query.url).hostname,
@@ -685,7 +676,7 @@ export const getScheduledMessages = async (req, res) => {
       filter.receiverId = id;
     }
 
-    const scheduled = await Message.find(filter).sort({ scheduledFor: 1 });
+    const scheduled = await Message.find(filter).sort({ scheduledFor: 1 }).lean();
     res.status(200).json(scheduled);
   } catch (error) {
     console.error("Error in getScheduledMessages:", error.message);
@@ -846,6 +837,31 @@ export const getThreadReplies = async (req, res) => {
     res.status(200).json(replies);
   } catch (error) {
     console.error("Error in getThreadReplies:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getMessageReceipts = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const message = await Message.findById(messageId)
+      .populate("readBy", "username profilePic status")
+      .populate("senderId", "username profilePic");
+
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    res.status(200).json({
+      messageId: message._id,
+      createdAt: message.createdAt,
+      sender: message.senderId,
+      readBy: message.readBy || [],
+      roomId: message.roomId,
+      receiverId: message.receiverId,
+    });
+  } catch (error) {
+    console.error("Error in getMessageReceipts:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

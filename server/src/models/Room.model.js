@@ -34,6 +34,8 @@ const roomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+roomSchema.index({ members: 1 });
+
 const Room = mongoose.model("Room", roomSchema);
 
 export default Room;

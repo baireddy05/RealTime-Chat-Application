@@ -247,7 +247,6 @@ export const useChatStore = create((set, get) => ({
         ...replyData,
         text: textToSend,
         isEncrypted,
-        aiPrompt: originalText,
         parentMessageId: activeThreadMessage._id,
       };
 
@@ -314,8 +313,9 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
-    const { selectedChat, messages, replyingTo, disappearingTimer } = get();
+    const { selectedChat, replyingTo, disappearingTimer, isSending } = get();
     if (!selectedChat) return;
+    if (isSending) return; // Prevent concurrent sends at store level
 
     set({ isSending: true });
     try {
@@ -335,12 +335,11 @@ export const useChatStore = create((set, get) => ({
         ...messageData,
         text: textToSend,
         isEncrypted,
-        aiPrompt: originalText,
         expiresIn: messageData.expiresIn !== undefined ? messageData.expiresIn : (disappearingTimer || undefined),
         replyTo: messageData.replyTo !== undefined ? messageData.replyTo : (replyingTo ? {
           messageId: replyingTo._id,
           senderName: replyingTo.senderId?.username || replyingTo.senderName || "User",
-          text: replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : "Attachment"),
+          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : "Attachment"),
           image: replyingTo.image || null,
           file: replyingTo.file || null,
         } : null),
@@ -364,14 +363,17 @@ export const useChatStore = create((set, get) => ({
           replyingTo: null,
         }));
       } else {
-        set((state) => ({
-          messages: [...state.messages, msgDataWithDecrypted],
-          lastMessages: {
-            ...state.lastMessages,
-            [selectedChat.id]: msgDataWithDecrypted,
-          },
-          replyingTo: null,
-        }));
+        set((state) => {
+          const alreadyExists = state.messages.some((m) => m._id === msgDataWithDecrypted._id);
+          return {
+            messages: alreadyExists ? state.messages : [...state.messages, msgDataWithDecrypted],
+            lastMessages: {
+              ...state.lastMessages,
+              [selectedChat.id]: msgDataWithDecrypted,
+            },
+            replyingTo: null,
+          };
+        });
         soundManager.playSendSound();
       }
       return { success: true, data: msgDataWithDecrypted };
@@ -448,7 +450,20 @@ export const useChatStore = create((set, get) => ({
     set({ isStarredLoading: true });
     try {
       const res = await axiosInstance.get(`/chat/starred/${chatId}?type=${type}`);
-      set({ starredMessages: res.data });
+      const authUser = useAuthStore.getState().authUser;
+      const key = getConversationKey(get().selectedChat, authUser?._id);
+
+      const decryptedMessages = await Promise.all(
+        res.data.map(async (m) => {
+          if (m.isEncrypted || isEncryptedMessage(m.text)) {
+            const dec = await decryptMessage(m.text, key);
+            return { ...m, decryptedText: dec };
+          }
+          return m;
+        })
+      );
+
+      set({ starredMessages: decryptedMessages });
     } catch (error) {
       console.error("Error fetching starred messages:", error);
     } finally {
@@ -462,6 +477,21 @@ export const useChatStore = create((set, get) => ({
 
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
+
+    // Remove any existing listeners first to prevent duplicates
+    // (React StrictMode double-mounts effects in dev mode)
+    socket.off("newMessage");
+    socket.off("threadUpdated");
+    socket.off("messageExpired");
+    socket.off("messageEdited");
+    socket.off("roomUpdated");
+    socket.off("newRoom");
+    socket.off("messageReaction");
+    socket.off("userTyping");
+    socket.off("userStoppedTyping");
+    socket.off("messagesRead");
+    socket.off("messageDeleted");
+    socket.off("messagePinned");
 
     // Join room if it's a room chat
     if (selectedChat.type === "room") {
@@ -621,14 +651,6 @@ export const useChatStore = create((set, get) => ({
       }
     });
 
-    // Real-time message edit
-    socket.on("messageEdited", ({ messageId, text, isEdited, updatedAt }) => {
-      const { messages } = get();
-      const updated = messages.map((m) =>
-        m._id === messageId ? { ...m, text, isEdited, updatedAt } : m
-      );
-      set({ messages: updated });
-    });
 
     // Real-time new room creation
     socket.on("newRoom", (newRoom) => {
@@ -787,8 +809,21 @@ export const useChatStore = create((set, get) => ({
   getScheduledMessages: async (chatId, type) => {
     try {
       const res = await axiosInstance.get(`/chat/scheduled/${chatId}?type=${type}`);
-      set({ scheduledMessages: res.data });
-      return res.data;
+      const authUser = useAuthStore.getState().authUser;
+      const key = getConversationKey(get().selectedChat, authUser?._id);
+
+      const decrypted = await Promise.all(
+        res.data.map(async (m) => {
+          if (m.isEncrypted || isEncryptedMessage(m.text)) {
+            const dec = await decryptMessage(m.text, key);
+            return { ...m, decryptedText: dec };
+          }
+          return m;
+        })
+      );
+
+      set({ scheduledMessages: decrypted });
+      return decrypted;
     } catch (error) {
       console.error("Error fetching scheduled messages:", error);
       return [];
@@ -858,12 +893,24 @@ export const useChatStore = create((set, get) => ({
 
   forwardMessage: async ({ message, targetChat }) => {
     try {
+      const authUser = useAuthStore.getState().authUser;
+      const plainText = message.decryptedText || message.text || "";
+      let textToSend = plainText;
+      let isEncrypted = false;
+
+      if (plainText) {
+        const key = getConversationKey(targetChat, authUser?._id);
+        textToSend = await encryptMessage(plainText, key);
+        isEncrypted = true;
+      }
+
       const payload = {
-        text: message.text || "",
+        text: textToSend,
         image: message.image || null,
         audio: message.audio || null,
         file: message.file || null,
         isForwarded: true,
+        isEncrypted,
       };
 
       if (targetChat.type === "room") {
@@ -873,12 +920,17 @@ export const useChatStore = create((set, get) => ({
       const endpoint = `/chat/send/${targetChat.type === "user" ? targetChat.id : ""}`;
       const res = await axiosInstance.post(endpoint, payload);
 
+      const returnedMessage = {
+        ...res.data,
+        decryptedText: plainText,
+      };
+
       const { selectedChat, messages } = get();
       if (selectedChat && selectedChat.id === targetChat.id) {
-        set({ messages: [...messages, res.data] });
+        set({ messages: [...messages, returnedMessage] });
       }
       soundManager.playSendSound();
-      return { success: true, data: res.data };
+      return { success: true, data: returnedMessage };
     } catch (error) {
       console.error("Error in forwardMessage:", error);
       return { success: false, error: error.message };

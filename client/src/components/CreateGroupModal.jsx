@@ -154,7 +154,7 @@ const CreateGroupModal = ({ onClose }) => {
                         <img
                           src={
                             friend.profilePic ||
-                            `https://ui-avatars.com/api/?name=${friend.username}&background=2563eb&color=ffffff`
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username || "User")}&background=2563eb&color=ffffff`
                           }
                           alt={friend.username}
                           className="w-7 h-7 rounded-full object-cover border border-[var(--glass-border)]"

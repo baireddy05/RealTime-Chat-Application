@@ -2,27 +2,57 @@
 
 const E2EE_PREFIX = "[e2ee]:";
 
+// Pre-instantiated encoders for zero-garbage text conversions
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+// Pre-computed lookup table for O(1) buffer-to-hex conversion without intermediate string arrays
+const byteToHexTable = [];
+for (let n = 0; n <= 0xff; ++n) {
+  byteToHexTable.push(n.toString(16).padStart(2, "0"));
+}
+
+// Bounded LRU-style caches for derived CryptoKeys and decrypted message texts
+const keyCache = new Map();
+const decryptionCache = new Map();
+const MAX_CACHE_SIZE = 500;
+
 /**
  * Derive a 256-bit AES-GCM CryptoKey from a given passphrase/conversation key
+ * Memoized to eliminate redundant WebCrypto SHA-256 digests and key imports
  */
 async function deriveKey(keyString) {
-  const enc = new TextEncoder();
-  const rawKeyData = enc.encode(keyString || "pulse-default-secure-vault-key");
+  const normalizedKey = keyString || "pulse-default-secure-vault-key";
+  if (keyCache.has(normalizedKey)) {
+    return keyCache.get(normalizedKey);
+  }
+
+  const rawKeyData = textEncoder.encode(normalizedKey);
   // Hash with SHA-256 to ensure exactly 32 bytes (256 bits)
   const hashBuffer = await crypto.subtle.digest("SHA-256", rawKeyData);
-  return crypto.subtle.importKey(
+  const cryptoKey = await crypto.subtle.importKey(
     "raw",
     hashBuffer,
     { name: "AES-GCM" },
     false,
     ["encrypt", "decrypt"]
   );
+
+  if (keyCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = keyCache.keys().next().value;
+    keyCache.delete(oldestKey);
+  }
+  keyCache.set(normalizedKey, cryptoKey);
+  return cryptoKey;
 }
 
 function bufferToHex(buffer) {
-  return Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const bytes = new Uint8Array(buffer);
+  const hex = new Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    hex[i] = byteToHexTable[bytes[i]];
+  }
+  return hex.join("");
 }
 
 function hexToBuffer(hex) {
@@ -44,8 +74,7 @@ export async function encryptMessage(text, keyString) {
   try {
     const key = await deriveKey(keyString);
     const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV recommended for AES-GCM
-    const enc = new TextEncoder();
-    const encodedData = enc.encode(text);
+    const encodedData = textEncoder.encode(text);
 
     const ciphertextBuffer = await crypto.subtle.encrypt(
       {
@@ -67,13 +96,19 @@ export async function encryptMessage(text, keyString) {
 }
 
 /**
- * Decrypt cipher text using AES-GCM
+ * Decrypt cipher text using AES-GCM with bounded cache for instantaneous repeated lookups
  * @param {string} cipherString Encrypted string formatted as [e2ee]:<iv_hex>:<cipher_hex>
  * @param {string} keyString Shared secret or conversation key
  * @returns {Promise<string>} Decrypted plain text
  */
 export async function decryptMessage(cipherString, keyString) {
   if (!isEncryptedMessage(cipherString)) return cipherString;
+
+  const cacheKey = `${keyString}:${cipherString}`;
+  if (decryptionCache.has(cacheKey)) {
+    return decryptionCache.get(cacheKey);
+  }
+
   try {
     const rawCipher = cipherString.slice(E2EE_PREFIX.length);
     const [ivHex, cipherHex] = rawCipher.split(":");
@@ -92,8 +127,15 @@ export async function decryptMessage(cipherString, keyString) {
       ciphertext
     );
 
-    const dec = new TextDecoder();
-    return dec.decode(decryptedBuffer);
+    const plainText = textDecoder.decode(decryptedBuffer);
+
+    if (decryptionCache.size >= MAX_CACHE_SIZE * 2) {
+      const oldest = decryptionCache.keys().next().value;
+      decryptionCache.delete(oldest);
+    }
+    decryptionCache.set(cacheKey, plainText);
+
+    return plainText;
   } catch (error) {
     console.warn("E2EE decryption error (likely wrong key or untrusted message):", error);
     return "[🔒 Encrypted Message - Unable to Decrypt]";

@@ -1,6 +1,7 @@
 import { generateToken } from "../lib/utils.js";
 import User from "../models/User.model.js";
 import bcrypt from "bcryptjs";
+import { io } from "../lib/socket.js";
 
 export const signup = async (req, res) => {
   const { username, email, password } = req.body;
@@ -13,8 +14,8 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const userEmail = await User.findOne({ email });
-    const userUsername = await User.findOne({ username });
+    const userEmail = await User.findOne({ email }).select("_id").lean();
+    const userUsername = await User.findOne({ username }).select("_id").lean();
 
     if (userEmail) return res.status(400).json({ message: "Email already exists" });
     if (userUsername) return res.status(400).json({ message: "Username already exists" });
@@ -121,7 +122,7 @@ export const updateProfile = async (req, res) => {
     const userId = req.user._id;
 
     if (username) {
-      const existingUser = await User.findOne({ username, _id: { $ne: userId } });
+      const existingUser = await User.findOne({ username, _id: { $ne: userId } }).select("_id").lean();
       if (existingUser) {
         return res.status(400).json({ message: "Username is already taken" });
       }
@@ -136,7 +137,11 @@ export const updateProfile = async (req, res) => {
         ...(status !== undefined && { status }),
       },
       { new: true }
-    ).select("-password");
+    ).select("-password").lean();
+
+    if (io) {
+      io.emit("userUpdated", updatedUser);
+    }
 
     res.status(200).json(updatedUser);
   } catch (error) {

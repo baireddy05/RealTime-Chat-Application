@@ -1,10 +1,30 @@
-// HTML5 Desktop Notification Manager for Pulse RealTime Chat
+// Service Worker & Web Push Notification Manager for Pulse RealTime Chat
 
 class DesktopNotificationManager {
   constructor() {
-    this.permission = typeof window !== "undefined" && "Notification" in window
-      ? Notification.permission
-      : "default";
+    this.permission =
+      typeof window !== "undefined" && "Notification" in window
+        ? Notification.permission
+        : "default";
+    this.swRegistration = null;
+
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        this.initServiceWorker();
+      });
+    }
+  }
+
+  async initServiceWorker() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.register("/sw.js");
+        this.swRegistration = reg;
+        console.log("[Pulse SW] Service worker registered with scope:", reg.scope);
+      }
+    } catch (err) {
+      console.warn("[Pulse SW] Service worker registration failed:", err);
+    }
   }
 
   async requestPermission() {
@@ -29,7 +49,14 @@ class DesktopNotificationManager {
     return this.isSupported() && this.permission === "granted";
   }
 
-  sendNotification({ title, body, icon = "/favicon.ico", onClick = null }) {
+  async sendNotification({
+    title,
+    body,
+    icon = "/favicon.ico",
+    tag = "pulse-message",
+    data = null,
+    onClick = null,
+  }) {
     if (!this.hasPermission()) return null;
 
     // Only trigger desktop notification if tab is in the background or hidden
@@ -38,11 +65,26 @@ class DesktopNotificationManager {
     }
 
     try {
+      // Try to use Service Worker notification if available
+      if (this.swRegistration && "showNotification" in this.swRegistration) {
+        await this.swRegistration.showNotification(title || "Pulse Message", {
+          body: body || "New message received",
+          icon: icon || "/favicon.ico",
+          badge: "/favicon.ico",
+          tag,
+          vibrate: [150, 80, 150],
+          data: data || { url: window.location.href },
+        });
+        return true;
+      }
+
+      // Fallback to standard Notification API
       const notification = new Notification(title || "Pulse Message", {
         body: body || "New message received",
         icon: icon || "/favicon.ico",
         badge: "/favicon.ico",
-        silent: true, // We play our custom glass chime sound via soundManager
+        tag,
+        silent: true,
       });
 
       notification.onclick = () => {
@@ -53,7 +95,6 @@ class DesktopNotificationManager {
         }
       };
 
-      // Auto close after 5 seconds
       setTimeout(() => {
         try {
           notification.close();
@@ -61,7 +102,8 @@ class DesktopNotificationManager {
       }, 5000);
 
       return notification;
-    } catch {
+    } catch (e) {
+      console.warn("Notification dispatch error:", e);
       return null;
     }
   }

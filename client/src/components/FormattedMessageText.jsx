@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Code2, Terminal } from "lucide-react";
+import { Check, Copy, Terminal } from "lucide-react";
 
 export const CodeSnippetBlock = ({ code, language }) => {
   const [copied, setCopied] = useState(false);
@@ -24,13 +24,13 @@ export const CodeSnippetBlock = ({ code, language }) => {
         </div>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--glass-hover)] hover:bg-accent-primary/20 text-theme-muted hover:text-accent-primary transition-all active:scale-95"
+          className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--glass-hover)] hover:bg-white/10 text-theme-muted hover:text-white transition-all active:scale-95"
           title="Copy Code"
         >
           {copied ? (
             <>
-              <Check size={11} className="text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <Check size={11} className="text-white" />
+              <span className="text-white font-semibold">Copied</span>
             </>
           ) : (
             <>
@@ -42,7 +42,7 @@ export const CodeSnippetBlock = ({ code, language }) => {
       </div>
 
       {/* Code Content */}
-      <pre className="p-3.5 overflow-x-auto text-emerald-300 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
+      <pre className="p-3.5 overflow-x-auto text-zinc-200 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
         <code>{code}</code>
       </pre>
     </div>
@@ -91,7 +91,11 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
         return (
           <code
             key={i}
-            className="px-1.5 py-0.5 mx-0.5 rounded-md bg-black/25 text-amber-300 font-mono text-[11px] border border-white/10"
+            className={`px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] ${
+              isMine
+                ? "bg-black/10 text-black border border-black/15 font-semibold"
+                : "bg-white/10 text-zinc-100 border border-white/15"
+            }`}
           >
             {inlineCode}
           </code>
@@ -110,8 +114,10 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
               href={urlSub}
               target="_blank"
               rel="noopener noreferrer"
-              className={`underline underline-offset-2 break-all ${
-                isMine ? "text-white font-medium hover:text-amber-200" : "text-accent-primary hover:underline font-medium"
+              className={`underline underline-offset-2 break-all transition-opacity ${
+                isMine
+                  ? "text-black font-semibold hover:opacity-70"
+                  : "text-white font-semibold hover:opacity-70"
               }`}
               onClick={(e) => e.stopPropagation()}
             >
@@ -133,8 +139,8 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
                 key={k}
                 className={
                   isMine
-                    ? "bg-amber-300 text-slate-950 font-bold px-0.5 rounded"
-                    : "bg-amber-200 text-amber-950 font-bold px-0.5 rounded"
+                    ? "bg-black text-white font-bold px-1 rounded"
+                    : "bg-white text-black font-bold px-1 rounded"
                 }
               >
                 {m}

@@ -39,6 +39,9 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Multikey index for O(log N) friend lookups and membership checks
+userSchema.index({ friends: 1 });
+
 const User = mongoose.model("User", userSchema);
 
 export default User;

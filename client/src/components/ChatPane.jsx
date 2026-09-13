@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, Fragment } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo, Fragment } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
+import { useCallStore } from "../store/useCallStore";
 import MessageInput from "./MessageInput";
 import ImageModal from "./ImageModal";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -12,18 +13,21 @@ import EmojiPicker, { Theme } from "emoji-picker-react";
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
 import { 
-  Loader, Search, X, CheckCheck, SmilePlus, Pin, PinOff, Trash2, Ban,
-  ChevronRight, Phone, Video, MoreVertical, Lock, MessageCircle,
-  Mic, MicOff, VideoOff, PhoneOff, Volume2, VolumeX, ArrowLeft, Reply,
-  Edit3, Forward, Star, FileText, Download, Info, Plus,
+  Loader, Search, X, CheckCheck, Pin, Trash2, Ban,
+  Lock, MessageCircle, Volume2, VolumeX, Reply,
+  Edit3, Forward, Star, Info, Plus,
   UploadCloud, Sparkles, ChevronUp, ChevronDown, DownloadCloud, Bell, BellOff,
-  Clock, Flame, Palette, Bot, MessageSquare
+  Clock, Flame, Palette, MessageSquare, MoreVertical
 } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
-import LinkPreviewCard from "./LinkPreviewCard";
+import LinkPreview from "./LinkPreview";
 import ScheduledMessagesModal from "./ScheduledMessagesModal";
-import WallpaperModal, { WALLPAPER_PRESETS } from "./WallpaperModal";
+import WallpaperModal from "./WallpaperModal";
+import { WALLPAPER_PRESETS } from "../lib/wallpapers";
 import ThreadDrawer from "./ThreadDrawer";
+import MessageInfoModal from "./MessageInfoModal";
+import { Virtuoso } from "react-virtuoso";
+
 
 const formatFileSize = (bytes) => {
   if (!bytes) return "";
@@ -46,20 +50,29 @@ const getSenderColor = (name = "") => {
   return SENDER_COLORS[Math.abs(hash) % SENDER_COLORS.length];
 };
 
-const highlightMatches = (text, query, isMine) => {
-  if (!query || !query.trim() || !text) return text;
-  const trimmed = query.trim();
-  const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(${escapedQuery})`, "gi");
-  const parts = text.split(regex);
-  return parts.map((part, index) =>
-    part.toLowerCase() === trimmed.toLowerCase() ? (
-      <mark key={index} className={isMine ? "bg-amber-300 text-slate-950 font-bold px-0.5 rounded" : "bg-amber-200 text-amber-950 font-bold px-0.5 rounded"}>
-        {part}
-      </mark>
-    ) : part
-  );
+const extractFirstUrl = (text) => {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const match = text.match(urlRegex);
+  return match ? match[0] : null;
 };
+
+
+const ChatHeader = memo(() => (
+  <div className="pt-6 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
+    <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--glass-heavy)] text-zinc-400 text-[11px] max-w-md text-center border border-[var(--glass-border)] shadow-sm">
+      <span className="material-symbols-outlined text-zinc-300 text-sm">lock</span>
+      <span>End-to-end encrypted with zero-knowledge keys.</span>
+    </div>
+    <div className="my-1.5">
+      <span className="px-3 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono text-[10px] tracking-wider uppercase border border-white/10">
+        Today
+      </span>
+    </div>
+  </div>
+));
+
+const ChatFooter = memo(() => <div className="h-6" />);
 
 const ChatPane = ({ onBack }) => {
   const { theme } = useThemeStore();
@@ -71,9 +84,10 @@ const ChatPane = ({ onBack }) => {
     isGroupInfoOpen, setIsGroupInfoOpen, typingUsers, soundMuted, toggleSound,
     chatWallpapers, globalWallpaper, isWallpaperOpen, setIsWallpaperOpen,
     isScheduledOpen, setIsScheduledOpen,
-    openThread, closeThread, isThreadOpen, activeThreadMessage,
+    openThread, closeThread, isThreadOpen,
   } = useChatStore();
   const { authUser, onlineUsers } = useAuthStore();
+  const { startCall } = useCallStore();
   const [activeImage, setActiveImage] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,15 +95,11 @@ const ChatPane = ({ onBack }) => {
   const [hoveredMessageId, setHoveredMessageId] = useState(null);
   const [activePickerId, setActivePickerId] = useState(null);
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
+  const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
-  const [activeCall, setActiveCall] = useState(null);
-  const [isCallMuted, setIsCallMuted] = useState(false);
-  const [isVideoDisabled, setIsVideoDisabled] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [callDuration, setCallDuration] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
+  const [infoModalMessage, setInfoModalMessage] = useState(null);
   const [showChatOptions, setShowChatOptions] = useState(false);
-  const [isChatMuted, setIsChatMuted] = useState(false);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(
     notificationManager.hasPermission()
   );
@@ -98,14 +108,122 @@ const ChatPane = ({ onBack }) => {
   const dragCounterRef = useRef(0);
 
   const messagesContainerRef = useRef(null);
+  const scrollerElementRef = useRef(null);
   const loadedChatIdRef = useRef(null);
   const prevSelectedChatIdRef = useRef(selectedChat?.id);
   const messagesRef = useRef(messages);
-  const unreadSeparatorId = null;
+
+  const virtuosoComponents = useMemo(() => ({
+    Header: ChatHeader,
+    Footer: ChatFooter,
+  }), []);
+
+  const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
+
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return messages.filter((m) => {
+      if (m.isDeleted) return false;
+      const messageText = m.decryptedText || m.text || "";
+      return messageText.toLowerCase().includes(q);
+    });
+  }, [messages, searchQuery]);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  const scrollToBottom = useCallback((behavior = "smooth") => {
+    // 1. Direct DOM scroller to guarantee scroll to the absolute bottom
+    const scroller = scrollerElementRef.current;
+    if (scroller) {
+      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+      if (maxScroll > 0) {
+        if (behavior === "smooth") {
+          scroller.scrollTo({ top: maxScroll + 500, behavior: "smooth" });
+        } else {
+          scroller.scrollTop = maxScroll + 500;
+        }
+      }
+    }
+    // 2. Virtuoso programmatic scroll
+    if (messagesContainerRef.current) {
+      try {
+        messagesContainerRef.current.scrollToIndex({
+          index: "LAST",
+          align: "end",
+          behavior,
+        });
+      } catch {
+        // ignore
+      }
+    }
+    // 3. Native scrollIntoView on last message element if available
+    const lastMsg = messagesRef.current?.[messagesRef.current.length - 1];
+    if (lastMsg) {
+      const el = document.getElementById(`msg-${lastMsg._id}`);
+      if (el) {
+        el.scrollIntoView({ behavior, block: "end" });
+      }
+    }
+  }, []);
+
+  // Auto-scroll to bottom when messages change (new message sent or received)
+  const prevMessagesLengthRef = useRef(messages.length);
+  useEffect(() => {
+    const prevLen = prevMessagesLengthRef.current;
+    const currLen = messages.length;
+    prevMessagesLengthRef.current = currLen;
+
+    if (currLen > prevLen) {
+      scrollToBottom("auto");
+      const t1 = setTimeout(() => scrollToBottom("smooth"), 40);
+      const t2 = setTimeout(() => scrollToBottom("smooth"), 120);
+      const t3 = setTimeout(() => scrollToBottom("smooth"), 250);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // Ensure scroll is at bottom when opening or switching a chat
+  useEffect(() => {
+    if (!isMessagesLoading && messages.length > 0) {
+      scrollToBottom("auto");
+      const t1 = setTimeout(() => scrollToBottom("auto"), 30);
+      const t2 = setTimeout(() => scrollToBottom("smooth"), 100);
+      const t3 = setTimeout(() => scrollToBottom("smooth"), 250);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [selectedChat?.id, isMessagesLoading, messages.length, scrollToBottom]);
+
+  // Global event listener for instant scroll on send
+  useEffect(() => {
+    const handleScrollReq = () => {
+      scrollToBottom("auto");
+      setTimeout(() => scrollToBottom("smooth"), 50);
+      setTimeout(() => scrollToBottom("smooth"), 150);
+      setTimeout(() => scrollToBottom("smooth"), 300);
+    };
+    window.addEventListener("pulse:scroll-to-bottom", handleScrollReq);
+    return () => window.removeEventListener("pulse:scroll-to-bottom", handleScrollReq);
+  }, [scrollToBottom]);
+
+  const handleTotalListHeightChanged = useCallback(() => {
+    const scroller = scrollerElementRef.current;
+    if (!scroller) return;
+    const distanceToBottom = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+    if (distanceToBottom < 250) {
+      scroller.scrollTop = scroller.scrollHeight + 500;
+    }
+  }, []);
 
   useEffect(() => {
     if (!selectedChat) return;
@@ -126,42 +244,40 @@ const ChatPane = ({ onBack }) => {
       setSearchQuery("");
       setSearchMatchIndex(0);
       setShowChatOptions(false);
+      setOpenMenuMessageId(null);
+      setActivePickerId(null);
       setIsDraggingOver(false);
       dragCounterRef.current = 0;
     }
   }, [selectedChat?.id]);
 
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    const handleGlobalClick = () => {
+      setOpenMenuMessageId(null);
+      setActivePickerId(null);
+      setFullReactionPickerMsgId(null);
+    };
+    if (openMenuMessageId || activePickerId || fullReactionPickerMsgId) {
+      document.addEventListener("click", handleGlobalClick);
+      return () => document.removeEventListener("click", handleGlobalClick);
     }
-  }, [messages]);
+  }, [openMenuMessageId, activePickerId, fullReactionPickerMsgId]);
 
-  const handleContainerScroll = () => {};
-
-  const startCall = (type) => {
-    setActiveCall({ type, status: "Connected", startTime: Date.now() });
-    setCallDuration(0);
-  };
-
-  const endCall = () => {
-    setActiveCall(null);
-  };
-
-  useEffect(() => {
-    let interval = null;
-    if (activeCall && activeCall.status === "Connected") {
-      interval = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
+  const handleStartCall = (type) => {
+    if (!selectedChat) return;
+    if (selectedChat.type === "room") {
+      alert("1-on-1 audio and video calls are supported for direct contacts. Please select a user to call.");
+      return;
     }
-    return () => clearInterval(interval);
-  }, [activeCall]);
-
-  const formatCallTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+    startCall({
+      targetUser: {
+        _id: selectedChat.id,
+        name: selectedChat.name,
+        username: selectedChat.name,
+        authName: authUser?.username,
+      },
+      callType: type,
+    });
   };
 
   if (!selectedChat) {
@@ -187,9 +303,6 @@ const ChatPane = ({ onBack }) => {
   }
 
   const displayedMessages = messages;
-  const searchMatches = searchQuery.trim()
-    ? messages.filter((m) => !m.isDeleted && m.text && m.text.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-    : [];
 
   const handleNextMatch = () => {
     if (searchMatches.length === 0) return;
@@ -302,7 +415,7 @@ const ChatPane = ({ onBack }) => {
 
       lines.push(`[${time}] ${senderName}${editedTag}:`);
       if (msg.text) {
-        lines.push(`  ${msg.text}`);
+        lines.push(`  ${msg.decryptedText || msg.text}`);
       }
       if (msg.image) {
         lines.push(`  [Attachment: Image (${msg.image})]`);
@@ -342,22 +455,17 @@ const ChatPane = ({ onBack }) => {
 
   const scrollToMessage = (msgId) => {
     const el = document.getElementById(`msg-${msgId}`);
-    if (el && messagesContainerRef.current) {
-      const containerRect = messagesContainerRef.current.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      messagesContainerRef.current.scrollTo({ top: elRect.top - containerRect.top + messagesContainerRef.current.scrollTop - 40, behavior: "smooth" });
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.classList.add("ring-2", "ring-accent-primary", "rounded-2xl", "shadow-glow");
       setTimeout(() => { el.classList.remove("ring-2", "ring-accent-primary", "shadow-glow"); }, 2000);
     }
   };
 
   const handleDelete = (messageId) => setMessageToDelete(messageId);
-  const isUserOnline = selectedChat.type === "user" && onlineUsers.includes(selectedChat.id);
+  const isUserOnline = selectedChat?.type === "user" && onlineUsersSet.has(selectedChat.id);
 
-  const actionBtnClass = (visible) =>
-    `p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] text-theme-muted hover:text-theme-main shadow-sm transition-all duration-150 cursor-pointer ${
-      visible ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto"
-    }`;
+
 
   const currentChatWallpaper =
     (selectedChat?.id && chatWallpapers[selectedChat.id]) || globalWallpaper || "default";
@@ -382,7 +490,7 @@ const ChatPane = ({ onBack }) => {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex-1 flex flex-col overflow-hidden relative bg-transparent"
+      className="h-full w-full flex flex-col overflow-hidden relative text-on-surface bg-transparent"
     >
       {/* Dynamic Wallpaper Backdrop Layer */}
       {wallpaperStyle && (
@@ -413,54 +521,78 @@ const ChatPane = ({ onBack }) => {
           </div>
         </div>
       )}
-      {/* Header */}
-      <div className="h-[60px] border-b border-[var(--glass-border)] flex items-center justify-between px-3 md:px-5 z-30 flex-shrink-0 relative bg-[var(--glass-surface)] backdrop-blur-xl">
+      {/* Monochromatic Glass Chat Header */}
+      <div className="flex items-center justify-between px-4 xl:px-6 py-3 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] shadow-sm z-30 flex-shrink-0 relative">
         <div 
           onClick={() => selectedChat.type === "room" && setIsGroupInfoOpen(true)}
-          className={`flex items-center gap-2 md:gap-3 min-w-0 ${selectedChat.type === "room" ? "cursor-pointer group select-none" : ""}`}
+          className={`flex items-center gap-3 min-w-0 ${selectedChat.type === "room" ? "cursor-pointer group select-none" : ""}`}
         >
           {onBack && (
             <button onClick={(e) => { e.stopPropagation(); onBack(); }}
-              className="md:hidden p-2 text-theme-muted hover:text-theme-main rounded-lg hover:bg-[var(--glass-hover)] flex-shrink-0 transition-colors">
-              <ArrowLeft size={18} />
+              className="xl:hidden p-2 text-zinc-400 hover:text-white rounded-xl hover:bg-white/10 flex-shrink-0 transition-colors mr-1" title="Back to conversations">
+              <span className="material-symbols-outlined text-lg">arrow_back</span>
             </button>
           )}
-          <div className="relative flex-shrink-0">
-            <img
-              src={selectedChat.type === "room"
-                ? `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name.replace(/^#/, ""))}&background=2563eb&color=ffffff`
-                : `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=2563eb&color=ffffff`}
-              alt={selectedChat.name}
-              className="w-9 h-9 rounded-full object-cover border border-[var(--glass-border)] group-hover:border-accent-primary transition-all"
-            />
-            {isUserOnline && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-online ring-2 ring-[var(--glass-surface)]" />}
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-medium text-[14px] text-theme-main truncate leading-tight capitalize flex items-center gap-1.5">
-              <span>{selectedChat.name.replace(/^#/, "")}</span>
-              {selectedChat.type === "room" && <Info size={12} className="text-theme-muted group-hover:text-accent-primary transition-colors" />}
-            </h3>
-            <p className="text-[11px] truncate">
-              {selectedChat.type === "room" ? (
-                <span className="text-theme-muted">{selectedChat.members?.length ? `${selectedChat.members.length} members` : "Channel"}</span>
-              ) : activeTypers.length > 0 ? (
-                <span className="text-accent-primary font-medium">typing...</span>
-              ) : isUserOnline ? (
-                <span className="text-status-online font-medium">Online</span>
-              ) : (
-                <span className="text-theme-muted/60">Offline</span>
-              )}
-            </p>
+          {selectedChat.type === "room" ? (
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-white text-[#0d0c11] font-bold shrink-0 shadow-md">
+              <span className="text-lg">#</span>
+            </div>
+          ) : (
+            <div className="relative shrink-0">
+              <img
+                src={selectedChat.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
+                alt={selectedChat.name}
+                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-white/10"
+              />
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-[#0e0d13] ${isUserOnline ? "bg-white" : "bg-zinc-600"}`} />
+            </div>
+          )}
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2 truncate">
+              <h2 className="text-white font-semibold truncate text-base sm:text-lg tracking-tight">
+                {selectedChat.name.replace(/^#/, "")}
+              </h2>
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono text-[10px] border border-white/5">
+                <span className="material-symbols-outlined text-xs">verified_user</span>
+                <span>E2EE</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-zinc-400 text-xs truncate">
+              <span className="text-zinc-500 font-bold">•</span>
+              <span className="truncate">
+                {selectedChat.type === "room"
+                  ? `${selectedChat.members?.length || 1} online • Channel`
+                  : activeTypers.length > 0
+                  ? "typing..."
+                  : isUserOnline
+                  ? "Active now"
+                  : "Offline"}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5">
-          <button onClick={() => startCall("video")} className="p-2 text-theme-muted hover:text-theme-main rounded-lg hover:bg-[var(--glass-hover)] transition-colors" title="Video call"><Video size={17} /></button>
-          <button onClick={() => startCall("audio")} className="p-2 text-theme-muted hover:text-theme-main rounded-lg hover:bg-[var(--glass-hover)] transition-colors" title="Voice call"><Phone size={16} /></button>
-
+        {/* Monochromatic Header Action Dock */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => handleStartCall("audio")}
+            className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+            title="Start Voice Call"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-lg">call</span>
+          </button>
+          <button
+            onClick={() => handleStartCall("video")}
+            className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+            title="Start Video Call"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-lg">videocam</span>
+          </button>
           {isSearchOpen ? (
-            <div className="flex items-center glass-input border border-[var(--glass-border)] rounded-xl px-2.5 py-1 gap-1.5 animate-fadeIn">
-              <Search size={13} className="text-theme-muted flex-shrink-0" />
+            <div className="flex items-center bg-[var(--glass-heavy)] border border-[var(--glass-border)] rounded-xl px-2.5 py-1 gap-1.5 animate-fadeIn">
+              <span className="material-symbols-outlined text-zinc-400 text-sm">search</span>
               <input
                 type="text"
                 placeholder="Search messages..."
@@ -471,11 +603,11 @@ const ChatPane = ({ onBack }) => {
                 }}
                 onKeyDown={handleSearchKeyDown}
                 autoFocus
-                className="bg-transparent text-[12px] text-theme-main placeholder-theme-muted/50 focus:outline-none w-24 sm:w-36"
+                className="bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none w-24 sm:w-36"
               />
               {searchQuery && (
                 <div className="flex items-center gap-0.5">
-                  <span className="text-[10px] text-theme-muted px-1 font-medium select-none">
+                  <span className="text-[10px] text-zinc-400 px-1 font-mono select-none">
                     {searchMatches.length > 0
                       ? `${searchMatchIndex + 1}/${searchMatches.length}`
                       : "0"}
@@ -484,14 +616,14 @@ const ChatPane = ({ onBack }) => {
                     <div className="flex items-center">
                       <button
                         onClick={handlePrevMatch}
-                        className="p-1 rounded-md text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
+                        className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
                         title="Previous match (Shift+Enter)"
                       >
                         <ChevronUp size={13} />
                       </button>
                       <button
                         onClick={handleNextMatch}
-                        className="p-1 rounded-md text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
+                        className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
                         title="Next match (Enter)"
                       >
                         <ChevronDown size={13} />
@@ -506,7 +638,7 @@ const ChatPane = ({ onBack }) => {
                   setSearchQuery("");
                   setSearchMatchIndex(0);
                 }}
-                className="text-theme-muted hover:text-theme-main p-0.5 rounded transition-colors"
+                className="text-zinc-400 hover:text-white p-0.5 rounded transition-colors"
                 title="Close search (Esc)"
               >
                 <X size={13} />
@@ -515,10 +647,11 @@ const ChatPane = ({ onBack }) => {
           ) : (
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="p-2 text-theme-muted hover:text-theme-main rounded-lg hover:bg-[var(--glass-hover)] transition-colors"
-              title="Search messages"
+              className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+              title="Search in thread"
+              type="button"
             >
-              <Search size={17} />
+              <span className="material-symbols-outlined text-lg">search</span>
             </button>
           )}
 
@@ -528,10 +661,11 @@ const ChatPane = ({ onBack }) => {
                 e.stopPropagation();
                 setShowChatOptions((p) => !p);
               }}
-              className="p-2 text-theme-muted hover:text-theme-main rounded-lg hover:bg-[var(--glass-hover)] transition-colors"
-              title="Options"
+              className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+              title="Thread details"
+              type="button"
             >
-              <MoreVertical size={17} />
+              <span className="material-symbols-outlined text-lg">more_vert</span>
             </button>
             {showChatOptions && (
               <>
@@ -666,70 +800,57 @@ const ChatPane = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Call UI */}
-      {activeCall && (
-        <div className="fixed inset-0 z-50 apple-ambient-bg flex flex-col items-center justify-between py-12 px-6 animate-fadeIn text-theme-main">
-          <div className="flex flex-col items-center gap-4 text-center mt-8">
-            <div className="relative">
-              <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name.replace(/^#/, ""))}&background=2563eb&color=ffffff&size=128`}
-                alt="Call" className="w-28 h-28 rounded-full border-2 border-[var(--glass-border)] shadow-2xl object-cover" />
-              <span className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-accent-primary flex items-center justify-center shadow-lg text-white">
-                {activeCall.type === "video" ? <Video size={13} /> : <Phone size={13} />}
-              </span>
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold capitalize text-theme-main">{selectedChat.name.replace(/^#/, "")}</h2>
-              <p className="text-[13px] text-theme-muted mt-1">{activeCall.status === "Connected" ? formatCallTime(callDuration) : activeCall.status}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] px-8 py-4 rounded-full mb-8 shadow-glass">
-            <button onClick={() => setIsCallMuted(!isCallMuted)} className={`p-4 rounded-full transition-all ${isCallMuted ? "bg-red-500 text-white" : "bg-[var(--glass-hover)] text-theme-main hover:bg-[var(--glass-active)]"}`}>
-              {isCallMuted ? <MicOff size={20} /> : <Mic size={20} />}
-            </button>
-            {activeCall.type === "video" && (
-              <button onClick={() => setIsVideoDisabled(!isVideoDisabled)} className={`p-4 rounded-full transition-all ${isVideoDisabled ? "bg-red-500 text-white" : "bg-[var(--glass-hover)] text-theme-main hover:bg-[var(--glass-active)]"}`}>
-                {isVideoDisabled ? <VideoOff size={20} /> : <Video size={20} />}
-              </button>
-            )}
-            <button onClick={() => setIsSpeakerOn(!isSpeakerOn)} className={`p-4 rounded-full transition-all ${isSpeakerOn ? "bg-accent-primary/20 text-accent-primary" : "bg-[var(--glass-hover)] text-theme-muted"}`}>
-              <Volume2 size={20} />
-            </button>
-            <button onClick={endCall} className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg transition-all"><PhoneOff size={20} /></button>
-          </div>
-        </div>
-      )}
-
-      {/* Pinned bar */}
+      {/* Sticky Pinned Message Banner (Stitch Specification) */}
       {currentPinned && (
-        <div className="bg-[var(--glass-surface)] backdrop-blur-xl border-b border-[var(--glass-border)] px-4 py-2 flex items-center justify-between z-10">
-          <button onClick={() => scrollToMessage(currentPinned._id)} className="flex items-center gap-2.5 text-left flex-1 min-w-0">
-            <Pin size={12} className="text-accent-primary flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-medium text-accent-primary tracking-wide">PINNED {pinnedMessages.length > 1 && `${pinnedIndex + 1}/${pinnedMessages.length}`}</span>
-              <p className="text-[12px] text-theme-main truncate">{currentPinned.text || (currentPinned.image ? "📷 Photo" : "Attachment")}</p>
+        <div className="flex items-center justify-between px-4 xl:px-6 py-2 bg-surface-container-high/70 backdrop-blur-md border-b border-outline-variant/15 shadow-sm z-20">
+          <div className="flex items-center gap-space-md min-w-0 flex-1">
+            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 shrink-0">
+              <span className="material-symbols-outlined text-sm">push_pin</span>
             </div>
-          </button>
-          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-space-sm min-w-0 flex-1 cursor-pointer" onClick={() => scrollToMessage(currentPinned._id)}>
+              <span className="px-1.5 py-0.2 rounded bg-surface-container-highest text-amber-400 font-label-mono text-[10px] uppercase font-bold shrink-0">
+                PINNED {pinnedMessages.length > 1 && `${pinnedIndex + 1}/${pinnedMessages.length}`}
+              </span>
+              <p className="font-body-md text-xs text-on-surface-variant truncate">
+                {currentPinned.text || (currentPinned.image ? "📷 Photo" : "Attachment")}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-space-xs shrink-0">
             {pinnedMessages.length > 1 && (
-              <button onClick={() => setPinnedIndex((p) => (p + 1) % pinnedMessages.length)} className="p-1 text-theme-muted hover:text-theme-main rounded-lg hover:bg-[var(--glass-hover)]"><ChevronRight size={14} /></button>
+              <>
+                <button
+                  onClick={() => setPinnedIndex((p) => (p - 1 + pinnedMessages.length) % pinnedMessages.length)}
+                  className="p-1 rounded text-outline hover:text-on-surface"
+                  title="Previous pinned message"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-base">chevron_left</span>
+                </button>
+                <button
+                  onClick={() => setPinnedIndex((p) => (p + 1) % pinnedMessages.length)}
+                  className="p-1 rounded text-outline hover:text-on-surface"
+                  title="Next pinned message"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-base">chevron_right</span>
+                </button>
+              </>
             )}
-            <button onClick={() => togglePinMessage(currentPinned._id)} className="p-1 text-theme-muted hover:text-red-400 rounded-lg hover:bg-red-500/10"><PinOff size={13} /></button>
+            <button
+              onClick={() => togglePinMessage(currentPinned._id)}
+              className="p-1 rounded text-outline hover:text-error transition-colors"
+              title="Unpin from top"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
           </div>
         </div>
       )}
 
       {/* Messages */}
-      <div ref={messagesContainerRef} onScroll={handleContainerScroll} className="flex-1 overflow-y-auto p-3 md:p-6">
-        <div className="flex justify-center my-3 px-4">
-          <div className="bg-[var(--glass-surface)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl px-4 py-2 text-[11px] text-theme-muted flex items-center gap-2 max-w-md text-center shadow-sm">
-            <Lock size={12} className="text-emerald-400 flex-shrink-0" />
-            <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
-          </div>
-        </div>
-        <div className="flex justify-center my-2">
-          <span className="bg-[var(--glass-surface)] border border-[var(--glass-border)] text-theme-muted text-[10px] font-medium px-3 py-1 rounded-full tracking-wide shadow-sm">Today</span>
-        </div>
-
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative w-full">
         {isMessagesLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader className="size-6 animate-spin text-accent-primary" />
@@ -740,10 +861,39 @@ const ChatPane = ({ onBack }) => {
             {searchQuery ? `No messages matching "${searchQuery}"` : "No messages yet. Start the conversation!"}
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {displayedMessages.map((message) => {
+          <Virtuoso
+            ref={messagesContainerRef}
+            scrollerRef={(el) => { scrollerElementRef.current = el; }}
+            className="flex-1 w-full h-full overflow-x-hidden custom-scrollbar"
+            data={searchQuery.trim() ? searchMatches : displayedMessages}
+            initialTopMostItemIndex={searchQuery.trim() ? searchMatches.length - 1 : (displayedMessages.length > 0 ? displayedMessages.length - 1 : 0)}
+            followOutput="smooth"
+            alignToBottom={true}
+            defaultItemHeight={80}
+            totalListHeightChanged={handleTotalListHeightChanged}
+            components={virtuosoComponents}
+            itemContent={(index, message) => {
+              const currentList = searchQuery.trim() ? searchMatches : displayedMessages;
               const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
               const sender = message.senderId;
+              const prevMessage = index > 0 ? currentList[index - 1] : null;
+              const prevSenderId = prevMessage ? (prevMessage.senderId?._id || prevMessage.senderId) : null;
+              const currentSenderId = message.senderId?._id || message.senderId;
+              const isSameSenderAsPrev = prevSenderId === currentSenderId;
+
+              const nextMessage = index < currentList.length - 1 ? currentList[index + 1] : null;
+              const nextSenderId = nextMessage ? (nextMessage.senderId?._id || nextMessage.senderId) : null;
+              const isSameSenderAsNext = nextSenderId === currentSenderId;
+
+              // Authentic speech bubble curvature & corner tail
+              const bubbleRadius = isMine
+                ? `${isSameSenderAsPrev ? "rounded-tr-[8px]" : "rounded-tr-[20px]"} ${
+                    isSameSenderAsNext ? "rounded-br-[8px]" : "rounded-br-[4px]"
+                  } rounded-tl-[20px] rounded-bl-[20px]`
+                : `${isSameSenderAsPrev ? "rounded-tl-[8px]" : "rounded-tl-[20px]"} ${
+                    isSameSenderAsNext ? "rounded-bl-[8px]" : "rounded-bl-[4px]"
+                  } rounded-tr-[20px] rounded-br-[20px]`;
+
               const reactionGroups = (message.reactions || []).reduce((acc, r) => {
                 acc[r.emoji] = acc[r.emoji] || { emoji: r.emoji, count: 0, users: [], hasReacted: false };
                 acc[r.emoji].count += 1;
@@ -753,56 +903,79 @@ const ChatPane = ({ onBack }) => {
               }, {});
               const isReadByRecipient = selectedChat.type === "user" && (message.readBy || []).includes(selectedChat.id);
               const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
+              const openUpwards = index >= 2;
 
               return (
                 <Fragment key={message._id}>
-                  <div id={`msg-${message._id}`}
+                  <div
+                    id={`msg-${message._id}`}
                     onMouseEnter={() => setHoveredMessageId(message._id)}
                     onMouseLeave={() => setHoveredMessageId(null)}
-                    className={`flex max-w-full relative group transition-all ${isMine ? "justify-end" : "justify-start"}`}>
-                    <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] md:max-w-[65%]`}>
+                    className={`flex max-w-full relative group transition-all px-4 sm:px-6 md:px-8 ${
+                      isSameSenderAsPrev ? "mt-1" : "mt-3.5"
+                    } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
+                  >
+                    {!isMine && selectedChat.type === "room" && (
+                      <div className="w-7 h-7 flex-shrink-0 self-end mb-0.5 mr-2">
+                        {!isSameSenderAsNext ? (
+                          <img
+                            src={sender?.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender?.username || "User")}&background=2563eb&color=ffffff&size=64`}
+                            alt={sender?.username}
+                            className="w-7 h-7 rounded-full object-cover border border-[var(--glass-border)] shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-7 h-7" />
+                        )}
+                      </div>
+                    )}
+
+                    <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] md:max-w-[70%]`}>
                       <div className={`flex items-center gap-1.5 ${isMine ? "flex-row-reverse" : "flex-row"}`}>
-                        {/* Message Bubble */}
+                        {/* Speech Bubble */}
                         <div 
                           style={
                             !message.isDeleted
                               ? isMine
-                                ? { background: 'var(--bubble-outgoing-gradient)', color: 'var(--bubble-outgoing-text)' }
-                                : { background: 'var(--bubble-incoming-surface)', color: 'var(--bubble-incoming-text)' }
+                                ? {
+                                    background: 'var(--bubble-outgoing-gradient)',
+                                    color: 'var(--bubble-outgoing-text)',
+                                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 rgba(255, 255, 255, 0.4)',
+                                  }
+                                : {
+                                    background: 'var(--bubble-incoming-surface)',
+                                    color: 'var(--bubble-incoming-text)',
+                                    backdropFilter: 'blur(24px)',
+                                    border: '1px solid var(--bubble-incoming-border)',
+                                    boxShadow: 'inset 0 1px 1px 0 rgba(255, 255, 255, 0.12)',
+                                  }
                               : {}
                           }
-                          className={`py-2 px-3 rounded-2xl relative transition-all ${
+                          className={`py-2 px-3.5 ${bubbleRadius} relative transition-all w-fit max-w-full ${
                             message.isDeleted
-                              ? "bg-[var(--glass-hover)] text-theme-muted/40 italic"
+                              ? "bg-surface-container/40 text-outline italic"
                               : isMine
-                              ? "rounded-tr-sm shadow-md border border-white/25 border-t-[var(--glass-border-specular)] shadow-glass"
-                              : "backdrop-blur-2xl border border-[var(--bubble-incoming-border)] border-t-[var(--glass-border-specular)] rounded-tl-sm shadow-glass"
+                              ? "border border-white/40 shadow-sm"
+                              : ""
                           }`}
                         >
-                          {!isMine && selectedChat.type === "room" && !message.isDeleted && (
-                            <p className={`text-[11px] font-semibold mb-0.5 ${getSenderColor(sender.username)}`}>{sender.username}</p>
-                          )}
-                          {(message.isAiResponse || sender.username === "Pulse AI") && !message.isDeleted && (
-                            <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500/25 to-teal-500/25 text-emerald-400 border border-emerald-500/35 mb-1.5 shadow-sm">
-                              <Bot size={11} />
-                              <span>Pulse AI</span>
-                            </div>
+                          {!isMine && selectedChat.type === "room" && !message.isDeleted && !isSameSenderAsPrev && (
+                            <p className={`text-[11.5px] font-bold mb-1 tracking-tight ${getSenderColor(sender.username)}`}>{sender.username}</p>
                           )}
                           {message.isPinned && !message.isDeleted && (
-                            <div className="flex items-center gap-1 text-[9px] text-amber-400 font-medium mb-1 pb-1 border-b border-white/[0.10]">
+                            <div className={`flex items-center gap-1 text-[9px] font-medium mb-1 pb-1 border-b ${isMine ? "text-zinc-600 border-black/10" : "text-zinc-300 border-white/[0.10]"}`}>
                               <Pin size={9} /> Pinned
                             </div>
                           )}
                           {message.isForwarded && !message.isDeleted && (
-                            <div className="flex items-center gap-1 text-[9px] italic opacity-60 mb-1">
+                            <div className={`flex items-center gap-1 text-[9px] italic mb-1 ${isMine ? "text-zinc-600" : "opacity-60"}`}>
                               <Forward size={10} /> Forwarded
                             </div>
                           )}
                           {message.replyTo && !message.isDeleted && (
                             <div onClick={() => message.replyTo.messageId && scrollToMessage(message.replyTo.messageId)}
-                              className={`mb-1.5 p-2 rounded-xl cursor-pointer transition-colors text-[11px] select-none ${isMine ? "bg-black/20 border-l-2 border-white/80" : "bg-[var(--glass-hover)] border-l-2 border-accent-primary"}`}>
-                              <span className={`font-semibold block text-[10px] ${isMine ? "text-white" : "text-accent-primary"}`}>{message.replyTo.senderName || "User"}</span>
-                              <p className="opacity-80 truncate">{message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
+                              className={`mb-1.5 p-2 rounded-xl cursor-pointer transition-colors text-[11px] select-none ${isMine ? "bg-black/5 border-l-2 border-black/40 text-black" : "bg-[var(--glass-hover)] border-l-2 border-white/50 text-white"}`}>
+                              <span className={`font-semibold block text-[10px] ${isMine ? "text-black" : "text-white"}`}>{message.replyTo.senderName || "User"}</span>
+                              <p className={`truncate ${isMine ? "text-zinc-600" : "opacity-80"}`}>{message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
                             </div>
                           )}
                           {message.isDeleted ? (
@@ -816,16 +989,36 @@ const ChatPane = ({ onBack }) => {
                                 </div>
                               )}
                               {message.file && (
-                                <div className="mb-2 p-2.5 rounded-xl bg-[var(--glass-hover)] border border-[var(--glass-border)] flex items-center justify-between gap-3 max-w-xs">
+                                <div className={`flex items-center justify-between p-2.5 rounded-xl transition-all border my-1 max-w-sm ${
+                                  isMine 
+                                    ? "bg-black/5 border-black/10 text-black" 
+                                    : "bg-white/5 border-white/10 text-white hover:bg-white/10"
+                                }`}>
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="p-2 rounded-lg bg-accent-primary/20 text-accent-primary flex-shrink-0"><FileText size={16} /></div>
-                                    <div className="min-w-0">
-                                      <p className="text-[12px] font-medium truncate">{message.file.name}</p>
-                                      <p className="text-[10px] opacity-60">{formatFileSize(message.file.size)}</p>
+                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/20 text-red-400 shrink-0">
+                                      <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-xs font-semibold truncate">{message.file.name}</span>
+                                      <span className={`text-[11px] font-mono ${isMine ? "text-zinc-600" : "text-zinc-400"}`}>
+                                        {formatFileSize(message.file.size)} • Document
+                                      </span>
                                     </div>
                                   </div>
-                                  <a href={message.file.url} target="_blank" rel="noreferrer" download={message.file.name}
-                                    className="p-1.5 rounded-lg bg-[var(--glass-hover)] hover:bg-[var(--glass-active)] text-accent-primary transition-colors flex-shrink-0"><Download size={12} /></a>
+                                  <a
+                                    href={message.file.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    download={message.file.name}
+                                    className={`p-2 rounded-lg transition-all ml-2 shrink-0 ${
+                                      isMine
+                                        ? "bg-black/10 hover:bg-black/15 text-black"
+                                        : "bg-white/10 hover:bg-white/20 text-white"
+                                    }`}
+                                    title="Download Document"
+                                  >
+                                    <span className="material-symbols-outlined text-base">download</span>
+                                  </a>
                                 </div>
                               )}
                               {message.audio && <div className="mb-0.5"><AudioMessagePlayer audioUrl={message.audio} isMine={isMine} /></div>}
@@ -836,75 +1029,207 @@ const ChatPane = ({ onBack }) => {
                                 </div>
                               )}
                               {message.text && (
-                                <div className="text-[13px] leading-relaxed break-words pr-12">
-                                  <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
+                                <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
+                                  <div className="text-[13.5px] leading-relaxed break-words font-normal">
+                                    <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
+                                  </div>
+                                  <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 ${
+                                    isMine ? "text-[#52505b] font-medium" : "text-zinc-400"
+                                  }`}>
+                                    {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}
+                                    <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                    {isMine && !message.isDeleted && (
+                                      <span className={`material-symbols-outlined text-sm ${isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"}`}>
+                                        done_all
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               )}
-                              {message.linkPreview && (
-                                <LinkPreviewCard preview={message.linkPreview} isMine={isMine} />
-                              )}
-                              <div className="flex items-center justify-end gap-1 -mt-1 float-right ml-2 select-none">
-                                {message.isEdited && <span className={`text-[9px] italic ${isMine ? "text-white/60" : "opacity-50"}`}>(edited)</span>}
-                                <span className={`text-[10px] ${isMine ? "text-white/70" : "opacity-60"}`}>
-                                  {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                                {isMine && !message.isDeleted && (
-                                  <span title={isReadByRecipient ? "Read" : "Delivered"}>
-                                    <CheckCheck size={13} className={isReadByRecipient ? "text-white font-bold" : "text-white/50"} />
+                              
+                              {(() => {
+                                const url = extractFirstUrl(message.decryptedText || message.text);
+                                return url ? <LinkPreview url={url} /> : null;
+                              })()}
+
+                              {!message.text && (
+                                <div className="flex items-center justify-end gap-1 mt-1 select-none">
+                                  {message.isEdited && <span className={`text-[9px] italic ${isMine ? "text-[#52505b]" : "text-zinc-400 opacity-60"}`}>(edited)</span>}
+                                  <span className={`text-[10px] font-medium ${isMine ? "text-[#52505b]" : "text-zinc-400"}`}>
+                                    {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                   </span>
-                                )}
-                              </div>
+                                  {isMine && !message.isDeleted && (
+                                    <CheckCheck size={13} className={isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"} />
+                                  )}
+                                </div>
+                              )}
                             </>
                           )}
                         </div>
 
-                        {/* Hover actions */}
+                        {/* 3-dot dropdown menu trigger & popover */}
                         {!message.isDeleted && (
-                          <div className="relative flex items-center gap-0.5 flex-shrink-0">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); setActivePickerId(activePickerId === message._id ? null : message._id); }}
-                              className={actionBtnClass(hoveredMessageId === message._id || activePickerId === message._id)} title="React"><SmilePlus size={12} /></button>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); openThread(message); }}
-                              className={actionBtnClass(hoveredMessageId === message._id)} title="Reply in Thread"><MessageSquare size={12} /></button>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); setReplyingTo(message); }}
-                              className={actionBtnClass(hoveredMessageId === message._id)} title="Reply"><Reply size={12} /></button>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); toggleStarMessage(message._id); }}
+                          <div className="relative flex items-center flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuMessageId(openMenuMessageId === message._id ? null : message._id);
+                                setActivePickerId(null);
+                              }}
                               className={`p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] shadow-sm transition-all duration-150 cursor-pointer ${
-                                isStarred ? "opacity-100 scale-100 text-amber-400 pointer-events-auto" : hoveredMessageId === message._id ? "opacity-100 scale-100 text-theme-muted hover:text-amber-400 pointer-events-auto" : "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto text-theme-muted hover:text-amber-400"
-                              }`} title={isStarred ? "Unstar" : "Star"}>
-                              <Star size={12} className={isStarred ? "fill-amber-400" : ""} />
+                                openMenuMessageId === message._id || hoveredMessageId === message._id
+                                  ? "opacity-100 scale-100 pointer-events-auto text-theme-main bg-[var(--glass-hover)]"
+                                  : "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
+                              }`}
+                              title="Message options"
+                            >
+                              <MoreVertical size={13} />
                             </button>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); setForwardingMessage(message); }}
-                              className={actionBtnClass(hoveredMessageId === message._id)} title="Forward"><Forward size={12} /></button>
-                            {isMine && <button type="button" onClick={(e) => { e.stopPropagation(); setEditingMessage(message); }}
-                              className={actionBtnClass(hoveredMessageId === message._id)} title="Edit"><Edit3 size={12} /></button>}
-                            <button type="button" onClick={(e) => { e.stopPropagation(); togglePinMessage(message._id); }}
-                              className={`p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] shadow-sm transition-all duration-150 cursor-pointer ${
-                                message.isPinned ? "opacity-100 scale-100 text-accent-primary pointer-events-auto" : hoveredMessageId === message._id ? "opacity-100 scale-100 text-theme-muted hover:text-accent-primary pointer-events-auto" : "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto text-theme-muted hover:text-accent-primary"
-                              }`} title={message.isPinned ? "Unpin" : "Pin"}>
-                              <Pin size={12} className={message.isPinned ? "fill-accent-primary" : ""} />
-                            </button>
-                            {isMine && <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(message._id); }}
-                              className={`p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] text-theme-muted hover:text-red-400 shadow-sm transition-all duration-150 cursor-pointer ${
-                                hoveredMessageId === message._id ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto"
-                              }`} title="Delete"><Trash2 size={12} /></button>}
 
-                            {activePickerId === message._id && (
-                              <div onClick={(e) => e.stopPropagation()}
-                                className={`absolute bottom-full mb-1.5 ${isMine ? "right-0" : "left-0"} z-30 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-full px-2 py-1 flex items-center gap-1 shadow-glass animate-fadeIn`}>
-                                {QUICK_REACTIONS.map((emoji) => (
-                                  <button key={emoji} type="button" onClick={() => { reactToMessage(message._id, emoji); setActivePickerId(null); }}
-                                    className="hover:scale-125 transition-transform text-base p-1">{emoji}</button>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFullReactionPickerMsgId(fullReactionPickerMsgId === message._id ? null : message._id);
-                                  }}
-                                  className="p-1 rounded-full text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all flex items-center justify-center ml-0.5"
-                                  title="All emojis"
-                                >
-                                  <Plus size={13} />
-                                </button>
+                            {openMenuMessageId === message._id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className={`absolute ${openUpwards ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${
+                                  isMine ? "right-0" : "left-0"
+                                } z-50 min-w-[210px] p-1.5 rounded-2xl bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] shadow-2xl animate-scaleIn select-none`}
+                              >
+                                {/* Quick Reactions row */}
+                                <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-white/5 rounded-xl border border-white/5">
+                                  {QUICK_REACTIONS.map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      type="button"
+                                      onClick={() => {
+                                        reactToMessage(message._id, emoji);
+                                        setOpenMenuMessageId(null);
+                                      }}
+                                      className="hover:scale-125 transition-transform text-base p-1 rounded-lg hover:bg-white/10"
+                                      title={`React ${emoji}`}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFullReactionPickerMsgId(fullReactionPickerMsgId === message._id ? null : message._id);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="p-1 rounded-lg text-theme-muted hover:text-theme-main hover:bg-white/10 transition-all flex items-center justify-center"
+                                    title="More reactions"
+                                  >
+                                    <Plus size={13} />
+                                  </button>
+                                </div>
+
+                                <div className="h-px bg-[var(--glass-border)] my-1" />
+
+                                {/* Menu Options */}
+                                <div className="flex flex-col gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReplyingTo(message);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                  >
+                                    <Reply size={14} className="text-theme-muted" />
+                                    <span>Reply</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      openThread(message);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                  >
+                                    <MessageSquare size={14} className="text-theme-muted" />
+                                    <span>Reply in Thread</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      toggleStarMessage(message._id);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                  >
+                                    <Star size={14} className={isStarred ? "text-amber-400 fill-amber-400" : "text-theme-muted"} />
+                                    <span>{isStarred ? "Unstar Message" : "Star Message"}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setForwardingMessage(message);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                  >
+                                    <Forward size={14} className="text-theme-muted" />
+                                    <span>Forward</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      togglePinMessage(message._id);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                  >
+                                    <Pin size={14} className={message.isPinned ? "text-accent-primary fill-accent-primary" : "text-theme-muted"} />
+                                    <span>{message.isPinned ? "Unpin Message" : "Pin Message"}</span>
+                                  </button>
+
+                                  {isMine && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingMessage(message);
+                                        setOpenMenuMessageId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                    >
+                                      <Edit3 size={14} className="text-theme-muted" />
+                                      <span>Edit Message</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setInfoModalMessage(message);
+                                      setOpenMenuMessageId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                  >
+                                    <Info size={14} className="text-theme-muted" />
+                                    <span>Message Info</span>
+                                  </button>
+
+                                  {isMine && (
+                                    <>
+                                      <div className="h-px bg-[var(--glass-border)] my-1" />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleDelete(message._id);
+                                          setOpenMenuMessageId(null);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors text-left"
+                                      >
+                                        <Trash2 size={14} className="text-red-400" />
+                                        <span>Delete Message</span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             )}
 
@@ -983,8 +1308,8 @@ const ChatPane = ({ onBack }) => {
                   </div>
                 </Fragment>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
 
@@ -1031,6 +1356,7 @@ const ChatPane = ({ onBack }) => {
       {isScheduledOpen && <ScheduledMessagesModal isOpen={isScheduledOpen} onClose={() => setIsScheduledOpen(false)} />}
       {isWallpaperOpen && <WallpaperModal isOpen={isWallpaperOpen} onClose={() => setIsWallpaperOpen(false)} />}
       {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
+      {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
     </div>
   );
 };

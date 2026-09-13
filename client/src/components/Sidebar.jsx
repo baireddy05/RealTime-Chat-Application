@@ -1,16 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
-import { useThemeStore } from "../store/useThemeStore";
-import { 
-  MessageSquare, Users, UserPlus, Check, X, UserX, Search, Loader, 
-  MoreVertical, CircleDashed, LogOut, User, Clock, CheckCheck, Plus,
-  Sun, Moon, Palette, Image as ImageIcon
-} from "lucide-react";
-import StatusModal from "./StatusModal";
 import CreateGroupModal from "./CreateGroupModal";
-import WallpaperModal from "./WallpaperModal";
+import { isEncryptedMessage } from "../lib/crypto";
 
 const formatTimeRelative = (dateStr) => {
   if (!dateStr) return "";
@@ -26,7 +19,32 @@ const formatTimeRelative = (dateStr) => {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-const Sidebar = ({ onChatSelect, onOpenProfile }) => {
+const getMessageSnippet = (msg) => {
+  if (!msg) return "";
+  if (msg.audio) return "🎤 Voice note";
+  if (msg.image) return "📷 Photo attachment";
+  if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
+  
+  const text = msg.decryptedText || msg.text || "";
+  if (isEncryptedMessage(text)) {
+    return "🔒 Encrypted Message";
+  }
+  return text;
+};
+
+const Sidebar = ({
+  onChatSelect,
+  onOpenSetStatus,
+  onOpenAddFriend,
+  onToggleTheme,
+  theme,
+  statusEmoji = "💻",
+  statusCategory = "Coding",
+  statusDetail = "Available",
+  handleInstallPWA,
+  logout,
+  setIsWallpaperOpen,
+}) => {
   const {
     rooms,
     getRooms,
@@ -34,518 +52,631 @@ const Sidebar = ({ onChatSelect, onOpenProfile }) => {
     setSelectedChat,
     unreadCounts,
     lastMessages,
-    isWallpaperOpen,
-    setIsWallpaperOpen,
   } = useChatStore();
-  const { theme, toggleTheme } = useThemeStore();
 
-  const selectChat = (chat) => {
-    setSelectedChat(chat);
-    onChatSelect?.();
-  };
-
-  const { authUser, onlineUsers, logout } = useAuthStore();
-  const { 
-    friends, incomingRequests, searchResults, isFriendsLoading, isSearching,
-    getFriends, getFriendRequests, searchUsers, sendFriendRequest, 
-    acceptFriendRequest, rejectFriendRequest, removeFriend,
-    subscribeToFriendEvents, unsubscribeFromFriendEvents
+  const { authUser, onlineUsers } = useAuthStore();
+  const {
+    friends,
+    incomingRequests,
+    searchResults,
+    getFriends,
+    getFriendRequests,
+    searchUsers,
+    sendFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    subscribeToFriendEvents,
+    unsubscribeFromFriendEvents,
   } = useFriendStore();
 
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState(null);
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
-  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     getRooms();
     getFriends();
     getFriendRequests();
     subscribeToFriendEvents();
-    return () => { unsubscribeFromFriendEvents(); };
+    return () => {
+      unsubscribeFromFriendEvents();
+    };
   }, [getRooms, getFriends, getFriendRequests, subscribeToFriendEvents, unsubscribeFromFriendEvents]);
 
+  // Keyboard shortcut: Command+K or Ctrl+K focuses the search input
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim().length > 0 && activeFilter === "add") {
-        searchUsers(searchQuery);
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
       }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, activeFilter, searchUsers]);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
-  const handleSendRequest = async (userId) => { setActionLoadingId(userId); await sendFriendRequest(userId); setActionLoadingId(null); };
-  const handleAcceptRequest = async (requestId) => { setActionLoadingId(requestId); await acceptFriendRequest(requestId); setActionLoadingId(null); };
-  const handleRejectRequest = async (requestId) => { setActionLoadingId(requestId); await rejectFriendRequest(requestId); setActionLoadingId(null); };
-  const handleRemoveFriend = async (userId) => {
-    if (window.confirm("Remove this friend from your contacts?")) {
-      setActionLoadingId(userId);
-      await removeFriend(userId);
-      if (selectedChat?.id === userId) setSelectedChat(null);
-      setActionLoadingId(null);
+  const handleAcceptRequest = async (requestId) => {
+    setActionLoadingId(requestId);
+    await acceptFriendRequest(requestId);
+    setActionLoadingId(null);
+  };
+
+  const handleRejectRequest = async (requestId) => {
+    setActionLoadingId(requestId);
+    await rejectFriendRequest(requestId);
+    setActionLoadingId(null);
+  };
+
+  const handleSendRequest = async (userId) => {
+    setActionLoadingId(userId);
+    await sendFriendRequest(userId);
+    setActionLoadingId(null);
+  };
+
+  const selectChat = (chat) => {
+    setSelectedChat(chat);
+    onChatSelect?.();
+  };
+
+  // Search filter
+  useEffect(() => {
+    if (searchQuery.trim().length >= 2) {
+      const timer = setTimeout(() => {
+        searchUsers(searchQuery);
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [searchQuery, searchUsers]);
 
-  const pendingCount = incomingRequests.length;
-  const filteredRooms = rooms.filter((r) => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const filteredFriends = friends.filter((f) => f.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  const pendingCount = incomingRequests?.length || 0;
+  const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
 
-  const filterBtn = (key, label, count) => {
-    const active = activeFilter === key;
-    return (
-      <button
-        onClick={() => setActiveFilter(key)}
-        className={`px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all flex-shrink-0 active:scale-[0.97] ${
-          active
-            ? "liquid-pill-active"
-            : "liquid-pill-inactive"
-        }`}
-      >
-        {label}{count !== undefined ? ` (${count})` : ""}
-      </button>
-    );
-  };
+  const filteredRooms = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return rooms;
+    return rooms.filter((r) => r.name.toLowerCase().includes(q));
+  }, [rooms, searchQuery]);
+
+  const filteredFriends = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return friends;
+    return friends.filter((f) => f.username.toLowerCase().includes(q));
+  }, [friends, searchQuery]);
+
+  const roomsCount = filteredRooms.length;
+  const directCount = filteredFriends.length;
+  const allCount = roomsCount + directCount;
+
+  const topPendingRequest = incomingRequests && incomingRequests.length > 0 ? incomingRequests[0] : null;
 
   return (
-    <aside className="w-full md:w-80 lg:w-[340px] flex flex-col h-full select-none relative bg-transparent">
-      {/* Header */}
-      <div className="h-[60px] border-b border-[var(--glass-border)] px-4 flex items-center justify-between flex-shrink-0 relative z-30">
-        {/* User Profile & Brand */}
-        <div className="flex items-center gap-3">
-          <div onClick={onOpenProfile} className="relative cursor-pointer group" title="Profile & Settings">
-            <img
-              src={authUser?.profilePic || `https://ui-avatars.com/api/?name=${authUser?.username}&background=2563eb&color=ffffff&bold=true`}
-              alt="Profile"
-              className="w-9 h-9 rounded-full object-cover ring-1 ring-[var(--glass-border)] group-hover:ring-accent-primary transition-all"
-            />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-online ring-2 ring-[var(--glass-surface)]" />
+    <section
+      aria-label="Chats List"
+      className="h-full flex flex-col p-3 text-on-surface select-none overflow-hidden transition-colors duration-200 bg-transparent"
+    >
+      {/* 1. Sleek Top Workspace Bar with Actions */}
+      <div className="flex flex-col gap-2 pb-2">
+        <div className="flex items-center justify-between px-1 pt-1">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setSelectedChat(null)}>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-accent-primary to-accent-secondary p-0.5 shadow-md flex items-center justify-center">
+              <img alt="Pulse" className="w-5 h-5 object-contain" src="/logo.svg" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold tracking-tight text-on-surface text-base leading-tight">Pulse</span>
+              <span className="text-[10px] font-mono text-outline leading-none">v2.4 E2EE</span>
+            </div>
           </div>
-          <div className="min-w-0">
-            <span className="font-semibold text-[14px] text-theme-main tracking-tight">Pulse</span>
-            <p className="text-[11px] text-theme-muted truncate max-w-[100px]">{authUser?.username}</p>
-          </div>
-        </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-0.5 relative">
-          {/* Theme Switcher Button */}
-          <button
-            id="theme-toggle-btn"
-            onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-[var(--glass-hover)] text-theme-muted hover:text-accent-primary transition-all relative"
-            title={theme === "dark" ? "Switch to Arctic Prism (Light Mode)" : "Switch to Cosmic Obsidian (Dark Mode)"}
-          >
-            {theme === "dark" ? (
-              <Sun size={17} className="text-amber-400 hover:rotate-45 transition-transform" />
-            ) : (
-              <Moon size={17} className="text-accent-primary hover:-rotate-12 transition-transform" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setIsStatusOpen(true)}
-            className="p-2 rounded-lg hover:bg-[var(--glass-hover)] text-theme-muted hover:text-accent-primary transition-all relative"
-            title="Stories & Status"
-          >
-            <CircleDashed size={17} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-accent-primary" />
-          </button>
-
-          <button
-            onClick={() => setActiveFilter(activeFilter === "add" ? "all" : "add")}
-            className={`p-2 rounded-lg transition-all relative ${
-              activeFilter === "add" ? "text-accent-primary bg-accent-primary/20" : "text-theme-muted hover:bg-[var(--glass-hover)] hover:text-theme-main"
-            }`}
-            title="Add contact"
-          >
-            <UserPlus size={17} />
-            {pendingCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-accent-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center shadow">
-                {pendingCount}
-              </span>
-            )}
-          </button>
-
-          {/* Menu */}
-          <div className="relative">
+          <div className="flex items-center gap-1">
+            {/* New Channel Button */}
             <button
-              onClick={(e) => { e.stopPropagation(); setShowMenuDropdown((prev) => !prev); }}
-              className="p-2 rounded-lg hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main transition-all"
-              title="Menu"
+              onClick={() => setIsCreateGroupOpen(true)}
+              className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors"
+              title="Create Channel"
+              type="button"
             >
-              <MoreVertical size={17} />
+              <span className="material-symbols-outlined text-lg">add</span>
             </button>
 
-            {showMenuDropdown && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMenuDropdown(false)} />
-                <div className="absolute right-0 top-10 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl shadow-glass py-1.5 w-52 animate-scaleIn smooth-gpu text-[13px]">
-                  <button onClick={() => { toggleTheme(); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 transition-colors text-theme-main">
-                    {theme === "dark" ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-accent-primary" />}
-                    <span>{theme === "dark" ? "Light: Arctic Prism" : "Dark: Cosmic Obsidian"}</span>
-                  </button>
-                  <button onClick={() => { setIsStatusOpen(true); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 transition-colors text-theme-main hover:text-accent-primary">
-                    <CircleDashed size={15} className="text-accent-primary" /> Status Stories
-                  </button>
-                  <button onClick={() => { setIsCreateGroupOpen(true); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 transition-colors text-theme-main hover:text-accent-primary">
-                    <Plus size={15} className="text-accent-primary" /> New Channel
-                  </button>
-                  <button onClick={() => { setActiveFilter("contacts"); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 transition-colors text-theme-main">
-                    <Users size={15} className="text-theme-muted" /> Contacts
-                  </button>
-                  <button onClick={() => { setIsWallpaperOpen(true); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 transition-colors text-theme-main hover:text-accent-primary">
-                    <Palette size={15} className="text-accent-primary" /> Chat Wallpaper
-                  </button>
-                  <button onClick={() => { onOpenProfile?.(); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 transition-colors text-theme-main">
-                    <User size={15} className="text-theme-muted" /> Profile
-                  </button>
-                  <div className="border-t border-[var(--glass-border)] my-1" />
-                  <button onClick={() => { logout(); setShowMenuDropdown(false); }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-red-500/15 text-red-400/80 hover:text-red-400 flex items-center gap-2.5 transition-colors">
-                    <LogOut size={15} /> Log Out
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Search & Filters */}
-      <div className="p-3 border-b border-[var(--glass-border)] space-y-2.5">
-        <div className="relative flex items-center">
-          <Search size={14} className="absolute left-3 text-theme-muted/50" />
-          <input
-            type="text"
-            placeholder={activeFilter === "add" ? "Search contacts..." : "Search..."}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full glass-input rounded-xl pl-8.5 pr-8 py-2 text-[13px] text-theme-main placeholder-theme-muted/50 border border-[var(--glass-border)] focus:outline-none focus:border-accent-primary/70 transition-all"
-            style={{ paddingLeft: '34px' }}
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-2.5 text-theme-muted/60 hover:text-theme-main">
-              <X size={13} />
+            {/* Add Friend Button */}
+            <button
+              onClick={onOpenAddFriend}
+              className="relative p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors"
+              title="Add Contact"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-lg">person_add</span>
+              {pendingCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+              )}
             </button>
-          )}
-        </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          {filterBtn("all", "All")}
-          {filterBtn("groups", "Channels", rooms.length)}
-          {filterBtn("contacts", "Contacts", friends.length)}
-          <button
-            id="filter-add-btn"
-            onClick={() => setActiveFilter("add")}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all flex-shrink-0 flex items-center gap-1.5 active:scale-[0.97] ${
-              activeFilter === "add"
-                ? "liquid-pill-active"
-                : "liquid-pill-inactive"
-            }`}
-          >
-            <UserPlus size={11} />
-            <span>Add</span>
-          </button>
-        </div>
-      </div>
+            {/* More Menu Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowOptionsDropdown(!showOptionsDropdown)}
+                className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors"
+                title="Options"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">more_vert</span>
+              </button>
 
-      {/* Main List */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {/* All & Groups View */}
-        {(activeFilter === "all" || activeFilter === "groups") && (
-          <div className="space-y-0.5">
-            {activeFilter === "groups" && (
-              <div className="flex items-center justify-between px-2 py-2 mb-1">
-                <span className="text-[11px] font-medium text-theme-muted/60 tracking-wider">CHANNELS</span>
-                <button onClick={() => setIsCreateGroupOpen(true)}
-                  className="flex items-center gap-1 text-[11px] font-medium text-accent-primary hover:text-accent-primary/80 px-2 py-1 rounded-lg hover:bg-accent-primary/15 transition-colors">
-                  <Plus size={12} /> New
-                </button>
-              </div>
-            )}
-
-            {filteredRooms.map((room) => {
-              const isSelected = selectedChat?.id === room._id;
-              const displayName = room.name.replace(/^#/, "");
-              const unread = unreadCounts[room._id] || 0;
-              const last = lastMessages[room._id] || room.lastMessage;
-              const hasUnread = unread > 0;
-
-              return (
-                <div
-                  key={room._id}
-                  id={`channel-${displayName.toLowerCase()}`}
-                  data-testid={`channel-${displayName.toLowerCase()}`}
-                  onClick={() => selectChat({ id: room._id, type: "room", name: room.name })}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-                    isSelected
-                      ? "bg-accent-primary/20 border border-accent-primary/40 shadow-sm"
-                      : "hover:bg-[var(--glass-hover)]"
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-primary/25 to-accent-secondary/25 flex items-center justify-center text-accent-primary font-semibold text-[12px] flex-shrink-0 border border-[var(--glass-border)]">
-                    {displayName.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-0.5">
-                      <h4 className={`font-medium text-[13px] truncate capitalize ${hasUnread ? "text-theme-main font-semibold" : "text-theme-main"}`}>
-                        {displayName}
-                      </h4>
-                      <span className="text-[10px] text-theme-muted/50 ml-2 flex-shrink-0">
-                        {last?.createdAt ? formatTimeRelative(last.createdAt) : "Channel"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className={`text-[11px] truncate ${hasUnread ? "text-theme-main font-medium" : "text-theme-muted"}`}>
-                        {last ? (
-                          <>
-                            {last.senderId?.username ? `${last.senderId.username}: ` : ""}
-                            {last.decryptedText || (last.text?.startsWith("[e2ee]:") ? "🔒 Encrypted Message" : last.text) || (last.image ? "📷 Photo" : last.file ? `📎 ${last.file.name}` : last.audio ? "🎤 Voice" : "Attachment")}
-                          </>
-                        ) : (
-                          room.description || "Channel chat"
-                        )}
-                      </p>
-                      {hasUnread && (
-                        <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                          {unread > 99 ? "99+" : unread}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Direct contacts in All view */}
-            {activeFilter === "all" && (
-              <>
-                {filteredFriends.length === 0 && filteredRooms.length === 0 ? (
-                  <div className="text-center py-16 px-4">
-                    <MessageSquare size={28} className="mx-auto mb-3 text-theme-muted/30" />
-                    <p className="text-[13px] font-medium text-theme-muted">No conversations</p>
-                    <button onClick={() => setActiveFilter("add")} className="mt-2 text-[12px] text-accent-primary hover:underline font-medium">
-                      Find contacts
+              {showOptionsDropdown && (
+                <div className="absolute right-0 top-9 w-48 rounded-xl bg-surface-container-high/95 backdrop-blur-2xl border border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none">
+                  {onOpenSetStatus && (
+                    <button
+                      onClick={() => { onOpenSetStatus(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-on-surface hover:bg-surface-variant transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-sm text-secondary">sentiment_satisfied</span>
+                      <span>Set Status Mood</span>
                     </button>
-                  </div>
-                ) : (
-                  filteredFriends.map((friend) => {
-                    const isOnline = onlineUsers.includes(friend._id);
-                    const isSelected = selectedChat?.id === friend._id;
-                    const unread = unreadCounts[friend._id] || 0;
-                    const last = lastMessages[friend._id] || friend.lastMessage;
-                    const hasUnread = unread > 0;
-
-                    return (
-                      <div
-                        key={friend._id}
-                        onClick={() => selectChat({ id: friend._id, type: "user", name: friend.username })}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-                          isSelected
-                            ? "bg-accent-primary/20 border border-accent-primary/40 shadow-sm"
-                            : "hover:bg-[var(--glass-hover)]"
-                        }`}
+                  )}
+                  {setIsWallpaperOpen && (
+                    <button
+                      onClick={() => { setIsWallpaperOpen(true); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-on-surface hover:bg-surface-variant transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-sm text-primary">wallpaper</span>
+                      <span>Chat Wallpaper</span>
+                    </button>
+                  )}
+                  {handleInstallPWA && (
+                    <button
+                      onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-on-surface hover:bg-surface-variant transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-sm text-accent-secondary">install_desktop</span>
+                      <span>Install Pulse PWA</span>
+                    </button>
+                  )}
+                  {onToggleTheme && (
+                    <button
+                      onClick={() => { onToggleTheme(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-on-surface hover:bg-surface-variant transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        {theme === "dark" ? "light_mode" : "dark_mode"}
+                      </span>
+                      <span>Switch Theme</span>
+                    </button>
+                  )}
+                  {logout && (
+                    <>
+                      <div className="my-1 border-t border-outline/10" />
+                      <button
+                        onClick={() => { logout(); setShowOptionsDropdown(false); }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-error hover:bg-error-container/30 transition-colors text-left"
                       >
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={friend.profilePic || `https://ui-avatars.com/api/?name=${friend.username}&background=2563eb&color=ffffff`}
-                            alt={friend.username}
-                            className="w-10 h-10 rounded-full object-cover border border-[var(--glass-border)]"
-                          />
-                          {isOnline && (
-                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-online ring-2 ring-[var(--glass-surface)]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-baseline mb-0.5">
-                            <h4 className={`font-medium text-[13px] truncate ${hasUnread ? "text-theme-main font-semibold" : "text-theme-main"}`}>
-                              {friend.username}
-                            </h4>
-                            <span className={`text-[10px] flex-shrink-0 ${hasUnread ? "text-accent-primary font-semibold" : isOnline ? "text-status-online font-medium" : "text-theme-muted/40"}`}>
-                              {last?.createdAt ? formatTimeRelative(last.createdAt) : isOnline ? "Online" : "Offline"}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className={`text-[11px] truncate flex items-center gap-1 ${hasUnread ? "text-theme-main font-medium" : "text-theme-muted"}`}>
-                              <CheckCheck size={12} className={hasUnread ? "text-accent-primary font-bold" : "text-accent-primary"} />
-                              <span>
-                                {last
-                                  ? (last.decryptedText || (last.text?.startsWith("[e2ee]:") ? "🔒 Encrypted Message" : last.text) || (last.image ? "📷 Photo" : last.file ? `📎 ${last.file.name}` : last.audio ? "🎤 Voice Note" : "Attachment"))
-                                  : (friend.status || "Available")}
-                              </span>
-                            </p>
-                            {hasUnread && (
-                              <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                                {unread > 99 ? "99+" : unread}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Contacts View */}
-        {activeFilter === "contacts" && (
-          <div className="space-y-3 p-1">
-            {incomingRequests.length > 0 && (
-              <div className="p-3 rounded-2xl glass-surface border border-[var(--glass-border)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-accent-primary tracking-wide">REQUESTS ({incomingRequests.length})</span>
-                  <Clock size={13} className="text-theme-muted/50" />
-                </div>
-                <div className="space-y-1.5">
-                  {incomingRequests.map((req) => (
-                    <div key={req._id} className="flex items-center justify-between p-2.5 bg-[var(--glass-hover)] rounded-xl border border-[var(--glass-border)]">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <img src={req.sender.profilePic || `https://ui-avatars.com/api/?name=${req.sender.username}`}
-                          alt={req.sender.username} className="w-8 h-8 rounded-full object-cover" />
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-theme-main truncate">{req.sender.username}</p>
-                          <p className="text-[10px] text-theme-muted">Wants to connect</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => handleAcceptRequest(req._id)} disabled={actionLoadingId === req._id}
-                          className="p-1.5 rounded-lg bg-accent-primary hover:bg-accent-primary/80 text-white transition-colors shadow-sm" title="Accept">
-                          <Check size={12} />
-                        </button>
-                        <button onClick={() => handleRejectRequest(req._id)} disabled={actionLoadingId === req._id}
-                          className="p-1.5 rounded-lg bg-[var(--glass-hover)] hover:bg-red-500/15 text-theme-muted hover:text-red-400 transition-colors" title="Decline">
-                          <X size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <span className="text-[11px] font-medium text-theme-muted/60 tracking-wider block mb-2 px-1">CONTACTS ({friends.length})</span>
-              {isFriendsLoading ? (
-                <div className="flex justify-center p-8"><Loader className="animate-spin text-accent-primary size-5" /></div>
-              ) : friends.length === 0 ? (
-                <div className="text-center py-10 px-4">
-                  <Users size={24} className="mx-auto mb-2 text-theme-muted/30" />
-                  <p className="text-[12px] text-theme-muted">No contacts yet</p>
-                  <button onClick={() => setActiveFilter("add")} className="mt-2 text-[12px] text-accent-primary font-medium hover:underline">Add a friend</button>
-                </div>
-              ) : (
-                <div className="space-y-0.5">
-                  {filteredFriends.map((friend) => {
-                    const isOnline = onlineUsers.includes(friend._id);
-                    return (
-                      <div key={friend._id} className="flex items-center justify-between p-2 rounded-xl hover:bg-[var(--glass-hover)] transition-colors group">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="relative flex-shrink-0">
-                            <img src={friend.profilePic || `https://ui-avatars.com/api/?name=${friend.username}`}
-                              alt={friend.username} className="w-9 h-9 rounded-full object-cover border border-[var(--glass-border)]" />
-                            {isOnline && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-online ring-2 ring-[var(--glass-surface)]" />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-theme-main truncate">{friend.username}</p>
-                            <p className="text-[11px] text-theme-muted truncate">{friend.status || "Available"}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => selectChat({ id: friend._id, type: "user", name: friend.username })}
-                            className="p-1.5 rounded-lg text-accent-primary hover:bg-accent-primary/20 transition-colors" title="Chat">
-                            <MessageSquare size={14} />
-                          </button>
-                          <button onClick={() => handleRemoveFriend(friend._id)} disabled={actionLoadingId === friend._id}
-                            className="p-1.5 rounded-lg text-theme-muted hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove">
-                            <UserX size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        <span className="material-symbols-outlined text-sm">logout</span>
+                        <span>Sign Out</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
           </div>
+        </div>
+
+        {/* Presence Status Mood Bar (Cleanly integrated in sidebar) */}
+        <div
+          onClick={onOpenSetStatus}
+          className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/20 cursor-pointer transition-all group"
+          title="Click to change your presence status"
+        >
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="text-xs">{statusEmoji}</span>
+            <span className="text-xs text-on-surface-variant truncate font-normal">
+              <span className="text-on-surface font-medium">{statusCategory}:</span> {statusDetail}
+            </span>
+          </div>
+          <span className="material-symbols-outlined text-xs text-outline group-hover:text-on-surface transition-colors">
+            edit
+          </span>
+        </div>
+
+        {/* Search Bar with ⌘K */}
+        <div className="relative flex items-center w-full mt-1.5">
+          <span className="material-symbols-outlined absolute left-3 text-outline pointer-events-none text-base">
+            search
+          </span>
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-11 py-2 rounded-full glass-input text-on-surface placeholder:text-outline text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-inner"
+            placeholder="Search conversations (⌘K)..."
+            type="text"
+          />
+          <kbd className="absolute right-3 px-1.5 py-0.5 rounded-md bg-[var(--glass-surface)] border border-[var(--glass-border)] text-outline font-mono text-[9px] pointer-events-none">
+            ⌘K
+          </kbd>
+        </div>
+
+        {/* Category Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1.5">
+          <button
+            onClick={() => setActiveFilter("all")}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              activeFilter === "all"
+                ? "bg-white text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+            type="button"
+          >
+            <span>All</span>
+            <span className="text-[10px] opacity-75 font-mono">({allCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter("channels")}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              activeFilter === "channels"
+                ? "bg-white text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+            type="button"
+          >
+            <span>Channels</span>
+            <span className="text-[10px] opacity-75 font-mono">({roomsCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter("direct")}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              activeFilter === "direct"
+                ? "bg-white text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+            type="button"
+          >
+            <span>Direct</span>
+            <span className="text-[10px] opacity-75 font-mono">({directCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter("requests")}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              activeFilter === "requests"
+                ? "bg-white text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+            type="button"
+          >
+            <span>Requests</span>
+            {pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-white text-black text-[9px] font-bold">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Top Pending Friend Request Banner */}
+      {topPendingRequest && (
+        <div className="my-1.5 p-2 rounded-xl bg-surface-container/90 border border-accent-primary/20 flex items-center justify-between gap-2 animate-fadeIn shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+              alt={topPendingRequest.sender?.username || "Contact"}
+              src={
+                topPendingRequest.sender?.profilePic ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  topPendingRequest.sender?.username || "U"
+                )}&background=8083ff&color=ffffff`
+              }
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium truncate text-on-surface">
+                {topPendingRequest.sender?.username}
+              </span>
+              <span className="text-[10px] text-outline truncate">Wants to connect</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => handleAcceptRequest(topPendingRequest._id)}
+              disabled={actionLoadingId === topPendingRequest._id}
+              className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+              title="Accept"
+            >
+              <span className="material-symbols-outlined text-sm">check</span>
+            </button>
+            <button
+              onClick={() => handleRejectRequest(topPendingRequest._id)}
+              disabled={actionLoadingId === topPendingRequest._id}
+              className="p-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors"
+              title="Decline"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Global User Search Results (When typing) */}
+      {searchQuery.trim().length >= 2 && searchResults.length > 0 && (
+        <div className="mb-2 p-2 rounded-xl bg-surface-container/80 border border-white/10 flex flex-col gap-1 shrink-0 max-h-48 overflow-y-auto custom-scrollbar">
+          <div className="text-[10px] font-mono text-secondary uppercase font-semibold px-1">
+            Global Search
+          </div>
+          {searchResults.map((user) => {
+            const isAlreadyFriend = friends.some((f) => f._id === user._id);
+            const isMe = user._id === authUser?._id;
+            return (
+              <div
+                key={user._id}
+                className="flex items-center justify-between p-1.5 rounded-lg hover:bg-surface-container-high transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <img
+                    src={user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=8083ff&color=ffffff`}
+                    alt={user.username}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                  <div className="min-w-0">
+                    <span className="text-xs font-medium text-on-surface block truncate">{user.username}</span>
+                    <span className="text-[10px] text-outline block truncate">{user.email}</span>
+                  </div>
+                </div>
+                {!isMe && !isAlreadyFriend && (
+                  <button
+                    onClick={() => handleSendRequest(user._id)}
+                    disabled={actionLoadingId === user._id}
+                    className="p-1 rounded-lg bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30 transition-colors"
+                    title="Send Friend Request"
+                  >
+                    <span className="material-symbols-outlined text-xs">person_add</span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 4. Conversation List (Clean, Smooth Virtual Scroll) */}
+      <div className="flex-1 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar space-y-1">
+        {/* Empty States */}
+        {activeFilter === "channels" && filteredRooms.length === 0 && (
+          <div className="p-8 text-center text-outline text-xs">No channels found.</div>
+        )}
+        {activeFilter === "direct" && filteredFriends.length === 0 && (
+          <div className="p-8 text-center text-outline text-xs">No direct contacts yet.</div>
         )}
 
-        {/* Add Friend View */}
-        {activeFilter === "add" && (
-          <div className="p-1 space-y-3">
-            <div className="p-3 rounded-2xl glass-surface border border-[var(--glass-border)] flex items-center gap-2.5 text-[12px] text-theme-muted">
-              <UserPlus size={14} className="flex-shrink-0 text-accent-primary" />
-              <span>Search by username to send friend requests</span>
-            </div>
+        {/* Section Header: Channels */}
+        {(activeFilter === "all" || activeFilter === "channels") && filteredRooms.length > 0 && (
+          <div className="pt-2 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-outline uppercase tracking-wider">
+            <span>Channels</span>
+            <span className="text-[9px] font-mono">{filteredRooms.length}</span>
+          </div>
+        )}
 
-            {isSearching ? (
-              <div className="flex justify-center p-10"><Loader className="animate-spin text-accent-primary size-5" /></div>
-            ) : searchQuery.trim().length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <Search size={24} className="mx-auto mb-2 text-theme-muted/30" />
-                <p className="text-[12px] text-theme-muted/60">Type a username above</p>
-              </div>
-            ) : searchResults.length === 0 ? (
-              <div className="text-center py-10 px-4">
-                <p className="text-[12px] text-theme-muted/60">No users found for "{searchQuery}"</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {searchResults.map((user) => {
-                  const isFriend = user.relationship === "friend";
-                  const isPendingOut = user.relationship === "pending_outgoing";
-                  const isPendingIn = user.relationship === "pending_incoming";
-                  const isSelf = user._id === authUser._id;
-                  if (isSelf) return null;
+        {/* Channels List */}
+        {(activeFilter === "all" || activeFilter === "channels") &&
+          filteredRooms.map((room) => {
+            const isSelected = selectedChat?.id === room._id;
+            const unread = unreadCounts[room._id] || 0;
+            const lastMsg = lastMessages[room._id];
+            const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
+            const previewText = getMessageSnippet(lastMsg);
+            const senderUsername = lastMsg?.senderId?.username || (lastMsg?.senderId === authUser?._id ? "You" : "");
 
-                  return (
-                    <div key={user._id} className="flex items-center justify-between p-2.5 rounded-xl border border-[var(--glass-border)] hover:bg-[var(--glass-hover)] transition-all">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <img src={user.profilePic || `https://ui-avatars.com/api/?name=${user.username}`}
-                          alt={user.username} className="w-9 h-9 rounded-full object-cover border border-[var(--glass-border)]" />
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-theme-main truncate">{user.username}</p>
-                          <p className="text-[10px] text-theme-muted truncate">{user.status || "Pulse user"}</p>
-                        </div>
-                      </div>
-                      <div>
-                        {isFriend ? (
-                          <span className="text-[11px] font-medium text-status-online bg-status-online/15 px-2.5 py-1 rounded-lg">Friend</span>
-                        ) : isPendingOut ? (
-                          <span className="text-[11px] font-medium text-accent-secondary bg-accent-secondary/15 border border-accent-secondary/30 px-2.5 py-1 rounded-lg">Sent</span>
-                        ) : isPendingIn ? (
-                          <span className="text-[11px] font-medium text-accent-primary bg-accent-primary/15 px-2.5 py-1 rounded-lg">Requested</span>
-                        ) : (
-                          <button onClick={() => handleSendRequest(user._id)} disabled={actionLoadingId === user._id}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-primary hover:bg-accent-primary/85 text-white font-medium text-[11px] shadow-sm transition-all active:scale-[0.97] disabled:opacity-50 cursor-pointer">
-                            {actionLoadingId === user._id ? <Loader size={11} className="animate-spin text-white" /> : <UserPlus size={11} className="text-white" />}
-                            <span className="text-white font-medium">Add</span>
-                          </button>
+            return (
+              <div
+                key={room._id}
+                onClick={() =>
+                  selectChat({
+                    id: room._id,
+                    name: room.name,
+                    type: "room",
+                    description: room.description,
+                    members: room.members,
+                  })
+                }
+                className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+                  isSelected
+                    ? "bg-white text-[#0d0c11] shadow-lg border border-white font-semibold"
+                    : "hover:bg-white/5 text-zinc-300 hover:text-white border border-transparent"
+                }`}
+              >
+                {/* Refined Channel Badge */}
+                <div className={`relative shrink-0 flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-150 ${
+                  isSelected
+                    ? "bg-[#0d0c11] text-white shadow-md font-bold scale-105"
+                    : "bg-white/5 border border-white/10 text-zinc-400 group-hover:text-white group-hover:scale-105"
+                }`}>
+                  <span className="text-base font-bold">#</span>
+                </div>
+
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-[#0d0c11] font-bold" : "text-zinc-200 group-hover:text-white"}`}>
+                      {room.name.replace(/^#/, "")}
+                    </span>
+                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-600 font-medium" : "text-zinc-500"}`}>
+                      {timeStr || "Active"}
+                    </span>
+                  </div>
+
+                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-600" : "text-zinc-400"}`}>
+                    {previewText ? (
+                      <>
+                        {senderUsername && (
+                          <span className={`font-medium shrink-0 ${isSelected ? "text-black" : "text-zinc-300"}`}>
+                            {senderUsername}:
+                          </span>
                         )}
-                      </div>
-                    </div>
-                  );
-                })}
+                        <span className="truncate">{previewText}</span>
+                      </>
+                    ) : (
+                      <span className="truncate opacity-75">{room.description || "General channel"}</span>
+                    )}
+                  </div>
+                </div>
+
+                {unread > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-black text-white text-[10px] font-bold shadow-sm animate-pulse">
+                    {unread}
+                  </span>
+                )}
               </div>
+            );
+          })}
+
+        {/* Section Header: Direct Messages */}
+        {(activeFilter === "all" || activeFilter === "direct") && filteredFriends.length > 0 && (
+          <div className="pt-3 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-outline uppercase tracking-wider">
+            <span>Direct Messages</span>
+            <span className="text-[9px] font-mono">{filteredFriends.length}</span>
+          </div>
+        )}
+
+        {/* Direct Contacts List */}
+        {(activeFilter === "all" || activeFilter === "direct") &&
+          filteredFriends.map((friend) => {
+            const isSelected = selectedChat?.id === friend._id;
+            const isOnline = onlineUsersSet.has(friend._id);
+            const unread = unreadCounts[friend._id] || 0;
+            const lastMsg = lastMessages[friend._id];
+            const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
+            const previewText = getMessageSnippet(lastMsg);
+
+            return (
+              <div
+                key={friend._id}
+                onClick={() =>
+                  selectChat({
+                    id: friend._id,
+                    name: friend.username,
+                    type: "user",
+                    profilePic: friend.profilePic,
+                  })
+                }
+                className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+                  isSelected
+                    ? "bg-white text-[#0d0c11] shadow-lg border border-white font-semibold"
+                    : "hover:bg-white/5 text-zinc-300 hover:text-white border border-transparent"
+                }`}
+              >
+                {/* Circular Avatar with Glowing Online Indicator */}
+                <div className="relative shrink-0 w-9 h-9 rounded-full overflow-hidden bg-white/5 border border-white/10">
+                  <img
+                    className="w-full h-full object-cover"
+                    alt={friend.username}
+                    src={
+                      friend.profilePic ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        friend.username
+                      )}&background=27272a&color=ffffff`
+                    }
+                  />
+                  <span
+                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-[#0e0d13] ${
+                      isOnline
+                        ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.85)]"
+                        : "bg-zinc-600"
+                    }`}
+                  />
+                </div>
+
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-[#0d0c11] font-bold" : "text-zinc-200 group-hover:text-white"}`}>
+                      {friend.username}
+                    </span>
+                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-600 font-medium" : "text-zinc-500"}`}>
+                      {timeStr || (isOnline ? "Online" : "")}
+                    </span>
+                  </div>
+
+                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-600" : "text-zinc-400"}`}>
+                    {previewText ? (
+                      <span className="truncate">{previewText}</span>
+                    ) : friend.status ? (
+                      <span className="truncate">{friend.status}</span>
+                    ) : (
+                      <span className="truncate opacity-75">{isOnline ? "Available now" : "Offline"}</span>
+                    )}
+                  </div>
+                </div>
+
+                {unread > 0 ? (
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
+                    isSelected ? "bg-black text-white" : "bg-white text-black"
+                  }`}>
+                    {unread}
+                  </span>
+                ) : (
+                  <span className="material-symbols-outlined text-xs text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    chat
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+        {/* Requests Filter Tab Content */}
+        {activeFilter === "requests" && (
+          <div className="flex flex-col gap-1.5 pt-2">
+            {incomingRequests.length === 0 ? (
+              <div className="p-8 text-center text-outline text-xs">No pending requests.</div>
+            ) : (
+              incomingRequests.map((req) => (
+                <div
+                  key={req._id}
+                  className="p-2.5 rounded-xl bg-surface-container/70 border border-white/5 flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img
+                      src={
+                        req.sender?.profilePic ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(req.sender?.username || "U")}&background=8083ff&color=ffffff`
+                      }
+                      alt={req.sender?.username}
+                      className="w-8 h-8 rounded-full object-cover shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <span className="text-xs font-medium text-on-surface block truncate">
+                        {req.sender?.username}
+                      </span>
+                      <span className="text-[10px] text-outline block truncate">Connection request</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleAcceptRequest(req._id)}
+                      disabled={actionLoadingId === req._id}
+                      className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                      title="Accept"
+                    >
+                      <span className="material-symbols-outlined text-sm">check</span>
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(req._id)}
+                      disabled={actionLoadingId === req._id}
+                      className="p-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors"
+                      title="Decline"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         )}
       </div>
 
-      {isStatusOpen && <StatusModal onClose={() => setIsStatusOpen(false)} />}
       {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
-      {isWallpaperOpen && <WallpaperModal isOpen={isWallpaperOpen} onClose={() => setIsWallpaperOpen(false)} />}
-    </aside>
+    </section>
   );
 };
 

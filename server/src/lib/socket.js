@@ -44,7 +44,7 @@ io.use((socket, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     socket.userId = decoded.userId;
     next();
-  } catch (error) {
+  } catch {
     return next(new Error("Authentication error: Invalid token"));
   }
 });
@@ -93,9 +93,52 @@ io.on("connection", (socket) => {
     }
   });
 
+  // WebRTC Audio/Video Calling Signaling
+  socket.on("callUser", ({ userToCall, signalData, callType, callerInfo }) => {
+    const receiverSocketId = getReceiverSocketId(userToCall);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("incomingCall", {
+        signal: signalData,
+        from: userId,
+        callType: callType || "video",
+        callerInfo: callerInfo || { _id: userId },
+      });
+    } else {
+      socket.emit("callUnavailable", { message: "User is currently offline" });
+    }
+  });
+
+  socket.on("answerCall", ({ to, signal }) => {
+    const callerSocketId = getReceiverSocketId(to);
+    if (callerSocketId) {
+      io.to(callerSocketId).emit("callAccepted", { signal });
+    }
+  });
+
+  socket.on("rejectCall", ({ to }) => {
+    const callerSocketId = getReceiverSocketId(to);
+    if (callerSocketId) {
+      io.to(callerSocketId).emit("callRejected");
+    }
+  });
+
+  socket.on("endCall", ({ to }) => {
+    const peerSocketId = getReceiverSocketId(to);
+    if (peerSocketId) {
+      io.to(peerSocketId).emit("callEnded");
+    }
+  });
+
+  socket.on("iceCandidate", ({ to, candidate }) => {
+    const peerSocketId = getReceiverSocketId(to);
+    if (peerSocketId) {
+      io.to(peerSocketId).emit("iceCandidate", { candidate });
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("A user disconnected:", socket.id);
-    if (userId) {
+    if (userId && userSocketMap[userId] === socket.id) {
       delete userSocketMap[userId];
       io.emit("getOnlineUsers", Object.keys(userSocketMap));
     }

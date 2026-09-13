@@ -162,7 +162,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
                         <img
                           src={
                             member.profilePic ||
-                            `https://ui-avatars.com/api/?name=${username}&background=2563eb&color=ffffff`
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "User")}&background=2563eb&color=ffffff`
                           }
                           alt={username}
                           className="w-8 h-8 rounded-full object-cover border border-[var(--glass-border)]"

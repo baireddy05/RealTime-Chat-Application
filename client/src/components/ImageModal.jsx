@@ -309,7 +309,7 @@ const ImageModal = ({ imageUrl, onClose }) => {
                         >
                           <div className="flex items-center gap-2">
                             <img
-                              src={user.profilePic || `https://ui-avatars.com/api/?name=${user.username}`}
+                              src={user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}`}
                               alt={user.username}
                               className="w-6 h-6 rounded-full bg-white/10 object-cover"
                             />

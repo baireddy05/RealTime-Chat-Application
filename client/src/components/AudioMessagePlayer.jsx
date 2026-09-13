@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Mic, Volume2 } from "lucide-react";
+import { Play, Pause, Mic } from "lucide-react";
 
 const ACOUSTIC_WAVE_PROFILE = [
   35, 55, 75, 45, 90, 65, 80, 40, 50, 70, 85, 45, 95, 60, 80, 50,
@@ -142,8 +142,8 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
                       ? "bg-white"
                       : "bg-white/35"
                     : isPlayed || isHovered
-                    ? "bg-accent-primary"
-                    : "bg-accent-primary/25 group-hover:bg-accent-primary/40"
+                    ? "bg-[#8B5CF6]"
+                    : "bg-white/20 group-hover:bg-white/30"
                 }`}
               />
             );

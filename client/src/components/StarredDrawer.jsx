@@ -112,9 +112,9 @@ const StarredDrawer = ({ onClose, onJumpToMessage }) => {
                     </div>
                   )}
 
-                  {msg.text && (
+                  {(msg.decryptedText || msg.text) && (
                     <p className="text-xs text-theme-main leading-relaxed break-words whitespace-pre-wrap">
-                      {msg.text}
+                      {msg.decryptedText || msg.text}
                     </p>
                   )}
 

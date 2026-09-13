@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
-import { X, Clock, Trash2, Calendar, Send, Loader } from "lucide-react";
+import { X, Clock, Trash2, Calendar, Loader } from "lucide-react";
 
 const ScheduledMessagesModal = ({ isOpen, onClose }) => {
   const { selectedChat, scheduledMessages, getScheduledMessages, cancelScheduledMessage } = useChatStore();
@@ -9,7 +9,7 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen && selectedChat) {
-      setLoading(true);
+      queueMicrotask(() => setLoading(true));
       getScheduledMessages(selectedChat.id, selectedChat.type).finally(() => setLoading(false));
     }
   }, [isOpen, selectedChat, getScheduledMessages]);
@@ -90,7 +90,7 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
                     <span>Sends {formatScheduledTime(msg.scheduledFor)}</span>
                   </div>
                   <p className="text-[13px] text-theme-main break-words">
-                    {msg.text || (msg.image ? "📷 Photo" : msg.file ? `📎 ${msg.file.name}` : "Attachment")}
+                    {(msg.decryptedText || msg.text) || (msg.image ? "📷 Photo" : msg.file ? `📎 ${msg.file.name}` : "Attachment")}
                   </p>
                 </div>
                 <button

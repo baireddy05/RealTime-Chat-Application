@@ -94,17 +94,17 @@ const ProfileModal = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--modal-backdrop)] backdrop-blur-xl p-4 animate-fadeIn">
-      <div className="bg-[var(--glass-heavy)] backdrop-blur-2xl rounded-3xl w-full max-w-md shadow-glass overflow-hidden flex flex-col max-h-[90vh] border border-[var(--glass-border)] text-theme-main">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4 animate-fadeIn">
+      <div className="bg-surface-container/90 backdrop-blur-2xl rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-outline-variant/20 text-on-surface">
         {/* Profile Header */}
-        <div className="border-b border-[var(--glass-border)] px-6 py-4 flex items-center justify-between bg-[var(--glass-hover)]">
+        <div className="border-b border-outline-variant/15 px-6 py-4 flex items-center justify-between bg-surface-container-high/60">
           <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-status-online" />
-            <h3 className="font-semibold text-base text-theme-main tracking-tight">Profile & Identity</h3>
+            <span className="w-2 h-2 rounded-full bg-tertiary" />
+            <h3 className="font-semibold text-base text-on-surface tracking-tight">Profile & Identity</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] p-1.5 rounded-full transition-colors"
+            className="text-outline hover:text-on-surface hover:bg-surface-container-highest p-1.5 rounded-full transition-colors"
           >
             <X size={16} />
           </button>
@@ -126,7 +126,7 @@ const ProfileModal = ({ onClose }) => {
               title="Change profile photo"
             >
               <img
-                src={avatarPreview || profilePic || `https://ui-avatars.com/api/?name=${authUser?.username}&background=2563eb&color=ffffff`}
+                src={avatarPreview || profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`}
                 alt="Profile Avatar"
                 className="w-24 h-24 rounded-full object-cover ring-2 ring-[var(--glass-border)] group-hover:ring-accent-primary shadow-glass transition-all"
               />
@@ -145,8 +145,8 @@ const ProfileModal = ({ onClose }) => {
           </div>
 
           {/* Username */}
-          <div className="bg-[var(--glass-surface)] p-3 rounded-2xl border border-[var(--glass-border)] focus-within:border-accent-primary transition-all">
-            <label className="text-[11px] font-medium text-theme-muted uppercase tracking-wider block mb-1">
+          <div className="bg-surface-container-low/80 p-3 rounded-2xl border border-outline-variant/15 focus-within:border-primary/40 transition-all">
+            <label className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
               Display Name
             </label>
             <input
@@ -154,47 +154,47 @@ const ProfileModal = ({ onClose }) => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full bg-transparent text-sm text-theme-main focus:outline-none placeholder-theme-muted/40"
+              className="w-full bg-transparent text-sm text-on-surface focus:outline-none placeholder-outline/40"
             />
           </div>
 
           {/* About / Bio */}
-          <div className="bg-[var(--glass-surface)] p-3 rounded-2xl border border-[var(--glass-border)] focus-within:border-accent-primary transition-all">
-            <label className="text-[11px] font-medium text-theme-muted uppercase tracking-wider block mb-1">
+          <div className="bg-surface-container-low/80 p-3 rounded-2xl border border-outline-variant/15 focus-within:border-primary/40 transition-all">
+            <label className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
               About / Bio
             </label>
             <input
               type="text"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="w-full bg-transparent text-sm text-theme-main focus:outline-none placeholder-theme-muted/40"
+              className="w-full bg-transparent text-sm text-on-surface focus:outline-none placeholder-outline/40"
             />
           </div>
 
           {/* Current Status Activity */}
-          <div className="bg-[var(--glass-surface)] p-3 rounded-2xl border border-[var(--glass-border)] focus-within:border-accent-primary transition-all">
-            <label className="text-[11px] font-medium text-theme-muted uppercase tracking-wider block mb-1">
+          <div className="bg-surface-container-low/80 p-3 rounded-2xl border border-outline-variant/15 focus-within:border-primary/40 transition-all">
+            <label className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
               Focus / Status
             </label>
             <div className="relative flex items-center">
-              <Activity size={14} className="text-status-online mr-2" />
+              <Activity size={14} className="text-tertiary mr-2" />
               <input
                 type="text"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 placeholder="Available, Focus, Coding..."
-                className="w-full bg-transparent text-sm text-theme-main focus:outline-none placeholder-theme-muted/40"
+                  className="w-full bg-transparent text-sm text-on-surface focus:outline-none placeholder-outline/40"
               />
             </div>
           </div>
 
           {/* Email (Read only) */}
-          <div className="bg-[var(--glass-surface)]/60 p-3 rounded-2xl border border-[var(--glass-border)]">
-            <label className="text-[11px] font-medium text-theme-muted/60 uppercase tracking-wider block mb-1">
+          <div className="bg-surface-container-low/40 p-3 rounded-2xl border border-outline-variant/10">
+            <label className="text-[11px] font-medium text-outline/60 uppercase tracking-wider block mb-1">
               Registered Email
             </label>
-            <div className="flex items-center text-xs text-theme-muted">
-              <Mail size={13} className="mr-2 text-theme-muted/60" />
+            <div className="flex items-center text-xs text-outline">
+              <Mail size={13} className="mr-2 text-outline/60" />
               <span>{authUser?.email}</span>
             </div>
           </div>
@@ -204,14 +204,14 @@ const ProfileModal = ({ onClose }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-[var(--glass-hover)] hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main text-xs font-medium border border-[var(--glass-border)] transition-colors"
+              className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-outline hover:text-on-surface text-xs font-medium border border-outline-variant/15 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || savedSuccess}
-              className="px-5 py-2 rounded-xl bg-accent-primary hover:bg-accent-primary/80 disabled:opacity-50 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shadow-accent-primary/25"
+              className="px-5 py-2 rounded-xl bg-primary hover:bg-primary/80 disabled:opacity-50 text-on-primary text-xs font-medium flex items-center gap-1.5 transition-all shadow-md"
             >
               {isSaving ? (
                 <>

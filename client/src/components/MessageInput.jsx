@@ -4,14 +4,11 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { 
-  Send, 
   X, 
   Loader, 
   Smile, 
-  Mic, 
   Trash2, 
   Check, 
-  Paperclip, 
   Image as ImageIcon, 
   Camera, 
   FileText, 
@@ -21,11 +18,6 @@ import {
   File,
   Clock,
   Flame,
-  Timer,
-  Calendar,
-  Lock,
-  Bot,
-  Sparkles,
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
@@ -55,8 +47,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showScheduleMenu, setShowScheduleMenu] = useState(false);
-  const [showMentionMenu, setShowMentionMenu] = useState(false);
-  const [mentionFilter, setMentionFilter] = useState("");
   const [scheduledFor, setScheduledFor] = useState(null);
   const [customScheduleDate, setCustomScheduleDate] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -98,7 +88,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const attachBtnRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
-  const mentionMenuRef = useRef(null);
 
   const {
     sendMessage,
@@ -117,17 +106,21 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   // Populate text when editing a message
   useEffect(() => {
     if (editingMessage) {
-      setText(editingMessage.text || "");
-      setReplyingTo(null);
+      queueMicrotask(() => {
+        setText(editingMessage.decryptedText || editingMessage.text || "");
+        setReplyingTo(null);
+      });
     }
   }, [editingMessage, setReplyingTo]);
 
   // Close popup menus and reset attachments when switching chats
   useEffect(() => {
-    setShowAttachMenu(false);
-    setShowEmojiPicker(false);
-    setImagePreview(null);
-    setDocumentFile(null);
+    queueMicrotask(() => {
+      setShowAttachMenu(false);
+      setShowEmojiPicker(false);
+      setImagePreview(null);
+      setDocumentFile(null);
+    });
   }, [selectedChat?.id]);
 
   // Global outside click handler to close popups
@@ -152,17 +145,9 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       ) {
         setShowEmojiPicker(false);
       }
-
-      if (
-        showMentionMenu &&
-        mentionMenuRef.current &&
-        !mentionMenuRef.current.contains(e.target)
-      ) {
-        setShowMentionMenu(false);
-      }
     };
 
-    if (showAttachMenu || showEmojiPicker || showMentionMenu) {
+    if (showAttachMenu || showEmojiPicker) {
       document.addEventListener("mousedown", handleClickOutside, true);
       document.addEventListener("touchstart", handleClickOutside, true);
     }
@@ -171,7 +156,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("touchstart", handleClickOutside, true);
     };
-  }, [showAttachMenu, showEmojiPicker, showMentionMenu]);
+  }, [showAttachMenu, showEmojiPicker]);
 
   useEffect(() => {
     return () => {
@@ -185,14 +170,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const handleTextChange = (e) => {
     const val = e.target.value;
     setText(val);
-
-    const mentionMatch = val.match(/@([a-zA-Z0-9_]*)$/);
-    if (mentionMatch) {
-      setShowMentionMenu(true);
-      setMentionFilter(mentionMatch[1].toLowerCase());
-    } else {
-      setShowMentionMenu(false);
-    }
 
     if (!socket || !selectedChat) return;
 
@@ -210,16 +187,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         username: authUser?.username,
       });
     }, 2000);
-  };
-
-  const insertMention = (mentionText) => {
-    setText((prev) => {
-      if (/@([a-zA-Z0-9_]*)$/.test(prev)) {
-        return prev.replace(/@([a-zA-Z0-9_]*)$/, `${mentionText} `);
-      }
-      return prev ? `${prev} ${mentionText} ` : `${mentionText} `;
-    });
-    setShowMentionMenu(false);
   };
 
   const handleEmojiSelect = (emoji) => {
@@ -390,10 +357,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           setIsUploading(false);
 
           if (audioUrl) {
+            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
             await sendMessage({
               text: "",
               audio: audioUrl,
             });
+            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
           }
         }
         if (streamRef.current) {
@@ -416,6 +385,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
   const handleSendMessage = async (e) => {
     e?.preventDefault();
+    if (isSending) return; // Prevent rapid fire sending duplicates
 
     // If editing existing message
     if (editingMessage) {
@@ -439,44 +409,60 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
     let imageUrl = null;
     let filePayload = null;
-
-    if (imagePreview) {
-      setIsUploading(true);
-      imageUrl = await uploadToCloudinary(imagePreview.file);
-      setIsUploading(false);
-    }
-
-    if (documentFile) {
-      setIsUploading(true);
-      const url = await uploadRawFile(documentFile);
-      setIsUploading(false);
-      filePayload = {
-        url,
-        name: documentFile.name,
-        size: documentFile.size,
-        fileType: documentFile.type,
-      };
-    }
-
-    await sendMessage({
-      text: text.trim(),
-      image: imageUrl,
-      file: filePayload,
-      scheduledFor: scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
-    });
-
+    
+    // Save current values and clear UI synchronously to prevent race conditions during rapid typing
+    const currentText = text.trim();
+    const currentImage = imagePreview;
+    const currentDoc = documentFile;
+    const currentSchedule = scheduledFor;
+    const currentReply = replyingTo;
+    
     setText("");
     removeImage();
     removeDocument();
     setShowEmojiPicker(false);
     setReplyingTo(null);
     setScheduledFor(null);
+
+    if (currentImage) {
+      setIsUploading(true);
+      imageUrl = await uploadToCloudinary(currentImage.file);
+      setIsUploading(false);
+    }
+
+    if (currentDoc) {
+      setIsUploading(true);
+      const url = await uploadRawFile(currentDoc);
+      setIsUploading(false);
+      filePayload = {
+        url,
+        name: currentDoc.name,
+        size: currentDoc.size,
+        fileType: currentDoc.type,
+      };
+    }
+
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    await sendMessage({
+      text: currentText,
+      image: imageUrl,
+      file: filePayload,
+      scheduledFor: currentSchedule ? new Date(currentSchedule).toISOString() : undefined,
+      replyTo: currentReply ? {
+        messageId: currentReply._id,
+        senderName: currentReply.senderId?.username || currentReply.senderName || "User",
+        text: currentReply.decryptedText || currentReply.text || (currentReply.image ? "📷 Photo" : currentReply.file ? `📎 ${currentReply.file.name}` : "Attachment"),
+        image: currentReply.image || null,
+        file: currentReply.file || null,
+      } : undefined,
+    });
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
   };
 
   const hasContent = text.trim().length > 0 || imagePreview || documentFile;
 
   return (
-    <div className="bg-[var(--glass-surface)] backdrop-blur-2xl border-t border-[var(--glass-border)] px-3 md:px-5 py-2 md:py-2.5 relative select-none safe-bottom flex flex-col gap-2">
+    <div className="bg-transparent px-3 md:px-5 pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-2">
       {/* Replying Banner */}
       {replyingTo && (
         <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[var(--glass-hover)] border-l-2 border-accent-primary border border-[var(--glass-border)] animate-fadeIn">
@@ -512,7 +498,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <div className="min-w-0">
               <span className="text-[11px] font-medium text-accent-secondary block">Editing message</span>
-              <p className="text-xs text-theme-muted truncate">{editingMessage.text}</p>
+              <p className="text-xs text-theme-muted truncate">{editingMessage.decryptedText || editingMessage.text}</p>
             </div>
           </div>
           <button
@@ -822,79 +808,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         />
       )}
 
-      {/* @pulse Mention Autocomplete Popover */}
-      {showMentionMenu && (
-        <div
-          ref={mentionMenuRef}
-          className="absolute bottom-16 left-4 sm:left-14 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-2 shadow-glass w-72 max-w-[calc(100vw-32px)] animate-scaleIn space-y-1.5 text-xs text-theme-main"
-        >
-          <div className="px-2 py-1 text-[10px] font-semibold text-theme-muted uppercase tracking-wider flex items-center justify-between border-b border-[var(--glass-border)]">
-            <span className="flex items-center gap-1">
-              <Sparkles size={11} className="text-emerald-400" />
-              Pulse AI Mention
-            </span>
-            <span className="text-[9px] text-emerald-400 font-semibold">Assistant</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => insertMention("@pulse")}
-            className="w-full text-left p-2 rounded-xl hover:bg-[var(--glass-hover)] transition-colors flex items-center gap-2.5 group cursor-pointer"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500/25 to-teal-500/25 text-emerald-400 border border-emerald-500/35 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Bot size={16} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-emerald-400 text-xs">@pulse</span>
-                <span className="text-[9px] px-1 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">
-                  AI Companion
-                </span>
-              </div>
-              <p className="text-[10px] text-theme-muted truncate">
-                Ask questions, summarize chat, translate languages
-              </p>
-            </div>
-          </button>
-
-          <div className="pt-1.5 border-t border-[var(--glass-border)] px-1">
-            <span className="text-[9px] text-theme-muted font-medium block mb-1">
-              Quick commands:
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {[
-                { label: "Summarize", text: "@pulse summarize" },
-                { label: "Translate", text: "@pulse translate to Spanish: " },
-                { label: "Explain", text: "@pulse explain " },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => insertMention(item.text)}
-                  className="text-[10px] px-2 py-1 rounded-lg bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)] hover:border-emerald-500/30 transition-colors font-medium cursor-pointer"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick AI & Security Header */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => insertMention("@pulse")}
-            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all active:scale-95 shadow-sm cursor-pointer"
-          >
-            <Sparkles size={11} />
-            <span>Ask @pulse</span>
-          </button>
-        </div>
-      </div>
-
       {/* Voice Recording Bar UI */}
       {isRecording ? (
         <div className="flex items-center justify-between bg-[var(--glass-surface)] border border-red-500/30 rounded-full px-4 py-2 shadow-glass animate-fadeIn">
@@ -927,78 +840,74 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSendMessage} className="flex items-center gap-1.5 sm:gap-2">
-          {/* Emoji Trigger */}
-          <button
-            ref={emojiBtnRef}
-            type="button"
-            onClick={() => {
-              setShowEmojiPicker((prev) => !prev);
-              setShowAttachMenu(false);
-            }}
-            className={`p-2 rounded-full transition-all duration-150 active:scale-90 flex-shrink-0 ${
-              showEmojiPicker ? "text-accent-primary bg-accent-primary/20" : "text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
-            }`}
-            title="Emojis"
-          >
-            <Smile size={19} />
-          </button>
+        <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 p-1.5 sm:p-2 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass">
+            {/* Attachment Button */}
+            <button
+              ref={attachBtnRef}
+              id="attach-button"
+              type="button"
+              onClick={() => {
+                setShowAttachMenu((prev) => !prev);
+                setShowEmojiPicker(false);
+              }}
+              className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors ml-1"
+              title="Attach file or media"
+            >
+              <span className="material-symbols-outlined text-xl">add_circle</span>
+            </button>
 
-          {/* Attachment Trigger */}
-          <button
-            ref={attachBtnRef}
-            id="attach-button"
-            type="button"
-            onClick={() => {
-              setShowAttachMenu((prev) => !prev);
-              setShowEmojiPicker(false);
-            }}
-            className={`p-2 rounded-full transition-all duration-150 active:scale-90 flex-shrink-0 ${
-              showAttachMenu ? "text-accent-primary bg-accent-primary/20" : "text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
-            }`}
-            title="Attach"
-          >
-            <Paperclip size={19} className="rotate-45" />
-          </button>
+            {/* Emoji Picker Trigger */}
+            <button
+              ref={emojiBtnRef}
+              type="button"
+              onClick={() => {
+                setShowEmojiPicker((prev) => !prev);
+                setShowAttachMenu(false);
+              }}
+              className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              title="Insert Emoji"
+            >
+              <span className="material-symbols-outlined text-xl">mood</span>
+            </button>
 
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleImageChange}
-          />
-
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.txt,.zip,.csv,.xlsx,.json,.js,.py,.html,.css"
-            className="hidden"
-            ref={documentInputRef}
-            onChange={handleDocumentChange}
-          />
-
-          {/* Main Message Input Capsule */}
-          <div className="flex-1 relative flex items-center min-w-0">
             <input
-              type="text"
-              className="w-full glass-input text-theme-main rounded-full pl-4 pr-24 py-2 border border-[var(--glass-border)] shadow-inner focus:outline-none focus:border-accent-primary/70 text-sm placeholder-theme-muted/50 transition-all duration-150"
-              placeholder={
-                scheduledFor
-                  ? "Schedule a message..."
-                  : disappearingTimer
-                  ? `Ephemeral message (${disappearingTimer}s)...`
-                  : editingMessage
-                  ? "Edit message..."
-                  : "Message"
-              }
-              value={text}
-              onChange={handleTextChange}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleImageChange}
             />
 
-            {/* In-capsule controls: Disappearing Timer & Schedule Button */}
-            <div className="absolute right-2 flex items-center gap-0.5">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.zip,.csv,.xlsx,.json,.js,.py,.html,.css"
+              className="hidden"
+              ref={documentInputRef}
+              onChange={handleDocumentChange}
+            />
 
-              {/* Timer button */}
+            {/* Text Input Field */}
+            <div className="flex-1 flex items-center px-2 min-w-0 relative">
+              <input
+                type="text"
+                className="w-full bg-transparent text-white placeholder:text-zinc-500 text-sm focus:outline-none"
+                placeholder={
+                  scheduledFor
+                    ? "Schedule a message..."
+                    : disappearingTimer
+                    ? `Ephemeral message (${disappearingTimer}s)...`
+                    : editingMessage
+                    ? "Edit message..."
+                    : "Type a message..."
+                }
+                value={text}
+                onChange={handleTextChange}
+              />
+            </div>
+
+            {/* In-capsule controls: Disappearing Timer & Schedule Button */}
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1007,18 +916,17 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 }}
                 className={`p-1.5 rounded-full transition-colors flex items-center gap-1 ${
                   disappearingTimer
-                    ? "text-orange-400 bg-orange-500/20 font-bold"
-                    : "text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
+                    ? "text-amber-400 bg-amber-500/20 font-bold"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title={disappearingTimer ? `Disappearing timer: ${disappearingTimer}s` : "Set Disappearing Message Timer"}
               >
-                <Flame size={14} className={disappearingTimer ? "animate-pulse" : ""} />
+                <Flame size={15} className={disappearingTimer ? "animate-pulse" : ""} />
                 {disappearingTimer && (
                   <span className="text-[10px] pr-0.5">{disappearingTimer < 60 ? `${disappearingTimer}s` : `${Math.floor(disappearingTimer / 60)}m`}</span>
                 )}
               </button>
 
-              {/* Schedule button */}
               <button
                 type="button"
                 onClick={() => {
@@ -1027,49 +935,39 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 }}
                 className={`p-1.5 rounded-full transition-colors ${
                   scheduledFor
-                    ? "text-accent-primary bg-accent-primary/20"
-                    : "text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
+                    ? "text-white bg-white/20 font-bold"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Schedule Message"
               >
-                <Clock size={14} />
+                <Clock size={15} />
+              </button>
+
+              {/* Voice Memo Trigger */}
+              <button
+                type="button"
+                onClick={startRecording}
+                className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                title="Record Audio Note"
+              >
+                <span className="material-symbols-outlined text-xl">mic</span>
+              </button>
+
+              {/* Primary Monochromatic Send Button */}
+              <button
+                type="submit"
+                disabled={!hasContent && !editingMessage}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-[#0d0c11] shadow-lg hover:scale-105 active:scale-95 transition-all mr-0.5 disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
+                title="Send encrypted message"
+              >
+                {isSending || isUploading ? (
+                  <Loader size={17} className="animate-spin text-black" />
+                ) : (
+                  <span className="material-symbols-outlined text-xl text-[#0d0c11] font-bold">send</span>
+                )}
               </button>
             </div>
           </div>
-
-          {/* Send / Mic / Save Button */}
-          {editingMessage ? (
-            <button
-              type="submit"
-              disabled={isSending || !text.trim()}
-              className="p-2 rounded-full bg-accent-primary hover:bg-accent-primary/80 text-white flex items-center justify-center transition-all duration-150 shadow-md shadow-accent-primary/25 flex-shrink-0 active:scale-90 disabled:opacity-40"
-              title="Save edit"
-            >
-              <Check size={16} />
-            </button>
-          ) : hasContent ? (
-            <button
-              type="submit"
-              disabled={isSending || isUploading}
-              className="p-2 rounded-full bg-accent-primary hover:bg-accent-primary/80 text-white flex items-center justify-center transition-all duration-150 shadow-md shadow-accent-primary/30 flex-shrink-0 active:scale-90 disabled:opacity-40"
-              title="Send"
-            >
-              {isSending || isUploading ? (
-                <Loader size={16} className="animate-spin text-white" />
-              ) : (
-                <Send size={15} className="ml-0.5 text-white" />
-              )}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={startRecording}
-              className="p-2 rounded-full text-theme-muted hover:text-accent-primary hover:bg-[var(--glass-hover)] flex items-center justify-center transition-all duration-150 flex-shrink-0 active:scale-90"
-              title="Record voice memo"
-            >
-              <Mic size={19} />
-            </button>
-          )}
         </form>
       )}
     </div>

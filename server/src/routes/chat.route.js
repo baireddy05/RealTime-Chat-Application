@@ -20,6 +20,7 @@ import {
   kickRoomMember,
   toggleRoomAdmin,
   getThreadReplies,
+  getMessageReceipts,
 } from "../controllers/chat.controller.js";
 
 const router = express.Router();
@@ -49,5 +50,6 @@ router.put("/message/:messageId", protectRoute, editMessage);
 router.delete("/message/:messageId", protectRoute, deleteMessage);
 router.post("/message/:messageId/pin", protectRoute, togglePinMessage);
 router.post("/message/:messageId/star", protectRoute, toggleStarMessage);
+router.get("/message/:messageId/receipts", protectRoute, getMessageReceipts);
 
 export default router;
