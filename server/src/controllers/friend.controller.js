@@ -59,7 +59,8 @@ export const searchUsers = async (req, res) => {
       return res.status(200).json([]);
     }
 
-    const searchRegex = new RegExp(query.trim(), "i");
+    const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const searchRegex = new RegExp(escapedQuery, "i");
     const foundUsers = await User.find({
       _id: { $ne: currentUserId },
       $or: [{ username: searchRegex }, { email: searchRegex }],

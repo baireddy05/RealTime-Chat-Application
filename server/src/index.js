@@ -12,7 +12,8 @@ import friendRoutes from "./routes/friend.route.js";
 
 const PORT = process.env.PORT || 5000;
 
-app.use(express.json());
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(
   cors({

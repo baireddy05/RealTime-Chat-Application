@@ -3,6 +3,7 @@ import http from "http";
 import express from "express";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
+import Room from "../models/Room.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -60,9 +61,23 @@ io.on("connection", (socket) => {
   }
 
   // Room logic
-  socket.on("joinRoom", (roomId) => {
-    socket.join(roomId);
-    console.log(`User ${userId} joined room ${roomId}`);
+  socket.on("joinRoom", async (roomId) => {
+    try {
+      if (!roomId || !userId) return;
+      const room = await Room.findById(roomId).select("members").lean();
+      if (!room) return;
+      const isMember = (room.members || []).some(
+        (m) => m.toString() === userId.toString()
+      );
+      if (isMember) {
+        socket.join(roomId);
+        console.log(`User ${userId} joined room ${roomId}`);
+      } else {
+        socket.emit("roomJoinDenied", { roomId, message: "Not a room member" });
+      }
+    } catch (err) {
+      console.error("Error in socket joinRoom:", err.message);
+    }
   });
 
   socket.on("leaveRoom", (roomId) => {

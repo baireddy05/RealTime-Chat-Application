@@ -3,6 +3,59 @@ import User from "../models/User.model.js";
 import Room from "../models/Room.model.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 
+// Helper to prevent Server-Side Request Forgery (SSRF)
+export const isSafeUrl = (rawUrl) => {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Disallow localhost and internal domain names
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal")
+    ) {
+      return false;
+    }
+
+    // Disallow non-standard ports to prevent port scanning internal services
+    if (parsed.port && parsed.port !== "80" && parsed.port !== "443") {
+      return false;
+    }
+
+    // Disallow IPv4 loopback, private ranges, link-local / cloud metadata
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Regex);
+    if (match) {
+      const o1 = Number(match[1]);
+      const o2 = Number(match[2]);
+      const o3 = Number(match[3]);
+      const o4 = Number(match[4]);
+      if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) return false;
+      if (o1 === 127 || o1 === 0) return false; // 127.0.0.0/8, 0.0.0.0
+      if (o1 === 10) return false; // 10.0.0.0/8
+      if (o1 === 169 && o2 === 254) return false; // 169.254.0.0/16 (Cloud metadata)
+      if (o1 === 172 && o2 >= 16 && o2 <= 31) return false; // 172.16.0.0/12
+      if (o1 === 192 && o2 === 168) return false; // 192.168.0.0/16
+      if (o1 >= 224) return false; // Multicast / reserved
+    }
+
+    // Disallow IPv6 loopback / private addresses
+    if (hostname.includes(":") || hostname === "[::1]" || hostname === "::1") {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
@@ -141,6 +194,17 @@ export const getMessages = async (req, res) => {
     };
 
     if (type === "room") {
+      const room = await Room.findById(id).select("members").lean();
+      if (!room) {
+        return res.status(404).json({ error: "Room not found" });
+      }
+      const isMember = (room.members || []).some(
+        (m) => m.toString() === myId.toString()
+      );
+      if (!isMember) {
+        return res.status(403).json({ error: "Access denied: You are not a member of this room" });
+      }
+
       const messages = await Message.find({ roomId: id, ...baseFilter })
         .populate("senderId", "username profilePic")
         .lean();
@@ -203,7 +267,7 @@ export const sendMessage = async (req, res) => {
     let resolvedPreview = linkPreview || null;
     if (!resolvedPreview && text) {
       const urlMatch = text.match(/https?:\/\/[^\s]+/i);
-      if (urlMatch) {
+      if (urlMatch && isSafeUrl(urlMatch[0])) {
         try {
           const targetUrl = urlMatch[0];
           const response = await fetch(targetUrl, {
@@ -241,6 +305,17 @@ export const sendMessage = async (req, res) => {
 
     let newMessage;
     if (roomId) {
+      const room = await Room.findById(roomId).select("members").lean();
+      if (!room) {
+        return res.status(404).json({ error: "Room not found" });
+      }
+      const isMember = (room.members || []).some(
+        (m) => m.toString() === senderId.toString()
+      );
+      if (!isMember) {
+        return res.status(403).json({ error: "Access denied: You are not a member of this room" });
+      }
+
       // Room message
       newMessage = new Message({
         senderId,
@@ -615,8 +690,8 @@ export const getStarredMessages = async (req, res) => {
 export const previewLink = async (req, res) => {
   try {
     const { url } = req.query;
-    if (!url || !url.startsWith("http")) {
-      return res.status(400).json({ error: "Valid HTTP/HTTPS URL required" });
+    if (!url || !url.startsWith("http") || !isSafeUrl(url)) {
+      return res.status(400).json({ error: "Valid public HTTP/HTTPS URL required" });
     }
 
     const response = await fetch(url, {
