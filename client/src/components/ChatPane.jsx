@@ -27,6 +27,7 @@ import { WALLPAPER_PRESETS } from "../lib/wallpapers";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
 import { Virtuoso } from "react-virtuoso";
+import { useBackHandler } from "../lib/backNavigation";
 
 
 const formatFileSize = (bytes) => {
@@ -107,6 +108,17 @@ const ChatPane = ({ onBack }) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [droppedFile, setDroppedFile] = useState(null);
   const dragCounterRef = useRef(0);
+
+  // Mobile Back Navigation handlers for ChatPane overlays
+  useBackHandler(!!activeImage, () => setActiveImage(null), "chat-modal-image");
+  useBackHandler(!!messageToDelete, () => setMessageToDelete(null), "chat-modal-delete");
+  useBackHandler(!!forwardingMessage, () => setForwardingMessage(null), "chat-modal-forward");
+  useBackHandler(isGroupInfoOpen, () => setIsGroupInfoOpen(false), "chat-modal-group-info");
+  useBackHandler(isScheduledOpen, () => setIsScheduledOpen(false), "chat-modal-scheduled");
+  useBackHandler(isThreadOpen, () => closeThread(), "chat-drawer-thread");
+  useBackHandler(!!infoModalMessage, () => setInfoModalMessage(null), "chat-modal-message-info");
+  useBackHandler(isSearchOpen, () => setIsSearchOpen(false), "chat-search-bar");
+  useBackHandler(showChatOptions, () => setShowChatOptions(false), "chat-dropdown-options");
 
   const messagesContainerRef = useRef(null);
   const scrollerElementRef = useRef(null);

@@ -23,9 +23,9 @@ function App() {
   return (
     <div className="h-full apple-ambient-bg flex flex-col">
       <Routes>
-        <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/login" />} />
-        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" />} />
-        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" />} />
+        <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/login" replace />} />
+        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" replace />} />
+        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" replace />} />
       </Routes>
     </div>
   );

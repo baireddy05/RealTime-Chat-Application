@@ -22,6 +22,7 @@ import {
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
+import { useBackHandler } from "../lib/backNavigation";
 
 const COMMON_EMOJIS = [
   "😀", "😂", "😍", "🔥", "👍", "❤️", "🎉", "🚀", 
@@ -52,6 +53,15 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [customScheduleDate, setCustomScheduleDate] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  // Mobile Back Navigation handlers for input popups and previews
+  useBackHandler(showEmojiPicker, () => setShowEmojiPicker(false), "input-emoji-picker");
+  useBackHandler(showAttachMenu, () => setShowAttachMenu(false), "input-attach-menu");
+  useBackHandler(showTimerMenu, () => setShowTimerMenu(false), "input-timer-menu");
+  useBackHandler(showScheduleMenu, () => setShowScheduleMenu(false), "input-schedule-menu");
+  useBackHandler(!!previewModalImage, () => setPreviewModalImage(null), "input-preview-modal");
+  useBackHandler(!!imagePreview, () => setImagePreview(null), "input-image-preview");
+  useBackHandler(!!documentFile, () => setDocumentFile(null), "input-doc-preview");
 
   useEffect(() => {
     if (!droppedFile) return;

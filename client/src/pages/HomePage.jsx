@@ -17,6 +17,7 @@ import { useFriendStore } from "../store/useFriendStore";
 import { useThemeStore } from "../store/useThemeStore";
 import { usePWAInstall } from "../hooks/usePWAInstall";
 import TypingPulseBackground from "../components/TypingPulseBackground";
+import { useBackHandler, backManager } from "../lib/backNavigation";
 
 const HomePage = () => {
   const { selectedChat, setSelectedChat, rooms, getRooms, isWallpaperOpen, setIsWallpaperOpen, unreadCounts, isStarredOpen, setIsStarredOpen, subscribeToMessages } = useChatStore();
@@ -33,6 +34,28 @@ const HomePage = () => {
   const [isStatusStoriesOpen, setIsStatusStoriesOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("chats");
+
+  // Initialize mobile root back-navigation guard
+  useEffect(() => {
+    backManager.ensureRootGuard();
+  }, []);
+
+  // Mobile Back Navigation handlers: Intercept phone back button/gestures
+  useBackHandler(!!selectedChat, () => setSelectedChat(null), "home-chat-view");
+  useBackHandler(isProfileOpen, () => setIsProfileOpen(false), "home-modal-profile");
+  useBackHandler(isSetStatusOpen, () => setIsSetStatusOpen(false), "home-modal-status");
+  useBackHandler(
+    isAddFriendOpen || isContactsModalOpen,
+    () => {
+      setIsAddFriendOpen(false);
+      setIsContactsModalOpen(false);
+    },
+    "home-modal-contacts"
+  );
+  useBackHandler(isStatusStoriesOpen, () => setIsStatusStoriesOpen(false), "home-modal-stories");
+  useBackHandler(isCreateGroupOpen, () => setIsCreateGroupOpen(false), "home-modal-create-group");
+  useBackHandler(isStarredOpen, () => setIsStarredOpen(false), "home-modal-starred");
+  useBackHandler(isWallpaperOpen, () => setIsWallpaperOpen(false), "home-modal-wallpaper");
 
   // Logo screen coordinate tracking for full UI background pulse waves
   const logoRef = useRef(null);

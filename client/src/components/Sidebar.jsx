@@ -4,6 +4,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import CreateGroupModal from "./CreateGroupModal";
 import { isEncryptedMessage } from "../lib/crypto";
+import { useBackHandler } from "../lib/backNavigation";
 
 const formatTimeRelative = (dateStr) => {
   if (!dateStr) return "";
@@ -80,6 +81,10 @@ const Sidebar = ({
   const [isLocalCreateGroupOpen, setIsLocalCreateGroupOpen] = useState(false);
   const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
   const searchInputRef = useRef(null);
+
+  // Mobile Back Navigation handlers
+  useBackHandler(isLocalCreateGroupOpen, () => setIsLocalCreateGroupOpen(false), "sidebar-create-group");
+  useBackHandler(showOptionsDropdown, () => setShowOptionsDropdown(false), "sidebar-options-dropdown");
 
   useEffect(() => {
     getRooms();
