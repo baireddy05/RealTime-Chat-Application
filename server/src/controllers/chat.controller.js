@@ -202,7 +202,7 @@ export const getMessages = async (req, res) => {
         (m) => m.toString() === myId.toString()
       );
       if (!isMember) {
-        return res.status(403).json({ error: "Access denied: You are not a member of this room" });
+        await Room.findByIdAndUpdate(id, { $addToSet: { members: myId } });
       }
 
       const messages = await Message.find({ roomId: id, ...baseFilter })
@@ -313,7 +313,7 @@ export const sendMessage = async (req, res) => {
         (m) => m.toString() === senderId.toString()
       );
       if (!isMember) {
-        return res.status(403).json({ error: "Access denied: You are not a member of this room" });
+        await Room.findByIdAndUpdate(roomId, { $addToSet: { members: senderId } });
       }
 
       // Room message

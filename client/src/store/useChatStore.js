@@ -425,10 +425,18 @@ export const useChatStore = create((set, get) => ({
       return { success: true, data: msgDataWithDecrypted };
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove optimistic placeholder on failure
-      set((state) => ({
-        messages: state.messages.filter((m) => m._id !== tempId),
-      }));
+      // Remove optimistic placeholder on failure and restore previous last message
+      set((state) => {
+        const remaining = state.messages.filter((m) => m._id !== tempId);
+        const prevLast = remaining[remaining.length - 1] || null;
+        return {
+          messages: remaining,
+          lastMessages: {
+            ...state.lastMessages,
+            [selectedChat.id]: prevLast,
+          },
+        };
+      });
       return { success: false, error: error.message };
     } finally {
       set({ isSending: false });

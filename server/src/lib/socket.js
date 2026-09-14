@@ -75,12 +75,11 @@ io.on("connection", (socket) => {
       const isMember = (room.members || []).some(
         (m) => m.toString() === userId.toString()
       );
-      if (isMember) {
-        socket.join(roomId);
-        console.log(`User ${userId} joined room ${roomId}`);
-      } else {
-        socket.emit("roomJoinDenied", { roomId, message: "Not a room member" });
+      if (!isMember) {
+        await Room.findByIdAndUpdate(roomId, { $addToSet: { members: userId } });
       }
+      socket.join(roomId);
+      console.log(`User ${userId} joined room ${roomId}`);
     } catch (err) {
       console.error("Error in socket joinRoom:", err.message);
     }

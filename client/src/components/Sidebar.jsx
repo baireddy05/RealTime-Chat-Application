@@ -251,8 +251,8 @@ const Sidebar = ({
           <span className="material-symbols-outlined text-xl">groups</span>
         </div>
 
-        <div className="flex flex-col flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1">
+        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0 flex flex-col">
             <span
               className={`text-xs font-semibold truncate ${
                 isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
@@ -260,41 +260,43 @@ const Sidebar = ({
             >
               {room.name.replace(/^#/, "")}
             </span>
-            <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
-              {timeStr || "Active"}
-            </span>
+
+            <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+              {previewText ? (
+                <>
+                  {isOutgoing && (
+                    <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
+                      done_all
+                    </span>
+                  )}
+                  {senderUsername && (
+                    <span className={`font-medium shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-700 dark:text-zinc-300"}`}>
+                      {senderUsername}:
+                    </span>
+                  )}
+                  <span className="truncate">{previewText}</span>
+                </>
+              ) : (
+                <span className="truncate opacity-75">{room.description || "Group chat"}</span>
+              )}
+            </div>
           </div>
 
-          <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
-            {previewText ? (
-              <>
-                {isOutgoing && (
-                  <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                    done_all
-                  </span>
-                )}
-                {senderUsername && (
-                  <span className={`font-medium shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-700 dark:text-zinc-300"}`}>
-                    {senderUsername}:
-                  </span>
-                )}
-                <span className="truncate">{previewText}</span>
-              </>
-            ) : (
-              <span className="truncate opacity-75">{room.description || "Group chat"}</span>
+          <div className="shrink-0 flex flex-col items-end justify-center self-stretch gap-1 text-right">
+            <span className={`text-[10px] font-mono leading-none ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+              {timeStr || "Active"}
+            </span>
+            {unread > 0 && (
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm animate-pulse ${
+                  isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+                }`}
+              >
+                {unread}
+              </span>
             )}
           </div>
         </div>
-
-        {unread > 0 && (
-          <span
-            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
-              isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-            }`}
-          >
-            {unread}
-          </span>
-        )}
       </div>
     );
   };
@@ -343,8 +345,8 @@ const Sidebar = ({
           />
         </div>
 
-        <div className="flex flex-col flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1">
+        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0 flex flex-col">
             <span
               className={`text-xs font-semibold truncate ${
                 isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
@@ -352,42 +354,40 @@ const Sidebar = ({
             >
               {friend.username}
             </span>
-            <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
-              {timeStr || (isOnline ? "Online" : "")}
-            </span>
+
+            <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+              {previewText ? (
+                <>
+                  {isOutgoing && (
+                    <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
+                      done_all
+                    </span>
+                  )}
+                  <span className="truncate">{previewText}</span>
+                </>
+              ) : friend.status ? (
+                <span className="truncate">{friend.status}</span>
+              ) : (
+                <span className="truncate opacity-75">{isOnline ? "Available now" : "Offline"}</span>
+              )}
+            </div>
           </div>
 
-          <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
-            {previewText ? (
-              <>
-                {isOutgoing && (
-                  <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                    done_all
-                  </span>
-                )}
-                <span className="truncate">{previewText}</span>
-              </>
-            ) : friend.status ? (
-              <span className="truncate">{friend.status}</span>
-            ) : (
-              <span className="truncate opacity-75">{isOnline ? "Available now" : "Offline"}</span>
+          <div className="shrink-0 flex flex-col items-end justify-center self-stretch gap-1 text-right">
+            <span className={`text-[10px] font-mono leading-none ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+              {timeStr || (isOnline ? "Online" : "")}
+            </span>
+            {unread > 0 && (
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm animate-pulse ${
+                  isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+                }`}
+              >
+                {unread}
+              </span>
             )}
           </div>
         </div>
-
-        {unread > 0 ? (
-          <span
-            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
-              isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-            }`}
-          >
-            {unread}
-          </span>
-        ) : (
-          <span className="material-symbols-outlined text-xs text-zinc-400 dark:text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
-            chat
-          </span>
-        )}
       </div>
     );
   };
