@@ -228,7 +228,9 @@ const Sidebar = ({
             >
               <span className="material-symbols-outlined text-lg">person_add</span>
               {pendingCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-white animate-pulse" />
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-white text-black font-mono text-[9px] font-bold shadow-md animate-pulse">
+                  {pendingCount}
+                </span>
               )}
             </button>
 
@@ -346,7 +348,7 @@ const Sidebar = ({
           </kbd>
         </div>
 
-        {/* WhatsApp-Standard Category Filter Tabs: All, Unread, Groups, Direct */}
+        {/* WhatsApp-Standard Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1.5">
           <button
             onClick={() => setActiveFilter("all")}
@@ -377,6 +379,24 @@ const Sidebar = ({
               </span>
             )}
           </button>
+
+          {pendingCount > 0 && (
+            <button
+              onClick={() => setActiveFilter("requests")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+                activeFilter === "requests"
+                  ? "bg-white text-[#0d0c11] shadow-md font-bold"
+                  : "text-white bg-white/10 border border-white/20 hover:bg-white/20 font-semibold"
+              }`}
+              type="button"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span>Requests</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-white text-black text-[9px] font-bold">
+                {pendingCount}
+              </span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveFilter("groups")}
@@ -607,6 +627,73 @@ const Sidebar = ({
         )}
         {activeFilter === "direct" && filteredFriends.length === 0 && (
           <div className="p-8 text-center text-zinc-500 text-xs">No direct contacts yet.</div>
+        )}
+
+        {/* Requests Tab Dedicated View */}
+        {activeFilter === "requests" && (
+          <div className="space-y-2 p-1">
+            <div className="px-1 py-1 flex items-center justify-between text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+              <span>Incoming Friend Requests</span>
+              <span className="text-[9px] font-mono">{incomingRequests.length}</span>
+            </div>
+            {incomingRequests.length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 text-xs">No pending friend requests.</div>
+            ) : (
+              incomingRequests.map((req) => {
+                const sender = req.sender || {};
+                const isLoading = actionLoadingId === req._id;
+
+                return (
+                  <div
+                    key={req._id}
+                    className="p-3 rounded-2xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-all flex items-center justify-between gap-3 shadow-sm"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10 shadow-sm"
+                        alt={sender.username || "User"}
+                        src={
+                          sender.profilePic ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            sender.username || "User"
+                          )}&background=27272a&color=ffffff&bold=true`
+                        }
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-white truncate">
+                          {sender.username || "Unknown User"}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 truncate">
+                          {sender.status || "Wants to connect"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptRequest(req._id)}
+                        disabled={isLoading}
+                        className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shadow-sm flex items-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-xs">check</span>
+                        <span>Accept</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejectRequest(req._id)}
+                        disabled={isLoading}
+                        className="p-1.5 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
+                        title="Decline"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         )}
 
         {/* Section Header: Groups */}

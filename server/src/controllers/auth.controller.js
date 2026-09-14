@@ -31,7 +31,7 @@ export const signup = async (req, res) => {
 
     if (newUser) {
       await newUser.save();
-      generateToken(newUser._id, res);
+      const token = generateToken(newUser._id, res);
       res.status(201).json({
         _id: newUser._id,
         username: newUser.username,
@@ -39,6 +39,7 @@ export const signup = async (req, res) => {
         profilePic: newUser.profilePic,
         bio: newUser.bio,
         status: newUser.status,
+        token,
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -75,7 +76,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    generateToken(user._id, res);
+    const token = generateToken(user._id, res);
 
     res.status(200).json({
       _id: user._id,
@@ -84,6 +85,7 @@ export const login = async (req, res) => {
       profilePic: user.profilePic,
       bio: user.bio,
       status: user.status,
+      token,
     });
   } catch (error) {
     console.log("Error in login controller", error.message);
@@ -109,7 +111,11 @@ export const logout = (req, res) => {
 
 export const checkAuth = (req, res) => {
   try {
-    res.status(200).json(req.user);
+    const token = req.cookies.jwt || req.headers.authorization?.replace("Bearer ", "");
+    res.status(200).json({
+      ...(req.user.toObject ? req.user.toObject() : req.user),
+      token,
+    });
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });

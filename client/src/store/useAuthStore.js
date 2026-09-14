@@ -15,9 +15,13 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get("/auth/check");
+      if (res.data.token) {
+        localStorage.setItem("pulse-token", res.data.token);
+      }
       set({ authUser: res.data });
       get().connectSocket();
     } catch {
+      localStorage.removeItem("pulse-token");
       set({ authUser: null });
     } finally {
       set({ isCheckingAuth: false });
@@ -28,6 +32,9 @@ export const useAuthStore = create((set, get) => ({
     set({ isSigningUp: true });
     try {
       const res = await axiosInstance.post("/auth/signup", data);
+      if (res.data.token) {
+        localStorage.setItem("pulse-token", res.data.token);
+      }
       set({ authUser: res.data });
       get().connectSocket();
       return true;
@@ -43,6 +50,9 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoggingIn: true });
     try {
       const res = await axiosInstance.post("/auth/login", data);
+      if (res.data.token) {
+        localStorage.setItem("pulse-token", res.data.token);
+      }
       set({ authUser: res.data });
       get().connectSocket();
       return true;
@@ -57,6 +67,7 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try {
       await axiosInstance.post("/auth/logout");
+      localStorage.removeItem("pulse-token");
       set({ authUser: null });
       get().disconnectSocket();
     } catch (error) {
@@ -79,10 +90,10 @@ export const useAuthStore = create((set, get) => ({
     const { authUser, socket } = get();
     if (!authUser || (socket && socket.connected)) return;
 
-    // We rely on the secure HttpOnly cookie for auth, but socket.io client 
-    // requires withCredentials to send the cookie during handshake.
+    const token = localStorage.getItem("pulse-token");
     const newSocket = io(BASE_URL, {
       withCredentials: true,
+      auth: { token },
     });
     
     newSocket.connect();

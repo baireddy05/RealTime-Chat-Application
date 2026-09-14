@@ -29,15 +29,19 @@ export const getReceiverSocketId = (receiverId) => {
   return userSocketMap[receiverId.toString()];
 };
 
-// Middleware to authenticate socket connections via cookie
+// Middleware to authenticate socket connections via cookie OR auth payload
 io.use((socket, next) => {
+  let token;
   const cookies = socket.handshake.headers.cookie;
-  if (!cookies) {
-    return next(new Error("Authentication error: No cookies found"));
+  if (cookies) {
+    const parsedCookies = cookie.parse(cookies);
+    token = parsedCookies.jwt;
   }
 
-  const parsedCookies = cookie.parse(cookies);
-  const token = parsedCookies.jwt;
+  // Fallback to socket handshake auth token (crucial for cross-domain cookie restrictions)
+  if (!token && socket.handshake.auth?.token) {
+    token = socket.handshake.auth.token;
+  }
 
   if (!token) {
     return next(new Error("Authentication error: Token missing"));
