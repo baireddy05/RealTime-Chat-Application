@@ -4,18 +4,19 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import Room from "../models/Room.model.js";
+import { isOriginAllowed } from "./corsConfig.js";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://localhost:5175",
-    ],
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Socket CORS origin not allowed: ${origin}`));
+      }
+    },
     credentials: true,
   },
 });

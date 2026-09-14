@@ -12,21 +12,12 @@ import friendRoutes from "./routes/friend.route.js";
 
 const PORT = process.env.PORT || 5000;
 
+import { corsOptions } from "./lib/corsConfig.js";
+
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://localhost:5175",
-    ],
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
