@@ -25,7 +25,8 @@ const io = new Server(server, {
 const userSocketMap = {}; // { userId: socketId }
 
 export const getReceiverSocketId = (receiverId) => {
-  return userSocketMap[receiverId];
+  if (!receiverId) return undefined;
+  return userSocketMap[receiverId.toString()];
 };
 
 // Middleware to authenticate socket connections via cookie
@@ -44,7 +45,7 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.userId = decoded.userId;
+    socket.userId = decoded.userId?.toString();
     next();
   } catch {
     return next(new Error("Authentication error: Invalid token"));
@@ -53,7 +54,7 @@ io.use((socket, next) => {
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
-  const userId = socket.userId;
+  const userId = socket.userId?.toString();
 
   if (userId) {
     userSocketMap[userId] = socket.id;

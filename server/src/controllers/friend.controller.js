@@ -64,11 +64,17 @@ export const searchUsers = async (req, res) => {
         .limit(100)
         .lean();
     } else {
-      const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const cleanQuery = query.trim();
+      const escapedQuery = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const searchRegex = new RegExp(escapedQuery, "i");
-      foundUsers = await User.find({
-        $or: [{ username: searchRegex }, { email: searchRegex }],
-      })
+
+      // Search by email only if query explicitly contains '@'.
+      // Otherwise, search strictly by username to avoid returning unintended users whose email contains the username query.
+      const filter = cleanQuery.includes("@")
+        ? { email: searchRegex }
+        : { username: searchRegex };
+
+      foundUsers = await User.find(filter)
         .select("username email profilePic status bio friends")
         .limit(50)
         .lean();
@@ -131,7 +137,7 @@ export const sendFriendRequest = async (req, res) => {
     const senderId = req.user._id;
     const { targetUserId } = req.params;
 
-    if (senderId.toString() === targetUserId) {
+    if (senderId.toString() === targetUserId.toString()) {
       return res.status(400).json({ message: "You cannot send a friend request to yourself" });
     }
 
@@ -142,7 +148,7 @@ export const sendFriendRequest = async (req, res) => {
 
     // Check if already friends
     const currentUser = await User.findById(senderId);
-    if (currentUser.friends.some((f) => f.toString() === targetUserId)) {
+    if (currentUser.friends.some((f) => f.toString() === targetUserId.toString())) {
       return res.status(400).json({ message: "You are already friends with this user" });
     }
 
@@ -167,9 +173,9 @@ export const sendFriendRequest = async (req, res) => {
     await newRequest.populate("sender", "username email profilePic status bio");
 
     // Real-time socket notification to receiver
-    const receiverSocketId = getReceiverSocketId(targetUserId);
+    const receiverSocketId = getReceiverSocketId(targetUserId.toString());
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newFriendRequest", newRequest);
+      io.to(receiverSocketId).emit("newFriendRequest", newRequest.toObject ? newRequest.toObject() : newRequest);
     }
 
     res.status(201).json(newRequest);

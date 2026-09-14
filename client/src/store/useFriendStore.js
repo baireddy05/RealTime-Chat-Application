@@ -141,7 +141,7 @@ export const useFriendStore = create((set, get) => ({
     try {
       await axiosInstance.delete(`/friends/${userId}`);
       const { friends } = get();
-      set({ friends: friends.filter((f) => f._id !== userId) });
+      set({ friends: friends.filter((f) => f._id?.toString() !== userId?.toString()) });
       return { success: true };
     } catch (error) {
       console.error("Error removing friend:", error);
@@ -157,33 +157,39 @@ export const useFriendStore = create((set, get) => ({
 
     socket.on("newFriendRequest", (request) => {
       const { incomingRequests } = get();
-      if (!incomingRequests.some((r) => r._id === request._id)) {
+      if (!incomingRequests.some((r) => r._id?.toString() === request._id?.toString())) {
         set({ incomingRequests: [request, ...incomingRequests] });
       }
+      // Re-fetch to guarantee complete populated data
+      get().getFriendRequests();
     });
 
     socket.on("friendRequestAccepted", ({ newFriend, requestId }) => {
       const { friends, outgoingRequests, incomingRequests } = get();
+      const dedupedFriends = friends.filter((f) => f._id?.toString() !== newFriend?._id?.toString());
       set({
-        friends: [...friends.filter((f) => f._id !== newFriend._id), newFriend],
-        outgoingRequests: outgoingRequests.filter((r) => r._id !== requestId),
-        incomingRequests: incomingRequests.filter((r) => r._id !== requestId),
+        friends: newFriend ? [...dedupedFriends, newFriend] : friends,
+        outgoingRequests: outgoingRequests.filter((r) => r._id?.toString() !== requestId?.toString()),
+        incomingRequests: incomingRequests.filter((r) => r._id?.toString() !== requestId?.toString()),
       });
+      get().getFriends();
+      get().getFriendRequests();
     });
 
     socket.on("friendRemoved", ({ userId }) => {
       const { friends } = get();
-      set({ friends: friends.filter((f) => f._id !== userId) });
+      set({ friends: friends.filter((f) => f._id?.toString() !== userId?.toString()) });
+      get().getFriends();
     });
 
     socket.on("userUpdated", (updatedUser) => {
       if (!updatedUser?._id) return;
       const { friends } = get();
       set({
-        friends: friends.map((f) => (f._id === updatedUser._id ? { ...f, ...updatedUser } : f)),
+        friends: friends.map((f) => (f._id?.toString() === updatedUser._id?.toString() ? { ...f, ...updatedUser } : f)),
       });
       const authUser = useAuthStore.getState().authUser;
-      if (authUser && authUser._id === updatedUser._id) {
+      if (authUser && authUser._id?.toString() === updatedUser._id?.toString()) {
         useAuthStore.setState({ authUser: { ...authUser, ...updatedUser } });
       }
     });

@@ -57,7 +57,7 @@ const Sidebar = ({
     lastMessages,
   } = useChatStore();
 
-  const { authUser, onlineUsers } = useAuthStore();
+  const { authUser, onlineUsers, socket } = useAuthStore();
   const {
     friends,
     incomingRequests,
@@ -88,7 +88,7 @@ const Sidebar = ({
     return () => {
       unsubscribeFromFriendEvents();
     };
-  }, [getRooms, getFriends, getFriendRequests, subscribeToFriendEvents, unsubscribeFromFriendEvents]);
+  }, [getRooms, getFriends, getFriendRequests, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
 
   // Keyboard shortcut: Command+K or Ctrl+K focuses the search input
   useEffect(() => {
@@ -493,14 +493,14 @@ const Sidebar = ({
             Global Search
           </div>
           {searchResults.map((user) => {
-            const isAlreadyFriend = friends.some((f) => f._id === user._id) || user.relationship === "friend";
-            const isMe = user._id === authUser?._id;
+            const isAlreadyFriend = friends.some((f) => f._id?.toString() === user._id?.toString()) || user.relationship === "friend";
+            const isMe = user._id?.toString() === authUser?._id?.toString() || user.relationship === "self";
             const isPendingOutgoing =
               user.relationship === "pending_outgoing" ||
-              outgoingRequests?.some((r) => (r.receiver?._id || r.receiver) === user._id);
+              outgoingRequests?.some((r) => (r.receiver?._id || r.receiver)?.toString() === user._id?.toString());
             const isPendingIncoming =
               user.relationship === "pending_incoming" ||
-              incomingRequests?.some((r) => (r.sender?._id || r.sender) === user._id);
+              incomingRequests?.some((r) => (r.sender?._id || r.sender)?.toString() === user._id?.toString());
             const isLoading = actionLoadingId === user._id;
 
             return (

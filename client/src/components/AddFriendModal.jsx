@@ -37,6 +37,7 @@ const AddFriendModal = ({ onClose }) => {
   const handleSendRequest = async (userId) => {
     setActionLoadingId(userId);
     await sendFriendRequest(userId);
+    await searchUsers(searchQuery);
     setActionLoadingId(null);
   };
 
@@ -264,7 +265,7 @@ const AddFriendModal = ({ onClose }) => {
                           <button
                             onClick={() => {
                               const matchingReq = incomingRequests.find(
-                                (r) => (r.sender?._id || r.sender) === user._id
+                                (r) => (r.sender?._id || r.sender)?.toString() === user._id?.toString()
                               );
                               if (matchingReq) handleAccept(matchingReq._id);
                             }}
