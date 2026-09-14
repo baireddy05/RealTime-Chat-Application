@@ -297,9 +297,13 @@ const HomePage = () => {
               />
             </div>
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-white ring-2 ring-white dark:ring-[#0a0e14]" />
-            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
-              Profile & Settings
-            </span>
+            <div className="absolute left-full ml-3 px-3 py-2 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
+              <div className="font-semibold text-white">{authUser?.username || "Profile"}</div>
+              <div className="text-[11px] text-zinc-300 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                <span>{statusEmoji}</span>
+                <span>{statusCategory}: {statusDetail}</span>
+              </div>
+            </div>
           </div>
         </div>
       </nav>
@@ -313,7 +317,7 @@ const HomePage = () => {
         <Sidebar
           onChatSelect={() => {}}
           onOpenProfile={() => setIsProfileOpen(true)}
-          onOpenSetStatus={() => setIsSetStatusOpen(true)}
+          onOpenSetStatus={() => setIsProfileOpen(true)}
           onOpenAddFriend={() => setIsAddFriendOpen(true)}
           onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
           onOpenStatus={() => setIsStatusStoriesOpen(true)}

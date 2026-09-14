@@ -312,23 +312,6 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Presence Status Mood Bar */}
-        <div
-          onClick={onOpenSetStatus}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-black/[0.03] hover:bg-black/[0.06] border border-black/10 dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 cursor-pointer transition-all group"
-          title="Click to change your presence status"
-        >
-          <div className="flex items-center gap-1.5 truncate">
-            <span className="text-xs">{statusEmoji}</span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate font-normal">
-              <span className="text-zinc-900 dark:text-white font-medium">{statusCategory}:</span> {statusDetail}
-            </span>
-          </div>
-          <span className="material-symbols-outlined text-xs text-zinc-400 group-hover:text-zinc-900 dark:text-zinc-500 dark:group-hover:text-white transition-colors">
-            edit
-          </span>
-        </div>
-
         {/* Search Bar with ⌘K */}
         <div className="relative flex items-center w-full mt-1">
           <span className="material-symbols-outlined absolute left-3 text-zinc-400 dark:text-zinc-500 pointer-events-none text-base">

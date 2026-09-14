@@ -11,6 +11,44 @@ const AVATAR_PRESETS = [
   "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
 ];
 
+const STATUS_PRESETS = [
+  { emoji: "💻", title: "Coding", desc: "Building cool features" },
+  { emoji: "🎧", title: "In the zone", desc: "Headphones on, focus" },
+  { emoji: "☕", title: "Coffee break", desc: "Recharging & sipping" },
+  { emoji: "🚀", title: "Shipping", desc: "Pushing to prod" },
+  { emoji: "🌴", title: "AFK / Away", desc: "Stepped away briefly" },
+  { emoji: "⚡", title: "Quick replies", desc: "Rapid response open" },
+  { emoji: "🥪", title: "Lunch break", desc: "Grabbing some food" },
+  { emoji: "😴", title: "Do Not Disturb", desc: "Notifications muted" },
+];
+
+const parseStatus = (raw) => {
+  if (!raw) return { emoji: "💻", title: "Coding", detail: "Available" };
+  if (raw.includes(":")) {
+    const parts = raw.split(":");
+    const prefix = parts[0].trim();
+    const detail = parts.slice(1).join(":").trim();
+    const emojiMatch = prefix.match(/\p{Extended_Pictographic}/u);
+    if (emojiMatch) {
+      return {
+        emoji: emojiMatch[0],
+        title: prefix.replace(emojiMatch[0], "").trim() || "Status",
+        detail: detail || "Available",
+      };
+    }
+    return { emoji: "⚡", title: prefix || "Status", detail: detail || "Available" };
+  }
+  const emojiMatch = raw.match(/\p{Extended_Pictographic}/u);
+  if (emojiMatch) {
+    return {
+      emoji: emojiMatch[0],
+      title: "Status",
+      detail: raw.replace(emojiMatch[0], "").trim() || "Available",
+    };
+  }
+  return { emoji: "⚡", title: "Status", detail: raw || "Available" };
+};
+
 const cleanInitialAvatar = (name) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "User")}&background=27272a&color=ffffff&bold=true&size=150`;
 
@@ -18,7 +56,11 @@ const ProfileModal = ({ onClose }) => {
   const { authUser, updateProfile } = useAuthStore();
   const [username, setUsername] = useState(authUser?.username || "");
   const [bio, setBio] = useState(authUser?.bio || "Hey there! I am using Pulse.");
-  const [status, setStatus] = useState(authUser?.status || "Available");
+  
+  const initialStatus = parseStatus(authUser?.status);
+  const [statusEmoji, setStatusEmoji] = useState(initialStatus.emoji);
+  const [statusTitle, setStatusTitle] = useState(initialStatus.title);
+  const [statusDetail, setStatusDetail] = useState(initialStatus.detail);
   
   // Clean initial photo if it contains the old distressed avatar
   const initialPic = authUser?.profilePic?.includes("avataaars")
@@ -91,10 +133,12 @@ const ProfileModal = ({ onClose }) => {
         }
       }
 
+      const fullStatus = `${statusEmoji} ${statusTitle}: ${statusDetail.trim() || "Available"}`;
+
       const res = await updateProfile({
         username: username.trim(),
         bio: bio.trim(),
-        status: status.trim(),
+        status: fullStatus,
         profilePic: finalPicUrl,
       });
 
@@ -257,22 +301,88 @@ const ProfileModal = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Focus / Status Activity Field */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block">
-              Focus / Status
-            </label>
-            <div className="relative flex items-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 focus-within:border-zinc-900 dark:focus-within:border-white rounded-2xl transition-all shadow-inner">
-              <span className="pl-3.5 text-zinc-400">
-                <Activity size={15} />
+          {/* Presence Status Section (Migrated from Sidebar header into Profile section) */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block">
+                Presence Status & Mood
+              </label>
+              <span className="text-[10px] text-zinc-400">Visible to contacts</span>
+            </div>
+
+            {/* Live Presence Status Pill (Matches exact aesthetic from user's request) */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 shadow-sm transition-all group">
+              <div className="flex items-center gap-2 truncate">
+                <span className="text-base shrink-0">{statusEmoji}</span>
+                <div className="truncate">
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-white mr-1.5">{statusTitle}:</span>
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400">{statusDetail}</span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-xs text-zinc-400 dark:text-zinc-500 shrink-0 ml-2">
+                edit
               </span>
-              <input
-                type="text"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                placeholder="Available, Focus, Coding..."
-                className="w-full bg-transparent px-3 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
-              />
+            </div>
+
+            {/* Quick Mood Presets */}
+            <div className="space-y-1.5 pt-0.5">
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Quick Moods:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_PRESETS.map((preset, idx) => {
+                  const isActive = statusEmoji === preset.emoji && statusTitle === preset.title;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setStatusEmoji(preset.emoji);
+                        setStatusTitle(preset.title);
+                        setStatusDetail(preset.desc);
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs transition-all ${
+                        isActive
+                          ? "bg-zinc-900 text-white dark:bg-white dark:text-black font-semibold shadow-sm scale-[1.02]"
+                          : "bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 border border-black/5 dark:border-white/5"
+                      }`}
+                    >
+                      <span>{preset.emoji}</span>
+                      <span>{preset.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Status Inputs */}
+            <div className="flex items-center gap-2 pt-1">
+              <div className="w-12 relative flex items-center justify-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-2xl py-2 shrink-0" title="Emoji">
+                <input
+                  type="text"
+                  value={statusEmoji}
+                  onChange={(e) => setStatusEmoji(e.target.value)}
+                  className="w-full text-center bg-transparent text-sm focus:outline-none"
+                  maxLength={4}
+                  title="Emoji"
+                />
+              </div>
+              <div className="w-28 relative flex items-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-2xl shrink-0">
+                <input
+                  type="text"
+                  value={statusTitle}
+                  onChange={(e) => setStatusTitle(e.target.value)}
+                  placeholder="Category"
+                  className="w-full bg-transparent px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none font-semibold"
+                />
+              </div>
+              <div className="flex-1 relative flex items-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-2xl">
+                <input
+                  type="text"
+                  value={statusDetail}
+                  onChange={(e) => setStatusDetail(e.target.value)}
+                  placeholder="Status message or detail..."
+                  className="w-full bg-transparent px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
 
