@@ -10,34 +10,7 @@ const STATUS_BG_COLORS = [
   "bg-gradient-to-tr from-cyan-500 to-blue-600",
 ];
 
-const INITIAL_NETWORK_PERSONS = [
-  {
-    id: "user-alex",
-    user: "Alex Johnson",
-    avatar: "https://ui-avatars.com/api/?name=Alex+Johnson&background=2563eb&color=ffffff",
-    stories: [
-      {
-        id: "story-alex-1",
-        time: "35m ago",
-        text: "Loving the new Frosted Glass UI! ✨",
-        bg: "bg-gradient-to-tr from-sky-500 to-indigo-600",
-      },
-    ],
-  },
-  {
-    id: "user-sarah",
-    user: "Sarah Williams",
-    avatar: "https://ui-avatars.com/api/?name=Sarah+Williams&background=7c3aed&color=ffffff",
-    stories: [
-      {
-        id: "story-sarah-1",
-        time: "2h ago",
-        text: "Coffee time before the design sprint ☕",
-        bg: "bg-gradient-to-tr from-amber-400 to-orange-500",
-      },
-    ],
-  },
-];
+const INITIAL_NETWORK_PERSONS = [];
 
 const StatusModal = ({ onClose }) => {
   const { authUser } = useAuthStore();
@@ -486,38 +459,44 @@ const StatusModal = ({ onClose }) => {
                 Recent Updates
               </span>
 
-              <div className="space-y-1">
-                {networkPersons.map((person, pIdx) => (
-                  <div
-                    key={person.id}
-                    onClick={() => {
-                      setActiveViewer({
-                        type: "network",
-                        personIndex: pIdx,
-                        storyIndex: 0,
-                      });
-                      setStoryProgress(0);
-                    }}
-                    className="flex items-center gap-3 p-2 rounded-2xl hover:bg-[var(--glass-hover)] cursor-pointer transition-colors"
-                  >
-                    <div className="relative flex-shrink-0">
-                      <img
-                        src={person.avatar}
-                        alt={person.user}
-                        className="w-10 h-10 rounded-full object-cover ring-2 ring-accent-secondary p-0.5"
-                      />
+              {networkPersons && networkPersons.length > 0 ? (
+                <div className="space-y-1">
+                  {networkPersons.map((person, pIdx) => (
+                    <div
+                      key={person.id}
+                      onClick={() => {
+                        setActiveViewer({
+                          type: "network",
+                          personIndex: pIdx,
+                          storyIndex: 0,
+                        });
+                        setStoryProgress(0);
+                      }}
+                      className="flex items-center gap-3 p-2 rounded-2xl hover:bg-[var(--glass-hover)] cursor-pointer transition-colors"
+                    >
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={person.avatar}
+                          alt={person.user}
+                          className="w-10 h-10 rounded-full object-cover ring-2 ring-accent-secondary p-0.5"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs text-theme-main truncate">{person.user}</p>
+                        <p className="text-[10px] text-theme-muted truncate">
+                          {person.stories.length > 1
+                            ? `${person.stories.length} updates • ${person.stories[0].time}`
+                            : person.stories[0].time}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-xs text-theme-main truncate">{person.user}</p>
-                      <p className="text-[10px] text-theme-muted truncate">
-                        {person.stories.length > 1
-                          ? `${person.stories.length} updates • ${person.stories[0].time}`
-                          : person.stories[0].time}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-5 px-4 text-center text-theme-muted text-xs bg-[var(--glass-surface)] rounded-2xl border border-[var(--glass-border)]">
+                  No recent status updates from contacts.
+                </div>
+              )}
             </div>
           </div>
         </div>
