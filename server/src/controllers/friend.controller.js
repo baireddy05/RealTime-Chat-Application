@@ -58,9 +58,7 @@ export const searchUsers = async (req, res) => {
     let foundUsers;
     if (!query || query.trim().length === 0) {
       // When no query is provided, return all registered users so anyone can discover & add friends
-      foundUsers = await User.find({
-        _id: { $ne: currentUserId },
-      })
+      foundUsers = await User.find()
         .select("username email profilePic status bio friends")
         .sort({ createdAt: -1 })
         .limit(100)
@@ -69,7 +67,6 @@ export const searchUsers = async (req, res) => {
       const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const searchRegex = new RegExp(escapedQuery, "i");
       foundUsers = await User.find({
-        _id: { $ne: currentUserId },
         $or: [{ username: searchRegex }, { email: searchRegex }],
       })
         .select("username email profilePic status bio friends")
@@ -88,20 +85,26 @@ export const searchUsers = async (req, res) => {
 
     const results = foundUsers.map((user) => {
       let relationship = "none";
-      const isFriend = currentUser.friends.some((f) => f.toString() === user._id.toString());
+      const isSelf = user._id.toString() === currentUserId.toString();
 
-      if (isFriend) {
-        relationship = "friend";
+      if (isSelf) {
+        relationship = "self";
       } else {
-        const reqOut = existingRequests.find(
-          (r) => r.sender.toString() === currentUserId.toString() && r.receiver.toString() === user._id.toString()
-        );
-        const reqIn = existingRequests.find(
-          (r) => r.receiver.toString() === currentUserId.toString() && r.sender.toString() === user._id.toString()
-        );
+        const isFriend = (currentUser.friends || []).some((f) => f.toString() === user._id.toString());
 
-        if (reqOut) relationship = "pending_outgoing";
-        else if (reqIn) relationship = "pending_incoming";
+        if (isFriend) {
+          relationship = "friend";
+        } else {
+          const reqOut = existingRequests.find(
+            (r) => r.sender.toString() === currentUserId.toString() && r.receiver.toString() === user._id.toString()
+          );
+          const reqIn = existingRequests.find(
+            (r) => r.receiver.toString() === currentUserId.toString() && r.sender.toString() === user._id.toString()
+          );
+
+          if (reqOut) relationship = "pending_outgoing";
+          else if (reqIn) relationship = "pending_incoming";
+        }
       }
 
       return {

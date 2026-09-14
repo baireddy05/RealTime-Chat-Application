@@ -73,7 +73,14 @@ const AddFriendModal = ({ onClose }) => {
             </div>
             <div>
               <h3 className="font-bold text-sm text-white tracking-tight">Add Contact</h3>
-              <p className="text-[11px] text-zinc-400">Discover all users & manage friend requests</p>
+              <p className="text-[11px] text-zinc-400 flex items-center gap-1.5 flex-wrap">
+                <span>Discover users & friend requests</span>
+                {authUser?.username && (
+                  <span className="text-zinc-300 font-semibold bg-white/10 border border-white/10 px-2 py-0.5 rounded-full text-[10px]">
+                    Signed in as @{authUser.username}
+                  </span>
+                )}
+              </p>
             </div>
           </div>
 
@@ -205,11 +212,10 @@ const AddFriendModal = ({ onClose }) => {
             ) : (
               <div className="space-y-1.5">
                 {searchResults.map((user) => {
+                  const isSelf = user._id === authUser?._id || user.relationship === "self";
                   const isFriend = user.relationship === "friend";
                   const isPendingOut = user.relationship === "pending_outgoing";
                   const isPendingIn = user.relationship === "pending_incoming";
-                  const isSelf = user._id === authUser?._id;
-                  if (isSelf) return null;
 
                   return (
                     <div
@@ -226,13 +232,26 @@ const AddFriendModal = ({ onClose }) => {
                           className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-sm shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-white truncate">{user.username}</p>
-                          <p className="text-[10px] text-zinc-400 truncate">{user.status || "Available"}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-white truncate">{user.username}</p>
+                            {isSelf && (
+                              <span className="text-[10px] font-bold text-black bg-white px-1.5 py-0.2 rounded-full leading-tight">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {isSelf ? "Your active account" : (user.status || "Available")}
+                          </p>
                         </div>
                       </div>
 
                       <div className="shrink-0 ml-2">
-                        {isFriend ? (
+                        {isSelf ? (
+                          <span className="text-[11px] font-semibold text-zinc-400 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+                            Current User
+                          </span>
+                        ) : isFriend ? (
                           <span className="text-[11px] font-bold text-black bg-white px-3 py-1 rounded-full shadow-sm flex items-center gap-1">
                             <UserCheck size={12} />
                             <span>Contact</span>
