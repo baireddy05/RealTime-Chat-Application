@@ -26,7 +26,8 @@ const userSocketMap = {}; // { userId: socketId }
 
 export const getReceiverSocketId = (receiverId) => {
   if (!receiverId) return undefined;
-  return userSocketMap[receiverId.toString()];
+  const id = receiverId._id ? receiverId._id.toString() : receiverId.toString();
+  return userSocketMap[id];
 };
 
 // Middleware to authenticate socket connections via cookie OR auth payload

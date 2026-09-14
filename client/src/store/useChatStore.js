@@ -558,11 +558,22 @@ export const useChatStore = create((set, get) => ({
 
     socket.on("newMessage", async (newMessage) => {
       const myId = useAuthStore.getState().authUser?._id;
-      const chatId = newMessage.roomId || (newMessage.senderId?._id === myId ? newMessage.receiverId : (newMessage.senderId?._id || newMessage.senderId));
+      const myIdStr = myId?.toString();
+      const senderIdStr = (newMessage.senderId?._id || newMessage.senderId)?.toString();
+      const receiverIdStr = (newMessage.receiverId?._id || newMessage.receiverId)?.toString();
+      const isMyMessage = senderIdStr === myIdStr;
+      const chatId = newMessage.roomId || (isMyMessage ? receiverIdStr : senderIdStr);
 
       let processedMessage = newMessage;
       if (processedMessage.isEncrypted || isEncryptedMessage(processedMessage.text)) {
-        const key = getConversationKey(selectedChat, myId);
+        let key;
+        if (newMessage.roomId) {
+          key = `pulse-room-key-${newMessage.roomId}`;
+        } else {
+          const otherId = isMyMessage ? receiverIdStr : senderIdStr;
+          const ids = [String(myIdStr), String(otherId)].sort();
+          key = `pulse-dm-key-${ids[0]}-${ids[1]}`;
+        }
         const dec = await decryptMessage(processedMessage.text, key);
         processedMessage = { ...processedMessage, decryptedText: dec };
       }
@@ -575,19 +586,21 @@ export const useChatStore = create((set, get) => ({
         },
       }));
 
-      const isRoomMsg = selectedChat.type === "room" && processedMessage.roomId === selectedChat.id;
-      const isUserMsg = selectedChat.type === "user" && 
-        (processedMessage.senderId?._id === selectedChat.id || processedMessage.senderId === selectedChat.id || processedMessage.receiverId === selectedChat.id);
+      const isRoomMsg = selectedChat?.type === "room" && processedMessage.roomId?.toString() === selectedChat.id?.toString();
+      const isUserMsg = selectedChat?.type === "user" && 
+        (senderIdStr === selectedChat.id?.toString() || receiverIdStr === selectedChat.id?.toString());
 
       if (isRoomMsg || isUserMsg) {
         set((state) => {
           const exists = state.messages.some((m) => m._id === processedMessage._id);
-          return { messages: exists ? state.messages : [...state.messages, processedMessage] };
+          return {
+            messages: exists ? state.messages : [...state.messages, processedMessage],
+            scheduledMessages: state.scheduledMessages.filter((m) => m._id !== processedMessage._id),
+          };
         });
         get().markMessagesAsRead(selectedChat.id, selectedChat.type);
 
-        const senderId = processedMessage.senderId?._id || processedMessage.senderId;
-        if (senderId !== myId) {
+        if (!isMyMessage) {
           soundManager.playReceiveSound();
           const senderName = processedMessage.senderId?.username || "Pulse User";
           const title = selectedChat.type === "room"
@@ -599,11 +612,13 @@ export const useChatStore = create((set, get) => ({
             body,
             icon: processedMessage.senderId?.profilePic || "/favicon.ico",
           });
+        } else {
+          soundManager.playSendSound();
+          window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         }
       } else {
         // Increment unread count for the non-active chat
-        const senderId = processedMessage.senderId?._id || processedMessage.senderId;
-        if (senderId !== myId) {
+        if (!isMyMessage) {
           set((state) => ({
             unreadCounts: {
               ...state.unreadCounts,
@@ -849,6 +864,7 @@ export const useChatStore = create((set, get) => ({
       set({ 
         selectedChat: chat, 
         messages: [], 
+        scheduledMessages: [],
         isMessagesLoading: chat ? true : false,
         replyingTo: null,
         editingMessage: null,

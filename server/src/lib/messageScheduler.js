@@ -19,8 +19,10 @@ export const startMessageScheduler = () => {
         if (msg.roomId) {
           io.to(msg.roomId.toString()).emit("newMessage", msg);
         } else {
-          const receiverSocketId = getReceiverSocketId(msg.receiverId.toString());
-          const senderSocketId = getReceiverSocketId(msg.senderId.toString());
+          const receiverIdStr = (msg.receiverId?._id || msg.receiverId)?.toString();
+          const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
+          const receiverSocketId = getReceiverSocketId(receiverIdStr);
+          const senderSocketId = getReceiverSocketId(senderIdStr);
           if (receiverSocketId) io.to(receiverSocketId).emit("newMessage", msg);
           if (senderSocketId) io.to(senderSocketId).emit("newMessage", msg);
         }
@@ -52,8 +54,10 @@ export const startMessageScheduler = () => {
         if (msg.roomId) {
           io.to(msg.roomId.toString()).emit("messageExpired", payload);
         } else {
-          const receiverSocket = getReceiverSocketId(msg.receiverId.toString());
-          const senderSocket = getReceiverSocketId(msg.senderId.toString());
+          const receiverIdStr = (msg.receiverId?._id || msg.receiverId)?.toString();
+          const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
+          const receiverSocket = getReceiverSocketId(receiverIdStr);
+          const senderSocket = getReceiverSocketId(senderIdStr);
           if (receiverSocket) io.to(receiverSocket).emit("messageExpired", payload);
           if (senderSocket) io.to(senderSocket).emit("messageExpired", payload);
         }

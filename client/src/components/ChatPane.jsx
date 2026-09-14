@@ -84,6 +84,7 @@ const ChatPane = ({ onBack }) => {
     isGroupInfoOpen, setIsGroupInfoOpen, typingUsers, soundMuted, toggleSound,
     chatWallpapers, globalWallpaper, isWallpaperOpen, setIsWallpaperOpen,
     isScheduledOpen, setIsScheduledOpen,
+    scheduledMessages, getScheduledMessages,
     openThread, closeThread, isThreadOpen,
   } = useChatStore();
   const { authUser, onlineUsers } = useAuthStore();
@@ -230,12 +231,13 @@ const ChatPane = ({ onBack }) => {
     if (loadedChatIdRef.current !== selectedChat.id) {
       loadedChatIdRef.current = selectedChat.id;
       getMessages(selectedChat.id, selectedChat.type);
+      getScheduledMessages(selectedChat.id, selectedChat.type);
     }
     subscribeToMessages();
     return () => {
       unsubscribeFromMessages();
     };
-  }, [selectedChat, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+  }, [selectedChat, getMessages, getScheduledMessages, subscribeToMessages, unsubscribeFromMessages]);
 
   useEffect(() => {
     if (prevSelectedChatIdRef.current !== selectedChat?.id) {
@@ -1304,6 +1306,24 @@ const ChatPane = ({ onBack }) => {
             <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce" />
           </div>
           <span>{activeTypers.join(", ")} {activeTypers.length === 1 ? "is" : "are"} typing...</span>
+        </div>
+      )}
+
+      {/* Pending scheduled messages banner */}
+      {scheduledMessages && scheduledMessages.length > 0 && (
+        <div className="px-5 py-2 flex items-center justify-between text-[12px] text-accent-primary bg-[var(--glass-surface)] backdrop-blur-xl border-t border-[var(--glass-border)] animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-accent-primary animate-pulse flex-shrink-0" />
+            <span className="font-medium">
+              {scheduledMessages.length} scheduled {scheduledMessages.length === 1 ? "message" : "messages"} pending
+            </span>
+          </div>
+          <button
+            onClick={() => setIsScheduledOpen(true)}
+            className="px-2.5 py-1 rounded-lg bg-accent-primary/15 hover:bg-accent-primary/25 text-accent-primary text-[11px] font-semibold transition-all cursor-pointer"
+          >
+            View
+          </button>
         </div>
       )}
 
