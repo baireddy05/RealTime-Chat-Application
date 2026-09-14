@@ -54,15 +54,14 @@ export const useFriendStore = create((set, get) => ({
     }
   },
 
-  searchUsers: async (query) => {
-    if (!query || query.trim().length === 0) {
-      set({ searchResults: [] });
-      return;
-    }
+  searchUsers: async (query = "") => {
     set({ isSearching: true });
     try {
-      const res = await axiosInstance.get(`/friends/search?query=${encodeURIComponent(query)}`);
-      set({ searchResults: res.data });
+      const endpoint = query && query.trim().length > 0
+        ? `/friends/search?query=${encodeURIComponent(query.trim())}`
+        : `/friends/search`;
+      const res = await axiosInstance.get(endpoint);
+      set({ searchResults: res.data || [] });
     } catch (error) {
       console.error("Error searching users:", error);
     } finally {

@@ -55,19 +55,27 @@ export const searchUsers = async (req, res) => {
     const { query } = req.query;
     const currentUserId = req.user._id;
 
+    let foundUsers;
     if (!query || query.trim().length === 0) {
-      return res.status(200).json([]);
+      // When no query is provided, return all registered users so anyone can discover & add friends
+      foundUsers = await User.find({
+        _id: { $ne: currentUserId },
+      })
+        .select("username email profilePic status bio friends")
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean();
+    } else {
+      const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedQuery, "i");
+      foundUsers = await User.find({
+        _id: { $ne: currentUserId },
+        $or: [{ username: searchRegex }, { email: searchRegex }],
+      })
+        .select("username email profilePic status bio friends")
+        .limit(50)
+        .lean();
     }
-
-    const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const searchRegex = new RegExp(escapedQuery, "i");
-    const foundUsers = await User.find({
-      _id: { $ne: currentUserId },
-      $or: [{ username: searchRegex }, { email: searchRegex }],
-    })
-      .select("username email profilePic status bio friends")
-      .limit(15)
-      .lean();
 
     const currentUser = await User.findById(currentUserId).select("friends").lean();
     const existingRequests = await FriendRequest.find({

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, UserPlus, Search, Loader } from "lucide-react";
+import { X, UserPlus, Search, Loader, Check, UserCheck, Inbox } from "lucide-react";
 import { useFriendStore } from "../store/useFriendStore";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -12,16 +12,25 @@ const AddFriendModal = ({ onClose }) => {
     isSearching,
     searchUsers,
     sendFriendRequest,
+    incomingRequests,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    getFriendRequests,
   } = useFriendStore();
 
   const { authUser } = useAuthStore();
 
+  // Load all users and latest pending requests immediately on mount
+  useEffect(() => {
+    getFriendRequests();
+    searchUsers("");
+  }, [getFriendRequests, searchUsers]);
+
+  // Debounced search when typing
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.trim().length > 0) {
-        searchUsers(searchQuery);
-      }
-    }, 300);
+      searchUsers(searchQuery);
+    }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery, searchUsers]);
 
@@ -31,6 +40,22 @@ const AddFriendModal = ({ onClose }) => {
     setActionLoadingId(null);
   };
 
+  const handleAccept = async (requestId) => {
+    setActionLoadingId(requestId);
+    await acceptFriendRequest(requestId);
+    await searchUsers(searchQuery);
+    setActionLoadingId(null);
+  };
+
+  const handleReject = async (requestId) => {
+    setActionLoadingId(requestId);
+    await rejectFriendRequest(requestId);
+    await searchUsers(searchQuery);
+    setActionLoadingId(null);
+  };
+
+  const pendingCount = incomingRequests?.length || 0;
+
   return (
     <div
       onClick={onClose}
@@ -38,7 +63,7 @@ const AddFriendModal = ({ onClose }) => {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#121117]/95 backdrop-blur-3xl border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-white flex flex-col max-h-[82vh]"
+        className="bg-[#121117]/95 backdrop-blur-3xl border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-white flex flex-col max-h-[85vh]"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.03] shrink-0">
@@ -48,7 +73,7 @@ const AddFriendModal = ({ onClose }) => {
             </div>
             <div>
               <h3 className="font-bold text-sm text-white tracking-tight">Add Contact</h3>
-              <p className="text-[11px] text-zinc-400">Search by username to connect</p>
+              <p className="text-[11px] text-zinc-400">Discover all users & manage friend requests</p>
             </div>
           </div>
 
@@ -66,7 +91,7 @@ const AddFriendModal = ({ onClose }) => {
             <Search size={14} className="absolute left-3.5 text-zinc-500" />
             <input
               type="text"
-              placeholder="Search username or email..."
+              placeholder="Search by username or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
@@ -84,87 +109,173 @@ const AddFriendModal = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          {isSearching ? (
-            <div className="flex justify-center p-10">
-              <Loader className="animate-spin text-white size-6" />
-            </div>
-          ) : searchQuery.trim().length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 text-zinc-400">
-                <Search size={20} />
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+          {/* 1. Pending Friend Requests Section (When available) */}
+          {pendingCount > 0 && (
+            <div className="p-3.5 rounded-2xl bg-white/[0.05] border border-white/20 backdrop-blur-xl shadow-glass flex flex-col gap-2.5">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Inbox size={15} className="text-white" />
+                  <span className="text-xs font-bold text-white tracking-wide">
+                    Friend Requests ({pendingCount})
+                  </span>
+                </div>
+                <span className="text-[10px] text-zinc-400">Pending approval</span>
               </div>
-              <p className="text-xs text-zinc-400 font-medium">Type a username to start searching</p>
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 text-zinc-500">
-                <UserPlus size={20} />
-              </div>
-              <p className="text-xs text-zinc-300 font-semibold mb-1">No users found</p>
-              <p className="text-[11px] text-zinc-500">Could not find a user with username "{searchQuery}"</p>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {searchResults.map((user) => {
-                const isFriend = user.relationship === "friend";
-                const isPendingOut = user.relationship === "pending_outgoing";
-                const isPendingIn = user.relationship === "pending_incoming";
-                const isSelf = user._id === authUser._id;
-                if (isSelf) return null;
 
-                return (
-                  <div
-                    key={user._id}
-                    className="flex items-center justify-between p-3 rounded-2xl border border-white/10 hover:bg-white/5 transition-all bg-white/[0.03]"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={
-                          user.profilePic ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=27272a&color=ffffff&bold=true`
-                        }
-                        alt={user.username}
-                        className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-sm"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-white truncate">{user.username}</p>
-                        <p className="text-[10px] text-zinc-400 truncate">{user.status || "Available"}</p>
+              <div className="space-y-2">
+                {incomingRequests.map((req) => {
+                  const sender = req.sender || {};
+                  const isLoading = actionLoadingId === req._id;
+
+                  return (
+                    <div
+                      key={req._id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={
+                            sender.profilePic ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(sender.username || "User")}&background=27272a&color=ffffff&bold=true`
+                          }
+                          alt={sender.username}
+                          className="w-9 h-9 rounded-full object-cover border border-white/10 shadow-sm shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">{sender.username}</p>
+                          <p className="text-[10px] text-zinc-400 truncate">{sender.status || "Wants to connect"}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleAccept(req._id)}
+                          disabled={isLoading}
+                          className="px-3 py-1 rounded-full bg-white text-black font-bold text-xs hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1 shadow-sm cursor-pointer"
+                        >
+                          {isLoading ? <Loader size={12} className="animate-spin" /> : <Check size={12} />}
+                          <span>Accept</span>
+                        </button>
+                        <button
+                          onClick={() => handleReject(req._id)}
+                          disabled={isLoading}
+                          className="p-1.5 rounded-full text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
+                          title="Decline"
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
                     </div>
-                    <div>
-                      {isFriend ? (
-                        <span className="text-[11px] font-bold text-black bg-white px-3 py-1 rounded-full shadow-sm">
-                          Contact
-                        </span>
-                      ) : isPendingOut ? (
-                        <span className="text-[11px] font-medium text-zinc-400 bg-white/10 border border-white/10 px-3 py-1 rounded-full">
-                          Sent
-                        </span>
-                      ) : isPendingIn ? (
-                        <span className="text-[11px] font-medium text-zinc-200 bg-white/20 border border-white/20 px-3 py-1 rounded-full">
-                          Requested
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleSendRequest(user._id)}
-                          disabled={actionLoadingId === user._id}
-                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-black font-bold text-xs shadow-sm hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                        >
-                          {actionLoadingId === user._id ? (
-                            <Loader size={12} className="animate-spin text-black" />
-                          ) : (
-                            <UserPlus size={12} className="text-black" />
-                          )}
-                          <span>Add</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
+
+          {/* 2. Registered Users / Search Results List */}
+          <div>
+            <div className="flex items-center justify-between px-1 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                {searchQuery.trim().length > 0
+                  ? `Search Results (${searchResults.length})`
+                  : `All Registered Users (${searchResults.length})`}
+              </span>
+              <span className="text-[10px] text-zinc-500">
+                {searchQuery.trim().length > 0 ? "Filtered" : "Browse & Connect"}
+              </span>
+            </div>
+
+            {isSearching ? (
+              <div className="flex justify-center p-8">
+                <Loader className="animate-spin text-white size-6" />
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center py-10 px-4">
+                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 text-zinc-500">
+                  <UserPlus size={20} />
+                </div>
+                <p className="text-xs text-zinc-300 font-semibold mb-1">No users found</p>
+                <p className="text-[11px] text-zinc-500">
+                  {searchQuery.trim().length > 0
+                    ? `No registered user matches "${searchQuery}"`
+                    : "No other registered users yet."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {searchResults.map((user) => {
+                  const isFriend = user.relationship === "friend";
+                  const isPendingOut = user.relationship === "pending_outgoing";
+                  const isPendingIn = user.relationship === "pending_incoming";
+                  const isSelf = user._id === authUser?._id;
+                  if (isSelf) return null;
+
+                  return (
+                    <div
+                      key={user._id}
+                      className="flex items-center justify-between p-3 rounded-2xl border border-white/10 hover:bg-white/5 transition-all bg-white/[0.03]"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={
+                            user.profilePic ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=27272a&color=ffffff&bold=true`
+                          }
+                          alt={user.username}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-sm shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">{user.username}</p>
+                          <p className="text-[10px] text-zinc-400 truncate">{user.status || "Available"}</p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 ml-2">
+                        {isFriend ? (
+                          <span className="text-[11px] font-bold text-black bg-white px-3 py-1 rounded-full shadow-sm flex items-center gap-1">
+                            <UserCheck size={12} />
+                            <span>Contact</span>
+                          </span>
+                        ) : isPendingOut ? (
+                          <span className="text-[11px] font-medium text-zinc-400 bg-white/10 border border-white/10 px-3 py-1 rounded-full">
+                            Sent
+                          </span>
+                        ) : isPendingIn ? (
+                          <button
+                            onClick={() => {
+                              const matchingReq = incomingRequests.find(
+                                (r) => (r.sender?._id || r.sender) === user._id
+                              );
+                              if (matchingReq) handleAccept(matchingReq._id);
+                            }}
+                            disabled={actionLoadingId === user._id}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black font-bold text-xs shadow-sm hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            <Check size={12} />
+                            <span>Accept</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSendRequest(user._id)}
+                            disabled={actionLoadingId === user._id}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-black font-bold text-xs shadow-sm hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            {actionLoadingId === user._id ? (
+                              <Loader size={12} className="animate-spin text-black" />
+                            ) : (
+                              <UserPlus size={12} className="text-black" />
+                            )}
+                            <span>Add</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

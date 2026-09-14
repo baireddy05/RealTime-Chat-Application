@@ -406,44 +406,82 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* 2. Top Pending Friend Request Banner */}
-      {topPendingRequest && (
-        <div className="my-1.5 p-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2 animate-fadeIn shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <img
-              className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
-              alt={topPendingRequest.sender?.username || "Contact"}
-              src={
-                topPendingRequest.sender?.profilePic ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  topPendingRequest.sender?.username || "U"
-                )}&background=27272a&color=ffffff`
-              }
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold truncate text-white">
-                {topPendingRequest.sender?.username}
+      {/* 2. Pending Friend Requests Banner List */}
+      {incomingRequests && incomingRequests.length > 0 && (
+        <div className="my-2 p-2.5 rounded-2xl bg-white/[0.05] border border-white/20 backdrop-blur-xl shadow-glass flex flex-col gap-2 shrink-0 animate-fadeIn">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-white">
+                Friend Requests ({incomingRequests.length})
               </span>
-              <span className="text-[10px] text-zinc-400 truncate">Wants to connect</span>
             </div>
+            {onOpenAddFriend && (
+              <button
+                type="button"
+                onClick={onOpenAddFriend}
+                className="text-[10px] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                View all
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => handleAcceptRequest(topPendingRequest._id)}
-              disabled={actionLoadingId === topPendingRequest._id}
-              className="p-1 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
-              title="Accept"
-            >
-              <span className="material-symbols-outlined text-sm">check</span>
-            </button>
-            <button
-              onClick={() => handleRejectRequest(topPendingRequest._id)}
-              disabled={actionLoadingId === topPendingRequest._id}
-              className="p-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-              title="Decline"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
+
+          <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
+            {incomingRequests.map((req) => {
+              const sender = req.sender || {};
+              const isLoading = actionLoadingId === req._id;
+
+              return (
+                <div
+                  key={req._id}
+                  className="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition-all flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
+                      alt={sender.username || "Contact"}
+                      src={
+                        sender.profilePic ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          sender.username || "User"
+                        )}&background=27272a&color=ffffff`
+                      }
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-semibold truncate text-white">
+                        {sender.username || "Unknown User"}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 truncate">
+                        {sender.status || "Wants to connect"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAcceptRequest(req._id)}
+                      disabled={isLoading}
+                      className="px-2.5 py-1 rounded-lg bg-white text-black text-[11px] font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shadow-sm flex items-center gap-1 cursor-pointer"
+                      title="Accept Request"
+                    >
+                      <span className="material-symbols-outlined text-xs">check</span>
+                      <span>Accept</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRejectRequest(req._id)}
+                      disabled={isLoading}
+                      className="p-1 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Decline"
+                    >
+                      <span className="material-symbols-outlined text-xs">close</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
