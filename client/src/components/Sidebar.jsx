@@ -160,16 +160,46 @@ const Sidebar = ({
     return (friends || []).filter((f) => f.username.toLowerCase().includes(q));
   }, [friends, searchQuery]);
 
+  // Sort helper by recent message
+  const getChatTimestamp = (item) => {
+    const lastMsg = lastMessages[item._id] || item.lastMessage;
+    if (lastMsg?.createdAt) {
+      const time = new Date(lastMsg.createdAt).getTime();
+      if (!isNaN(time) && time > 0) return time;
+    }
+    if (item.updatedAt) {
+      const time = new Date(item.updatedAt).getTime();
+      if (!isNaN(time) && time > 0) return time;
+    }
+    if (item.createdAt) {
+      const time = new Date(item.createdAt).getTime();
+      if (!isNaN(time) && time > 0) return time;
+    }
+    return 0;
+  };
+
+  // Sorted lists by recent activity
+  const sortedRooms = useMemo(() => {
+    return [...filteredRooms].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
+  }, [filteredRooms, lastMessages]);
+
+  const sortedFriends = useMemo(() => {
+    return [...filteredFriends].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
+  }, [filteredFriends, lastMessages]);
+
+  // Unified all chats stream (Groups + Direct combined, sorted by recent messages)
+  const allChats = useMemo(() => {
+    const roomItems = filteredRooms.map((r) => ({ ...r, chatType: "room" }));
+    const friendItems = filteredFriends.map((f) => ({ ...f, chatType: "user" }));
+    return [...roomItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
+  }, [filteredRooms, filteredFriends, lastMessages]);
+
   // Compute Unread lists
-  const unreadRooms = useMemo(() => {
-    return filteredRooms.filter((r) => (unreadCounts[r._id] || 0) > 0);
-  }, [filteredRooms, unreadCounts]);
+  const unreadChats = useMemo(() => {
+    return allChats.filter((c) => (unreadCounts[c._id] || 0) > 0);
+  }, [allChats, unreadCounts]);
 
-  const unreadFriends = useMemo(() => {
-    return filteredFriends.filter((f) => (unreadCounts[f._id] || 0) > 0);
-  }, [filteredFriends, unreadCounts]);
-
-  const totalUnreadCount = unreadRooms.length + unreadFriends.length;
+  const totalUnreadCount = unreadChats.length;
   const roomsCount = filteredRooms.length;
   const directCount = filteredFriends.length;
   const allCount = roomsCount + directCount;
@@ -182,6 +212,191 @@ const Sidebar = ({
     } else {
       setIsLocalCreateGroupOpen(true);
     }
+  };
+
+  const renderRoomCard = (room) => {
+    const isSelected = selectedChat?.id === room._id;
+    const unread = unreadCounts[room._id] || 0;
+    const lastMsg = lastMessages[room._id];
+    const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
+    const previewText = getMessageSnippet(lastMsg);
+    const isOutgoing = lastMsg?.senderId === authUser?._id || lastMsg?.senderId?._id === authUser?._id;
+    const senderUsername = isOutgoing ? "You" : lastMsg?.senderId?.username || "";
+
+    return (
+      <div
+        key={`room-${room._id}`}
+        onClick={() =>
+          selectChat({
+            id: room._id,
+            name: room.name,
+            type: "room",
+            description: room.description,
+            members: room.members,
+          })
+        }
+        className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+          isSelected
+            ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
+            : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
+        }`}
+      >
+        <div
+          className={`relative shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-150 ${
+            isSelected
+              ? "bg-white text-zinc-900 dark:bg-[#0d0c11] dark:text-white shadow-md font-bold scale-105"
+              : "bg-black/5 border border-black/10 text-zinc-600 group-hover:text-zinc-900 group-hover:scale-105 dark:bg-white/5 dark:border-white/10 dark:text-zinc-400 dark:group-hover:text-white"
+          }`}
+        >
+          <span className="material-symbols-outlined text-xl">groups</span>
+        </div>
+
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span
+              className={`text-xs font-semibold truncate ${
+                isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
+              }`}
+            >
+              {room.name.replace(/^#/, "")}
+            </span>
+            <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
+              {timeStr || "Active"}
+            </span>
+          </div>
+
+          <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+            {previewText ? (
+              <>
+                {isOutgoing && (
+                  <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
+                    done_all
+                  </span>
+                )}
+                {senderUsername && (
+                  <span className={`font-medium shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-700 dark:text-zinc-300"}`}>
+                    {senderUsername}:
+                  </span>
+                )}
+                <span className="truncate">{previewText}</span>
+              </>
+            ) : (
+              <span className="truncate opacity-75">{room.description || "Group chat"}</span>
+            )}
+          </div>
+        </div>
+
+        {unread > 0 && (
+          <span
+            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
+              isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+            }`}
+          >
+            {unread}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderFriendCard = (friend) => {
+    const isSelected = selectedChat?.id === friend._id;
+    const isOnline = onlineUsersSet.has(friend._id);
+    const unread = unreadCounts[friend._id] || 0;
+    const lastMsg = lastMessages[friend._id];
+    const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
+    const previewText = getMessageSnippet(lastMsg);
+    const isOutgoing = lastMsg?.senderId === authUser?._id || lastMsg?.senderId?._id === authUser?._id;
+
+    return (
+      <div
+        key={`friend-${friend._id}`}
+        onClick={() =>
+          selectChat({
+            id: friend._id,
+            name: friend.username,
+            type: "user",
+            profilePic: friend.profilePic,
+          })
+        }
+        className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+          isSelected
+            ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
+            : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
+        }`}
+      >
+        <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+          <img
+            className="w-full h-full object-cover"
+            alt={friend.username}
+            src={
+              friend.profilePic ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username)}&background=27272a&color=ffffff`
+            }
+          />
+          <span
+            className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${
+              isOnline
+                ? "bg-emerald-500 dark:bg-white shadow-[0_0_6px_rgba(16,185,129,0.5)] dark:shadow-[0_0_6px_rgba(255,255,255,0.85)]"
+                : "bg-zinc-400 dark:bg-zinc-600"
+            }`}
+          />
+        </div>
+
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span
+              className={`text-xs font-semibold truncate ${
+                isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
+              }`}
+            >
+              {friend.username}
+            </span>
+            <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
+              {timeStr || (isOnline ? "Online" : "")}
+            </span>
+          </div>
+
+          <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+            {previewText ? (
+              <>
+                {isOutgoing && (
+                  <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
+                    done_all
+                  </span>
+                )}
+                <span className="truncate">{previewText}</span>
+              </>
+            ) : friend.status ? (
+              <span className="truncate">{friend.status}</span>
+            ) : (
+              <span className="truncate opacity-75">{isOnline ? "Available now" : "Offline"}</span>
+            )}
+          </div>
+        </div>
+
+        {unread > 0 ? (
+          <span
+            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
+              isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+            }`}
+          >
+            {unread}
+          </span>
+        ) : (
+          <span className="material-symbols-outlined text-xs text-zinc-400 dark:text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
+            chat
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderChatCard = (item) => {
+    if (item.chatType === "room") {
+      return renderRoomCard(item);
+    }
+    return renderFriendCard(item);
   };
 
   return (
@@ -686,201 +901,49 @@ const Sidebar = ({
           </div>
         )}
 
-        {/* Section Header: Groups */}
-        {(activeFilter === "all" || activeFilter === "groups" || (activeFilter === "unread" && unreadRooms.length > 0)) &&
-          (activeFilter === "unread" ? unreadRooms : filteredRooms).length > 0 && (
-            <div className="pt-2 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-              <span>Groups</span>
-              <span className="text-[9px] font-mono">
-                {(activeFilter === "unread" ? unreadRooms : filteredRooms).length}
-              </span>
+        {/* ALL TAB: Unified Chat Stream (Groups + Direct merged, chronologically sorted by recent activity) */}
+        {activeFilter === "all" && (
+          allChats.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              No conversations yet. Start a chat or create a group!
             </div>
-          )}
+          ) : (
+            allChats.map(renderChatCard)
+          )
+        )}
 
-        {/* Groups List (WhatsApp Group Card Design) */}
-        {(activeFilter === "all" || activeFilter === "groups" || activeFilter === "unread") &&
-          (activeFilter === "unread" ? unreadRooms : filteredRooms).map((room) => {
-            const isSelected = selectedChat?.id === room._id;
-            const unread = unreadCounts[room._id] || 0;
-            const lastMsg = lastMessages[room._id];
-            const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
-            const previewText = getMessageSnippet(lastMsg);
-            const isOutgoing = lastMsg?.senderId === authUser?._id || lastMsg?.senderId?._id === authUser?._id;
-            const senderUsername = isOutgoing
-              ? "You"
-              : lastMsg?.senderId?.username || "";
-
-            return (
-              <div
-                key={room._id}
-                onClick={() =>
-                  selectChat({
-                    id: room._id,
-                    name: room.name,
-                    type: "room",
-                    description: room.description,
-                    members: room.members,
-                  })
-                }
-                className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
-                  isSelected
-                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
-                    : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
-                }`}
-              >
-                {/* WhatsApp Group Icon (No hash #) */}
-                <div className={`relative shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-150 ${
-                  isSelected
-                    ? "bg-white text-zinc-900 dark:bg-[#0d0c11] dark:text-white shadow-md font-bold scale-105"
-                    : "bg-black/5 border border-black/10 text-zinc-600 group-hover:text-zinc-900 group-hover:scale-105 dark:bg-white/5 dark:border-white/10 dark:text-zinc-400 dark:group-hover:text-white"
-                }`}>
-                  <span className="material-symbols-outlined text-xl">groups</span>
-                </div>
-
-                <div className="flex flex-col flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"}`}>
-                      {room.name.replace(/^#/, "")}
-                    </span>
-                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
-                      {timeStr || "Active"}
-                    </span>
-                  </div>
-
-                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
-                    {previewText ? (
-                      <>
-                        {isOutgoing && (
-                          <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                            done_all
-                          </span>
-                        )}
-                        {senderUsername && (
-                          <span className={`font-medium shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-700 dark:text-zinc-300"}`}>
-                            {senderUsername}:
-                          </span>
-                        )}
-                        <span className="truncate">{previewText}</span>
-                      </>
-                    ) : (
-                      <span className="truncate opacity-75">{room.description || "Group chat"}</span>
-                    )}
-                  </div>
-                </div>
-
-                {unread > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
-                    isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-                  }`}>
-                    {unread}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-
-        {/* Section Header: Direct Chats */}
-        {(activeFilter === "all" || activeFilter === "direct" || (activeFilter === "unread" && unreadFriends.length > 0)) &&
-          (activeFilter === "unread" ? unreadFriends : filteredFriends).length > 0 && (
-            <div className="pt-3 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-              <span>Direct Chats</span>
-              <span className="text-[9px] font-mono">
-                {(activeFilter === "unread" ? unreadFriends : filteredFriends).length}
-              </span>
+        {/* UNREAD TAB: Unified Unread Stream */}
+        {activeFilter === "unread" && (
+          unreadChats.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              No unread messages.
             </div>
-          )}
+          ) : (
+            unreadChats.map(renderChatCard)
+          )
+        )}
 
-        {/* Direct Contacts List */}
-        {(activeFilter === "all" || activeFilter === "direct" || activeFilter === "unread") &&
-          (activeFilter === "unread" ? unreadFriends : filteredFriends).map((friend) => {
-            const isSelected = selectedChat?.id === friend._id;
-            const isOnline = onlineUsersSet.has(friend._id);
-            const unread = unreadCounts[friend._id] || 0;
-            const lastMsg = lastMessages[friend._id];
-            const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
-            const previewText = getMessageSnippet(lastMsg);
-            const isOutgoing = lastMsg?.senderId === authUser?._id || lastMsg?.senderId?._id === authUser?._id;
+        {/* GROUPS TAB: Only Groups sorted by recent */}
+        {activeFilter === "groups" && (
+          sortedRooms.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              No groups found.
+            </div>
+          ) : (
+            sortedRooms.map(renderRoomCard)
+          )
+        )}
 
-            return (
-              <div
-                key={friend._id}
-                onClick={() =>
-                  selectChat({
-                    id: friend._id,
-                    name: friend.username,
-                    type: "user",
-                    profilePic: friend.profilePic,
-                  })
-                }
-                className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
-                  isSelected
-                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
-                    : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
-                }`}
-              >
-                {/* Circular Avatar with Online Ring */}
-                <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
-                  <img
-                    className="w-full h-full object-cover"
-                    alt={friend.username}
-                    src={
-                      friend.profilePic ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                        friend.username
-                      )}&background=27272a&color=ffffff`
-                    }
-                  />
-                  <span
-                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${
-                      isOnline
-                        ? "bg-emerald-500 dark:bg-white shadow-[0_0_6px_rgba(16,185,129,0.5)] dark:shadow-[0_0_6px_rgba(255,255,255,0.85)]"
-                        : "bg-zinc-400 dark:bg-zinc-600"
-                    }`}
-                  />
-                </div>
-
-                <div className="flex flex-col flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"}`}>
-                      {friend.username}
-                    </span>
-                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
-                      {timeStr || (isOnline ? "Online" : "")}
-                    </span>
-                  </div>
-
-                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
-                    {previewText ? (
-                      <>
-                        {isOutgoing && (
-                          <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                            done_all
-                          </span>
-                        )}
-                        <span className="truncate">{previewText}</span>
-                      </>
-                    ) : friend.status ? (
-                      <span className="truncate">{friend.status}</span>
-                    ) : (
-                      <span className="truncate opacity-75">{isOnline ? "Available now" : "Offline"}</span>
-                    )}
-                  </div>
-                </div>
-
-                {unread > 0 ? (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
-                    isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-                  }`}>
-                    {unread}
-                  </span>
-                ) : (
-                  <span className="material-symbols-outlined text-xs text-zinc-400 dark:text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                    chat
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        {/* DIRECT TAB: Only Direct Chats sorted by recent */}
+        {activeFilter === "direct" && (
+          sortedFriends.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              No direct chats found.
+            </div>
+          ) : (
+            sortedFriends.map(renderFriendCard)
+          )
+        )}
       </div>
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
