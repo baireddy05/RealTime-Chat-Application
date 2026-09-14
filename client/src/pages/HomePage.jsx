@@ -34,26 +34,29 @@ const HomePage = () => {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("chats");
 
-  // Logo coordinate tracking for background pulse waves
+  // Logo screen coordinate tracking for full UI background pulse waves
   const logoRef = useRef(null);
-  const commandCenterRef = useRef(null);
   const [logoCoords, setLogoCoords] = useState(null);
 
   useEffect(() => {
     const updateLogoCoords = () => {
-      if (logoRef.current && commandCenterRef.current) {
-        const cRect = commandCenterRef.current.getBoundingClientRect();
+      if (logoRef.current) {
         const lRect = logoRef.current.getBoundingClientRect();
         setLogoCoords({
-          x: lRect.left + lRect.width / 2 - cRect.left,
-          y: lRect.top + lRect.height / 2 - cRect.top,
+          x: lRect.left + lRect.width / 2,
+          y: lRect.top + lRect.height / 2,
         });
       }
     };
 
     updateLogoCoords();
+    // Delay slightly to account for initial layout settlement
+    const timer = setTimeout(updateLogoCoords, 100);
     window.addEventListener("resize", updateLogoCoords);
-    return () => window.removeEventListener("resize", updateLogoCoords);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updateLogoCoords);
+    };
   }, [selectedChat]);
 
   // WebRTC calling listeners
@@ -112,6 +115,28 @@ const HomePage = () => {
     <div className="h-[100dvh] w-screen overflow-hidden flex flex-row p-2 sm:p-2.5 md:p-3 gap-2 sm:gap-2.5 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200">
       {/* 1. Dynamic Liquid Glass Pulse Shockwave Background */}
       <TypingPulseBackground />
+
+      {/* Full UI Background Pulse: Originates strictly from Home Logo across the entire window */}
+      {!selectedChat && (
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
+          <div
+            className="absolute pointer-events-none select-none transition-all duration-300"
+            style={{
+              left: logoCoords ? `${logoCoords.x}px` : "65vw",
+              top: logoCoords ? `${logoCoords.y}px` : "33vh",
+            }}
+          >
+            {/* Ultra-wide Ambient Breathing Glow across the entire UI */}
+            <div className="absolute -top-[750px] -left-[750px] w-[1500px] h-[1500px] rounded-full bg-gradient-to-tr from-white/[0.08] via-white/[0.02] to-transparent blur-[120px] animate-home-logo-breath pointer-events-none" />
+            <div className="absolute -top-[200px] -left-[200px] w-[400px] h-[400px] rounded-full bg-white/[0.10] blur-[60px] animate-pulse pointer-events-none" />
+
+            {/* Concentric liquid-glass pulse shockwave rings radiating from the logo across the entire window */}
+            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border-2 border-white/35 shadow-[0_0_60px_rgba(255,255,255,0.15)] animate-home-logo-wave-1 pointer-events-none" />
+            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border border-white/25 shadow-[0_0_80px_rgba(255,255,255,0.10)] animate-home-logo-wave-2 pointer-events-none" />
+            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border border-white/15 shadow-[0_0_100px_rgba(255,255,255,0.06)] animate-home-logo-wave-3 pointer-events-none" />
+          </div>
+        </div>
+      )}
 
       {/* 2. Zone 1: Slim Activity Rail (Floating Island: 64px width on md+) */}
       <nav
@@ -316,31 +341,8 @@ const HomePage = () => {
           <ChatPane onBack={() => setSelectedChat(null)} />
         ) : (
           /* WhatsApp Web Style Command Center */
-          <div
-            ref={commandCenterRef}
-            className="home-command-center flex-1 h-full flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden select-none"
-          >
-            {/* 1. Pure Background Layer: Pulse waves emanate strictly from the logo coordinates into the screen background */}
-            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none">
-              <div
-                className="absolute pointer-events-none select-none"
-                style={{
-                  left: logoCoords ? `${logoCoords.x}px` : "50%",
-                  top: logoCoords ? `${logoCoords.y}px` : "calc(50% - 150px)",
-                }}
-              >
-                {/* Ultra-wide Ambient Breathing Glow */}
-                <div className="absolute -top-[500px] -left-[500px] w-[1000px] h-[1000px] md:-top-[700px] md:-left-[700px] md:w-[1400px] md:h-[1400px] rounded-full bg-gradient-to-tr from-white/[0.07] via-white/[0.02] to-transparent blur-[90px] animate-home-logo-breath pointer-events-none" />
-                <div className="absolute -top-[160px] -left-[160px] w-[320px] h-[320px] rounded-full bg-white/[0.08] blur-[45px] animate-pulse pointer-events-none" />
-
-                {/* Concentric liquid-glass pulse shockwave rings originating strictly from the logo */}
-                <div className="absolute -top-[240px] -left-[240px] w-[480px] h-[480px] rounded-full border border-white/30 shadow-[0_0_50px_rgba(255,255,255,0.12)] animate-home-logo-wave-1 pointer-events-none" />
-                <div className="absolute -top-[240px] -left-[240px] w-[480px] h-[480px] rounded-full border border-white/20 shadow-[0_0_70px_rgba(255,255,255,0.08)] animate-home-logo-wave-2 pointer-events-none" />
-                <div className="absolute -top-[240px] -left-[240px] w-[480px] h-[480px] rounded-full border border-white/12 shadow-[0_0_90px_rgba(255,255,255,0.05)] animate-home-logo-wave-3 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* 2. Foreground Screen: Content, cards, text, and interactive buttons */}
+          <div className="flex-1 h-full flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden select-none">
+            {/* Foreground Content: Central Logo, greeting, and quick launch cards */}
             <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center animate-fadeIn">
               {/* Central Glowing Hero Logo Emblem */}
               <div className="relative mb-6 flex items-center justify-center">
