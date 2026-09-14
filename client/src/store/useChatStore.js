@@ -530,9 +530,6 @@ export const useChatStore = create((set, get) => ({
   },
 
   subscribeToMessages: () => {
-    const { selectedChat } = get();
-    if (!selectedChat) return;
-
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
 
@@ -551,12 +548,14 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageDeleted");
     socket.off("messagePinned");
 
+    const { selectedChat } = get();
     // Join room if it's a room chat
-    if (selectedChat.type === "room") {
+    if (selectedChat?.type === "room") {
       socket.emit("joinRoom", selectedChat.id);
     }
 
     socket.on("newMessage", async (newMessage) => {
+      const { selectedChat } = get();
       const myId = useAuthStore.getState().authUser?._id;
       const myIdStr = myId?.toString();
       const senderIdStr = (newMessage.senderId?._id || newMessage.senderId)?.toString();
@@ -578,7 +577,7 @@ export const useChatStore = create((set, get) => ({
         processedMessage = { ...processedMessage, decryptedText: dec };
       }
 
-      // Always update last message in store
+      // Always update last message in store so sidebar re-sorts & shows preview
       set((state) => ({
         lastMessages: {
           ...state.lastMessages,
@@ -617,7 +616,7 @@ export const useChatStore = create((set, get) => ({
           window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         }
       } else {
-        // Increment unread count for the non-active chat
+        // Increment unread count for the non-active chat (e.g. mobile chats list view)
         if (!isMyMessage) {
           set((state) => ({
             unreadCounts: {
@@ -625,6 +624,15 @@ export const useChatStore = create((set, get) => ({
               [chatId]: (state.unreadCounts[chatId] || 0) + 1,
             },
           }));
+          soundManager.playReceiveSound();
+          const senderName = processedMessage.senderId?.username || "Pulse User";
+          const title = newMessage.roomId ? "New Group Message" : senderName;
+          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎 ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          notificationManager.sendNotification({
+            title,
+            body,
+            icon: processedMessage.senderId?.profilePic || "/favicon.ico",
+          });
         }
       }
     });
@@ -857,8 +865,18 @@ export const useChatStore = create((set, get) => ({
 
   setSelectedChat: (chat) => {
     const current = get().selectedChat;
+    const socket = useAuthStore.getState().socket;
     const unread = { ...get().unreadCounts };
     if (chat?.id) unread[chat.id] = 0;
+
+    if (socket) {
+      if (current?.type === "room" && current.id !== chat?.id) {
+        socket.emit("leaveRoom", current.id);
+      }
+      if (chat?.type === "room" && current?.id !== chat?.id) {
+        socket.emit("joinRoom", chat.id);
+      }
+    }
 
     if (current?.id !== chat?.id) {
       set({ 

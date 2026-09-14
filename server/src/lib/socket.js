@@ -65,6 +65,17 @@ io.on("connection", (socket) => {
     userSocketMap[userId] = socket.id;
     // Broadcast online status to all users
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+    // Auto-join user to all their rooms so they receive group messages in real-time
+    Room.find({ members: userId })
+      .select("_id")
+      .lean()
+      .then((userRooms) => {
+        (userRooms || []).forEach((r) => socket.join(r._id.toString()));
+      })
+      .catch((err) => {
+        console.error("Error auto-joining user rooms on socket connect:", err.message);
+      });
   }
 
   // Room logic

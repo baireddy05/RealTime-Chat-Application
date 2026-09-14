@@ -19,7 +19,7 @@ import { usePWAInstall } from "../hooks/usePWAInstall";
 import TypingPulseBackground from "../components/TypingPulseBackground";
 
 const HomePage = () => {
-  const { selectedChat, setSelectedChat, rooms, getRooms, isWallpaperOpen, setIsWallpaperOpen, unreadCounts, isStarredOpen, setIsStarredOpen } = useChatStore();
+  const { selectedChat, setSelectedChat, rooms, getRooms, isWallpaperOpen, setIsWallpaperOpen, unreadCounts, isStarredOpen, setIsStarredOpen, subscribeToMessages } = useChatStore();
   const { socket, authUser, logout } = useAuthStore();
   const { initSocketListeners } = useCallStore();
   const { friends, incomingRequests, getFriends, getFriendRequests } = useFriendStore();
@@ -59,12 +59,13 @@ const HomePage = () => {
     };
   }, [selectedChat]);
 
-  // WebRTC calling listeners
+  // Global real-time messaging and WebRTC calling listeners
   useEffect(() => {
     if (socket && authUser) {
       initSocketListeners(socket, authUser);
+      subscribeToMessages();
     }
-  }, [socket, authUser, initSocketListeners]);
+  }, [socket, authUser, initSocketListeners, subscribeToMessages]);
 
   useEffect(() => {
     getRooms();

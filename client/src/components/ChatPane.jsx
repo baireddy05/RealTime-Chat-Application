@@ -233,11 +233,7 @@ const ChatPane = ({ onBack }) => {
       getMessages(selectedChat.id, selectedChat.type);
       getScheduledMessages(selectedChat.id, selectedChat.type);
     }
-    subscribeToMessages();
-    return () => {
-      unsubscribeFromMessages();
-    };
-  }, [selectedChat, getMessages, getScheduledMessages, subscribeToMessages, unsubscribeFromMessages]);
+  }, [selectedChat, getMessages, getScheduledMessages]);
 
   useEffect(() => {
     if (prevSelectedChatIdRef.current !== selectedChat?.id) {
