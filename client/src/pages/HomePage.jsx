@@ -113,7 +113,7 @@ const HomePage = () => {
   };
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden flex flex-row p-2 sm:p-2.5 md:p-3 gap-2 sm:gap-2.5 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200">
+    <div className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200">
       {/* 1. Dynamic Liquid Glass Pulse Shockwave Background */}
       <TypingPulseBackground />
 
@@ -311,7 +311,7 @@ const HomePage = () => {
 
       {/* 2. Zone 2: Conversation Sidebar */}
       <div
-        className={`w-full md:w-80 lg:w-[340px] xl:w-[360px] h-full z-30 shrink-0 flex flex-col glass-panel rounded-2xl md:rounded-3xl border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass overflow-hidden transition-all duration-200 ${
+        className={`w-full md:w-80 lg:w-[340px] xl:w-[360px] h-full z-30 shrink-0 flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass overflow-hidden transition-all duration-200 ${
           selectedChat ? "hidden md:flex" : "flex"
         }`}
       >
@@ -338,7 +338,7 @@ const HomePage = () => {
 
       {/* 3. Zone 3: Master Active Chat Workstation or WhatsApp Command Center */}
       <main
-        className={`flex-1 h-full z-20 overflow-hidden flex flex-col glass-panel rounded-2xl md:rounded-3xl border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass transition-all duration-200 ${
+        className={`flex-1 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-all duration-200 ${
           !selectedChat ? "hidden md:flex" : "flex"
         }`}
       >

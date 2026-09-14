@@ -251,7 +251,7 @@ const SignUpPage = () => {
         </div>
 
         {/* Scrollable Form Container */}
-        <div className="flex-1 overflow-y-auto flex flex-col justify-center px-8 sm:px-14 md:px-20 py-12">
+        <div className="flex-1 overflow-y-auto flex flex-col justify-center px-5 sm:px-10 md:px-14 lg:px-20 py-12">
           
           <div className="w-full max-w-[400px] mx-auto animate-slide-up">
             

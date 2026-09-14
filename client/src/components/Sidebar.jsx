@@ -441,32 +441,32 @@ const Sidebar = ({
             {onOpenStatus && (
               <button
                 onClick={onOpenStatus}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="Status Stories"
                 type="button"
               >
-                <span className="material-symbols-outlined text-lg">motion_photos_on</span>
+                <span className="material-symbols-outlined text-xl md:text-lg">motion_photos_on</span>
               </button>
             )}
 
             {/* New Group Button */}
             <button
               onClick={handleOpenGroupModal}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="New Group"
               type="button"
             >
-              <span className="material-symbols-outlined text-lg">group_add</span>
+              <span className="material-symbols-outlined text-xl md:text-lg">group_add</span>
             </button>
 
             {/* Add Contact Button */}
             <button
               onClick={onOpenAddFriend}
-              className="relative p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="relative p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="Add Contact"
               type="button"
             >
-              <span className="material-symbols-outlined text-lg">person_add</span>
+              <span className="material-symbols-outlined text-xl md:text-lg">person_add</span>
               {pendingCount > 0 && (
                 <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold shadow-md animate-pulse">
                   {pendingCount}
@@ -478,11 +478,11 @@ const Sidebar = ({
             <div className="relative">
               <button
                 onClick={() => setShowOptionsDropdown(!showOptionsDropdown)}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="More options"
                 type="button"
               >
-                <span className="material-symbols-outlined text-lg">more_vert</span>
+                <span className="material-symbols-outlined text-xl md:text-lg">more_vert</span>
               </button>
 
               {showOptionsDropdown && (
@@ -591,10 +591,10 @@ const Sidebar = ({
         </div>
 
         {/* WhatsApp-Standard Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1.5 pb-1">
           <button
             onClick={() => setActiveFilter("all")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "all"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
@@ -607,7 +607,7 @@ const Sidebar = ({
 
           <button
             onClick={() => setActiveFilter("unread")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "unread"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
@@ -629,7 +629,7 @@ const Sidebar = ({
           {pendingCount > 0 && (
             <button
               onClick={() => setActiveFilter("requests")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
                 activeFilter === "requests"
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                   : "text-zinc-900 bg-black/5 border border-black/10 hover:bg-black/10 dark:text-white dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 font-semibold"
@@ -650,7 +650,7 @@ const Sidebar = ({
 
           <button
             onClick={() => setActiveFilter("groups")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "groups"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
@@ -663,7 +663,7 @@ const Sidebar = ({
 
           <button
             onClick={() => setActiveFilter("direct")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "direct"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"

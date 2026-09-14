@@ -63,7 +63,7 @@ const CreateGroupModal = ({ onClose }) => {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white/95 dark:bg-[#121117]/90 backdrop-blur-2xl border border-black/10 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-zinc-900 dark:text-white"
+        className="bg-white/95 dark:bg-[#121117]/90 backdrop-blur-2xl border border-black/10 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-zinc-900 dark:text-white flex flex-col max-h-[85vh]"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/5">
@@ -86,7 +86,7 @@ const CreateGroupModal = ({ onClose }) => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
           {error && (
             <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs font-medium animate-fadeIn">
               {error}

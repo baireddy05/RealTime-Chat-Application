@@ -855,7 +855,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </div>
       ) : (
         <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 p-1.5 sm:p-2 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass">
+          <div className="flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass">
             {/* Attachment Button */}
             <button
               ref={attachBtnRef}
@@ -865,7 +865,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowAttachMenu((prev) => !prev);
                 setShowEmojiPicker(false);
               }}
-              className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-1"
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 sm:ml-1"
               title="Attach file or media"
             >
               <span className="material-symbols-outlined text-xl">add_circle</span>
@@ -879,7 +879,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowEmojiPicker((prev) => !prev);
                 setShowAttachMenu(false);
               }}
-              className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="Insert Emoji"
             >
               <span className="material-symbols-outlined text-xl">mood</span>
@@ -902,11 +902,11 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             />
 
             {/* Text Input Field */}
-            <div className="flex-1 flex items-center px-2 min-w-0 relative">
+            <div className="flex-1 flex items-center px-1 sm:px-2 min-w-0 relative">
               <input
                 ref={inputRef}
                 type="text"
-                className="w-full bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-sm focus:outline-none"
+                className="w-full bg-transparent py-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-sm focus:outline-none"
                 placeholder={
                   scheduledFor
                     ? "Schedule a message..."
@@ -929,7 +929,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                   setShowTimerMenu((prev) => !prev);
                   setShowScheduleMenu(false);
                 }}
-                className={`p-1.5 rounded-full transition-colors flex items-center gap-1 ${
+                className={`p-2 rounded-full transition-colors flex items-center gap-1 ${
                   disappearingTimer
                     ? "text-amber-500 bg-amber-500/15 dark:text-amber-400 dark:bg-amber-500/20 font-bold"
                     : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
@@ -948,7 +948,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                   setShowScheduleMenu((prev) => !prev);
                   setShowTimerMenu(false);
                 }}
-                className={`p-1.5 rounded-full transition-colors ${
+                className={`p-2 rounded-full transition-colors hidden sm:flex ${
                   scheduledFor
                     ? "text-zinc-900 bg-black/10 dark:text-white dark:bg-white/20 font-bold"
                     : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
@@ -962,7 +962,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <button
                 type="button"
                 onClick={startRecording}
-                className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="Record Audio Note"
               >
                 <span className="material-symbols-outlined text-xl">mic</span>
