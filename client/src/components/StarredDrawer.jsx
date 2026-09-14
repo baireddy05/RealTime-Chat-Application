@@ -14,6 +14,8 @@ const StarredDrawer = ({ onClose, onJumpToMessage }) => {
   useEffect(() => {
     if (selectedChat) {
       getStarredMessages(selectedChat.id, selectedChat.type);
+    } else {
+      getStarredMessages("all");
     }
   }, [selectedChat, getStarredMessages]);
 
@@ -35,7 +37,7 @@ const StarredDrawer = ({ onClose, onJumpToMessage }) => {
             <div>
               <h3 className="font-semibold text-sm text-theme-main">Starred Messages</h3>
               <p className="text-[11px] text-theme-muted">
-                {starredMessages.length} saved
+                {selectedChat ? `${selectedChat.name} • ${starredMessages.length} saved` : `${starredMessages.length} saved`}
               </p>
             </div>
           </div>

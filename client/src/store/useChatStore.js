@@ -504,18 +504,26 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getStarredMessages: async (chatId, type) => {
+  getStarredMessages: async (chatId = "all", type = "") => {
     set({ isStarredLoading: true });
     try {
-      const res = await axiosInstance.get(`/chat/starred/${chatId}?type=${type}`);
+      const url = chatId && chatId !== "all" ? `/chat/starred/${chatId}?type=${type || ""}` : "/chat/starred/all";
+      const res = await axiosInstance.get(url);
       const authUser = useAuthStore.getState().authUser;
-      const key = getConversationKey(get().selectedChat, authUser?._id);
+      const currentChat = get().selectedChat;
+      const key = currentChat ? getConversationKey(currentChat, authUser?._id) : null;
 
       const decryptedMessages = await Promise.all(
         res.data.map(async (m) => {
           if (m.isEncrypted || isEncryptedMessage(m.text)) {
-            const dec = await decryptMessage(m.text, key);
-            return { ...m, decryptedText: dec };
+            try {
+              if (key) {
+                const dec = await decryptMessage(m.text, key);
+                return { ...m, decryptedText: dec };
+              }
+            } catch {
+              // Fallback if key doesn't match
+            }
           }
           return m;
         })

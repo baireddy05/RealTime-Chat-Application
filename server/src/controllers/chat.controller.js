@@ -668,17 +668,20 @@ export const getStarredMessages = async (req, res) => {
       isDeleted: false,
     };
 
-    if (type === "room") {
-      filter.roomId = id;
-    } else {
-      filter.$or = [
-        { senderId: myId, receiverId: id },
-        { senderId: id, receiverId: myId },
-      ];
+    if (id && id !== "all" && id !== "undefined") {
+      if (type === "room") {
+        filter.roomId = id;
+      } else {
+        filter.$or = [
+          { senderId: myId, receiverId: id },
+          { senderId: id, receiverId: myId },
+        ];
+      }
     }
 
     const starredMessages = await Message.find(filter)
       .populate("senderId", "username profilePic")
+      .sort({ createdAt: -1 })
       .lean();
     res.status(200).json(starredMessages);
   } catch (error) {

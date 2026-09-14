@@ -34,6 +34,7 @@ const getMessageSnippet = (msg) => {
 
 const Sidebar = ({
   onChatSelect,
+  onOpenProfile,
   onOpenSetStatus,
   onOpenAddFriend,
   onOpenCreateGroup,
@@ -411,8 +412,28 @@ const Sidebar = ({
       {/* 1. Sleek Top WhatsApp Header Bar with Actions */}
       <div className="flex flex-col gap-2 pb-2">
         <div className="flex items-center justify-between px-1 pt-1">
-          <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>
-            <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">Chats</h1>
+          <div className="flex items-center gap-2.5">
+            {onOpenProfile && (
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                className="md:hidden relative shrink-0 w-8 h-8 rounded-full overflow-hidden border border-black/10 dark:border-white/15 active:scale-95 transition-transform"
+                title="Open Profile & Status"
+              >
+                <img
+                  src={
+                    authUser?.profilePic ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=27272a&color=ffffff&bold=true`
+                  }
+                  alt={authUser?.username || "User"}
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
+              </button>
+            )}
+            <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>
+              <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">Chats</h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-1">
@@ -466,6 +487,15 @@ const Sidebar = ({
 
               {showOptionsDropdown && (
                 <div className="absolute right-0 top-9 w-52 rounded-2xl bg-white/95 dark:bg-[#14131a]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none text-zinc-900 dark:text-white">
+                  {onOpenProfile && (
+                    <button
+                      onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-sm">person</span>
+                      <span>My Profile</span>
+                    </button>
+                  )}
                   {onOpenStarred && (
                     <button
                       onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
@@ -540,13 +570,24 @@ const Sidebar = ({
             ref={searchInputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-11 py-2 rounded-full text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400/50 dark:focus:ring-white/40 transition-all bg-black/[0.04] dark:bg-white/5 border border-black/10 dark:border-white/10"
-            placeholder="Search or start new chat (⌘K)..."
+            className="w-full pl-9 pr-9 sm:pr-11 py-2 rounded-full text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400/50 dark:focus:ring-white/40 transition-all bg-black/[0.04] dark:bg-white/5 border border-black/10 dark:border-white/10"
+            placeholder="Search or start new chat..."
             type="text"
           />
-          <kbd className="absolute right-3 px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 font-mono text-[9px] pointer-events-none">
-            ⌘K
-          </kbd>
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 p-0.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors"
+              title="Clear search"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          ) : (
+            <kbd className="hidden sm:inline-block absolute right-3 px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 font-mono text-[9px] pointer-events-none">
+              ⌘K
+            </kbd>
+          )}
         </div>
 
         {/* WhatsApp-Standard Category Filter Tabs: All, Unread, Requests, Groups, Direct */}

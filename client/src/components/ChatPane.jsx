@@ -517,72 +517,22 @@ const ChatPane = ({ onBack }) => {
         </div>
       )}
       {/* Monochromatic Glass Chat Header */}
-      <div className="flex items-center justify-between px-4 xl:px-6 py-3 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] shadow-sm z-30 flex-shrink-0 relative">
-        <div 
-          onClick={() => selectedChat.type === "room" && setIsGroupInfoOpen(true)}
-          className={`flex items-center gap-3 min-w-0 ${selectedChat.type === "room" ? "cursor-pointer group select-none" : ""}`}
-        >
-          {onBack && (
-            <button onClick={(e) => { e.stopPropagation(); onBack(); }}
-              className="xl:hidden p-2 text-zinc-500 hover:text-zinc-900 rounded-xl hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 flex-shrink-0 transition-colors mr-1" title="Back to conversations">
+      {/* Monochromatic Glass Chat Header */}
+      <div className="flex items-center justify-between px-3 sm:px-4 xl:px-6 py-2.5 sm:py-3 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] shadow-sm z-30 flex-shrink-0 relative">
+        {isSearchOpen ? (
+          <div className="flex items-center gap-2 w-full animate-fadeIn">
+            <button
+              onClick={() => {
+                setIsSearchOpen(false);
+                setSearchQuery("");
+                setSearchMatchIndex(0);
+              }}
+              className="p-1.5 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
+              title="Close search"
+            >
               <span className="material-symbols-outlined text-lg">arrow_back</span>
             </button>
-          )}
-          {selectedChat.type === "room" ? (
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] font-bold shrink-0 shadow-md">
-              <span className="material-symbols-outlined text-xl">groups</span>
-            </div>
-          ) : (
-            <div className="relative shrink-0">
-              <img
-                src={selectedChat.profilePic || selectedChat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
-                alt={selectedChat.name}
-                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-black/10 dark:border-white/10"
-              />
-              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${isUserOnline ? "bg-emerald-500 dark:bg-white" : "bg-zinc-400 dark:bg-zinc-600"}`} />
-            </div>
-          )}
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2 truncate">
-              <h2 className="text-zinc-900 dark:text-white font-semibold truncate text-base sm:text-lg tracking-tight">
-                {selectedChat.name.replace(/^#/, "")}
-              </h2>
-            </div>
-            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs truncate">
-              <span className="text-zinc-400 dark:text-zinc-500 font-bold">•</span>
-              <span className="truncate">
-                {selectedChat.type === "room"
-                  ? `${selectedChat.members?.length || 1} participants • Group`
-                  : activeTypers.length > 0
-                  ? "typing..."
-                  : isUserOnline
-                  ? "online"
-                  : "offline"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Monochromatic Header Action Dock */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => handleStartCall("audio")}
-            className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
-            title="Start Voice Call"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-lg">call</span>
-          </button>
-          <button
-            onClick={() => handleStartCall("video")}
-            className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
-            title="Start Video Call"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-lg">videocam</span>
-          </button>
-          {isSearchOpen ? (
-            <div className="flex items-center bg-black/[0.04] dark:bg-[var(--glass-heavy)] border border-black/10 dark:border-[var(--glass-border)] rounded-xl px-2.5 py-1 gap-1.5 animate-fadeIn">
+            <div className="flex-1 flex items-center bg-black/[0.04] dark:bg-[var(--glass-heavy)] border border-black/10 dark:border-[var(--glass-border)] rounded-xl px-3 py-1.5 gap-2 min-w-0">
               <span className="material-symbols-outlined text-zinc-500 dark:text-zinc-400 text-sm">search</span>
               <input
                 type="text"
@@ -594,14 +544,12 @@ const ChatPane = ({ onBack }) => {
                 }}
                 onKeyDown={handleSearchKeyDown}
                 autoFocus
-                className="bg-transparent text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none w-24 sm:w-36"
+                className="bg-transparent text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none flex-1 min-w-0"
               />
               {searchQuery && (
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-1 shrink-0">
                   <span className="text-[10px] text-zinc-500 dark:text-zinc-400 px-1 font-mono select-none">
-                    {searchMatches.length > 0
-                      ? `${searchMatchIndex + 1}/${searchMatches.length}`
-                      : "0"}
+                    {searchMatches.length > 0 ? `${searchMatchIndex + 1}/${searchMatches.length}` : "0"}
                   </span>
                   {searchMatches.length > 0 && (
                     <div className="flex items-center">
@@ -621,30 +569,92 @@ const ChatPane = ({ onBack }) => {
                       </button>
                     </div>
                   )}
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSearchMatchIndex(0);
+                    }}
+                    className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-0.5 rounded"
+                  >
+                    <X size={13} />
+                  </button>
                 </div>
               )}
-              <button
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  setSearchQuery("");
-                  setSearchMatchIndex(0);
-                }}
-                className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white p-0.5 rounded transition-colors"
-                title="Close search (Esc)"
-              >
-                <X size={13} />
-              </button>
             </div>
-          ) : (
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
-              title="Search in thread"
-              type="button"
+          </div>
+        ) : (
+          <>
+            <div 
+              onClick={() => selectedChat.type === "room" && setIsGroupInfoOpen(true)}
+              className={`flex items-center gap-2.5 sm:gap-3 min-w-0 ${selectedChat.type === "room" ? "cursor-pointer group select-none" : ""}`}
             >
-              <span className="material-symbols-outlined text-lg">search</span>
-            </button>
-          )}
+              {onBack && (
+                <button onClick={(e) => { e.stopPropagation(); onBack(); }}
+                  className="xl:hidden p-1.5 sm:p-2 text-zinc-500 hover:text-zinc-900 rounded-xl hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 flex-shrink-0 transition-colors mr-0.5" title="Back to conversations">
+                  <span className="material-symbols-outlined text-lg">arrow_back</span>
+                </button>
+              )}
+              {selectedChat.type === "room" ? (
+                <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] font-bold shrink-0 shadow-md">
+                  <span className="material-symbols-outlined text-xl">groups</span>
+                </div>
+              ) : (
+                <div className="relative shrink-0">
+                  <img
+                    src={selectedChat.profilePic || selectedChat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
+                    alt={selectedChat.name}
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm border border-black/10 dark:border-white/10"
+                  />
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${isUserOnline ? "bg-emerald-500 dark:bg-white" : "bg-zinc-400 dark:bg-zinc-600"}`} />
+                </div>
+              )}
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2 truncate">
+                  <h2 className="text-zinc-900 dark:text-white font-semibold truncate text-sm sm:text-base tracking-tight">
+                    {selectedChat.name.replace(/^#/, "")}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs truncate">
+                  <span className="text-zinc-400 dark:text-zinc-500 font-bold">•</span>
+                  <span className="truncate">
+                    {selectedChat.type === "room"
+                      ? `${selectedChat.members?.length || 1} participants • Group`
+                      : activeTypers.length > 0
+                      ? "typing..."
+                      : isUserOnline
+                      ? "online"
+                      : "offline"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Monochromatic Header Action Dock */}
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              <button
+                onClick={() => handleStartCall("audio")}
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                title="Start Voice Call"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">call</span>
+              </button>
+              <button
+                onClick={() => handleStartCall("video")}
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                title="Start Video Call"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">videocam</span>
+              </button>
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                title="Search in thread"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">search</span>
+              </button>
 
           <div className="relative">
             <button
