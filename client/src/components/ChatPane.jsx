@@ -799,6 +799,8 @@ const ChatPane = ({ onBack }) => {
             )}
           </div>
         </div>
+        </>
+      )}
       </div>
 
       {/* Sticky Pinned Message Banner (Stitch Specification) */}
