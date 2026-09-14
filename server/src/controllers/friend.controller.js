@@ -1,11 +1,13 @@
 import User from "../models/User.model.js";
 import FriendRequest from "../models/FriendRequest.model.js";
+import Message from "../models/Message.model.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 
 // Get logged in user's friends
 export const getFriends = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
+    const loggedInUserId = req.user._id;
+    const user = await User.findById(loggedInUserId)
       .populate("friends", "username email profilePic status bio")
       .lean();
     // Deduplicate friends (in case of legacy duplicates in the array)
@@ -16,7 +18,36 @@ export const getFriends = async (req, res) => {
       seen.add(id);
       return true;
     });
-    res.status(200).json(uniqueFriends);
+
+    const friendsWithMeta = await Promise.all(
+      uniqueFriends.map(async (f) => {
+        const lastMsg = await Message.findOne({
+          $or: [
+            { senderId: loggedInUserId, receiverId: f._id },
+            { senderId: f._id, receiverId: loggedInUserId },
+          ],
+          isScheduled: { $ne: true },
+        })
+          .sort({ createdAt: -1 })
+          .select("text image file audio createdAt senderId isDeleted isEncrypted");
+
+        const unreadCount = await Message.countDocuments({
+          senderId: f._id,
+          receiverId: loggedInUserId,
+          readBy: { $ne: loggedInUserId },
+          isDeleted: false,
+          isScheduled: { $ne: true },
+        });
+
+        return {
+          ...f,
+          lastMessage: lastMsg || null,
+          unreadCount,
+        };
+      })
+    );
+
+    res.status(200).json(friendsWithMeta);
   } catch (error) {
     console.error("Error in getFriends controller:", error.message);
     res.status(500).json({ message: "Internal server error" });

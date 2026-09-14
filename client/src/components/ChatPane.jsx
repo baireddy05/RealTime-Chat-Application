@@ -461,7 +461,8 @@ const ChatPane = ({ onBack }) => {
   };
 
   const handleDelete = (messageId) => setMessageToDelete(messageId);
-  const isUserOnline = selectedChat?.type === "user" && onlineUsersSet.has(selectedChat.id);
+  const selectedUserId = (selectedChat?.id || selectedChat?._id)?.toString();
+  const isUserOnline = selectedChat?.type === "user" && onlineUsersSet.has(selectedUserId);
 
 
 
@@ -538,7 +539,7 @@ const ChatPane = ({ onBack }) => {
           ) : (
             <div className="relative shrink-0">
               <img
-                src={selectedChat.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
+                src={selectedChat.profilePic || selectedChat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
                 alt={selectedChat.name}
                 className="w-10 h-10 rounded-xl object-cover shadow-sm border border-black/10 dark:border-white/10"
               />

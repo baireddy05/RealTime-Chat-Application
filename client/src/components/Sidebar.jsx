@@ -215,20 +215,23 @@ const Sidebar = ({
   };
 
   const renderRoomCard = (room) => {
-    const isSelected = selectedChat?.id === room._id;
-    const unread = unreadCounts[room._id] || 0;
-    const lastMsg = lastMessages[room._id];
+    const roomId = (room._id || room.id)?.toString();
+    const isSelected = (selectedChat?.id || selectedChat?._id)?.toString() === roomId;
+    const unread = unreadCounts[roomId] || room.unreadCount || 0;
+    const lastMsg = lastMessages[roomId] || room.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     const previewText = getMessageSnippet(lastMsg);
-    const isOutgoing = lastMsg?.senderId === authUser?._id || lastMsg?.senderId?._id === authUser?._id;
+    const authUserId = authUser?._id?.toString();
+    const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
+    const isOutgoing = msgSenderId === authUserId;
     const senderUsername = isOutgoing ? "You" : lastMsg?.senderId?.username || "";
 
     return (
       <div
-        key={`room-${room._id}`}
+        key={`room-${roomId}`}
         onClick={() =>
           selectChat({
-            id: room._id,
+            id: roomId,
             name: room.name,
             type: "room",
             description: room.description,
@@ -302,20 +305,23 @@ const Sidebar = ({
   };
 
   const renderFriendCard = (friend) => {
-    const isSelected = selectedChat?.id === friend._id;
-    const isOnline = onlineUsersSet.has(friend._id);
-    const unread = unreadCounts[friend._id] || 0;
-    const lastMsg = lastMessages[friend._id];
+    const friendId = (friend._id || friend.id)?.toString();
+    const isSelected = (selectedChat?.id || selectedChat?._id)?.toString() === friendId;
+    const isOnline = onlineUsersSet.has(friendId);
+    const unread = unreadCounts[friendId] || friend.unreadCount || 0;
+    const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     const previewText = getMessageSnippet(lastMsg);
-    const isOutgoing = lastMsg?.senderId === authUser?._id || lastMsg?.senderId?._id === authUser?._id;
+    const authUserId = authUser?._id?.toString();
+    const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
+    const isOutgoing = msgSenderId === authUserId;
 
     return (
       <div
-        key={`friend-${friend._id}`}
+        key={`friend-${friendId}`}
         onClick={() =>
           selectChat({
-            id: friend._id,
+            id: friendId,
             name: friend.username,
             type: "user",
             profilePic: friend.profilePic,
@@ -365,10 +371,8 @@ const Sidebar = ({
                   )}
                   <span className="truncate">{previewText}</span>
                 </>
-              ) : friend.status ? (
-                <span className="truncate">{friend.status}</span>
               ) : (
-                <span className="truncate opacity-75">{isOnline ? "Available now" : "Offline"}</span>
+                <span className="truncate opacity-75">{isOnline ? "Online" : "Offline"}</span>
               )}
             </div>
           </div>

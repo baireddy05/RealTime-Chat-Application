@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import { useChatStore } from "./useChatStore";
 import { getConversationKey, decryptMessage, isEncryptedMessage } from "../lib/crypto";
 
 export const useFriendStore = create((set, get) => ({
@@ -17,8 +18,14 @@ export const useFriendStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/friends");
       const authUser = useAuthStore.getState().authUser;
+      const chatStore = useChatStore.getState();
+      const lastMessages = { ...chatStore.lastMessages };
+      const unreadCounts = { ...chatStore.unreadCounts };
 
       const decryptedFriends = await Promise.all(res.data.map(async (f) => {
+        if (f.unreadCount !== undefined) {
+          unreadCounts[f._id] = f.unreadCount;
+        }
         if (f.lastMessage) {
           let lastMsg = f.lastMessage;
           if (lastMsg.isEncrypted || isEncryptedMessage(lastMsg.text)) {
@@ -27,10 +34,12 @@ export const useFriendStore = create((set, get) => ({
             lastMsg = { ...lastMsg, decryptedText: dec };
           }
           f.lastMessage = lastMsg;
+          lastMessages[f._id] = lastMsg;
         }
         return f;
       }));
 
+      useChatStore.setState({ lastMessages, unreadCounts });
       set({ friends: decryptedFriends });
     } catch (error) {
       console.error("Error fetching friends:", error);

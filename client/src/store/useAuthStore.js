@@ -100,7 +100,7 @@ export const useAuthStore = create((set, get) => ({
     set({ socket: newSocket });
 
     newSocket.on("getOnlineUsers", (userIds) => {
-      set({ onlineUsers: userIds });
+      set({ onlineUsers: (userIds || []).map((id) => id?.toString()) });
     });
   },
 
