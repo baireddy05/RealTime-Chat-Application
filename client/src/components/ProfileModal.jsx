@@ -117,26 +117,26 @@ const ProfileModal = ({ onClose }) => {
   return (
     <div 
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-2xl p-4 animate-fadeIn select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/80 backdrop-blur-2xl p-4 animate-fadeIn select-none"
     >
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#121117]/95 backdrop-blur-3xl rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-white/10 text-white animate-scaleIn"
+        className="bg-white/95 dark:bg-[#121117]/95 backdrop-blur-3xl rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-black/10 dark:border-white/10 text-zinc-900 dark:text-white animate-scaleIn"
       >
         {/* Profile Header */}
-        <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between bg-white/[0.03]">
+        <div className="border-b border-black/10 dark:border-white/10 px-6 py-4 flex items-center justify-between bg-black/[0.02] dark:bg-white/[0.03]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-white text-black flex items-center justify-center font-bold shadow-md">
+            <div className="w-9 h-9 rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center font-bold shadow-md">
               <User size={18} />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-white tracking-tight">Profile & Identity</h3>
-              <p className="text-[11px] text-zinc-400">Your WhatsApp presence and details</p>
+              <h3 className="font-bold text-sm text-zinc-900 dark:text-white tracking-tight">Profile & Identity</h3>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Your WhatsApp presence and details</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"
+            className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 p-2 rounded-full transition-colors"
             title="Close"
           >
             <X size={16} />
@@ -146,7 +146,7 @@ const ProfileModal = ({ onClose }) => {
         {/* Profile Content */}
         <form onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
           {errorMessage && (
-            <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium animate-fadeIn">
+            <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs font-medium animate-fadeIn">
               {errorMessage}
             </div>
           )}
@@ -158,11 +158,11 @@ const ProfileModal = ({ onClose }) => {
               onClick={() => fileInputRef.current?.click()}
               title="Click to upload profile photo"
             >
-              <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-white to-zinc-400 shadow-xl">
+              <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-zinc-300 to-zinc-600 dark:from-white dark:to-zinc-400 shadow-xl">
                 <img
                   src={avatarPreview}
                   alt="Profile Avatar"
-                  className="w-full h-full rounded-full object-cover border-2 border-[#121117]"
+                  className="w-full h-full rounded-full object-cover border-2 border-white dark:border-[#121117]"
                 />
               </div>
               
@@ -173,7 +173,7 @@ const ProfileModal = ({ onClose }) => {
               </div>
 
               {/* Floating Camera Badge */}
-              <div className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-white text-black flex items-center justify-center shadow-lg border-2 border-[#121117] group-hover:scale-110 transition-transform">
+              <div className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center shadow-lg border-2 border-white dark:border-[#121117] group-hover:scale-110 transition-transform">
                 <Camera size={13} strokeWidth={2.5} />
               </div>
             </div>
@@ -188,7 +188,7 @@ const ProfileModal = ({ onClose }) => {
 
             {/* Quick Avatar Presets */}
             <div className="flex items-center gap-2 mt-3.5">
-              <span className="text-[10px] text-zinc-400 font-medium">Presets:</span>
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Presets:</span>
               {AVATAR_PRESETS.map((url, idx) => (
                 <button
                   key={idx}
@@ -196,8 +196,8 @@ const ProfileModal = ({ onClose }) => {
                   onClick={() => selectPresetAvatar(url)}
                   className={`w-6 h-6 rounded-full overflow-hidden border transition-all ${
                     avatarPreview === url
-                      ? "ring-2 ring-white border-transparent scale-110"
-                      : "border-white/20 opacity-70 hover:opacity-100 hover:scale-105"
+                      ? "ring-2 ring-zinc-900 dark:ring-white border-transparent scale-110"
+                      : "border-black/20 dark:border-white/20 opacity-70 hover:opacity-100 hover:scale-105"
                   }`}
                   title={`Preset ${idx + 1}`}
                 >
@@ -207,7 +207,7 @@ const ProfileModal = ({ onClose }) => {
               <button
                 type="button"
                 onClick={() => selectPresetAvatar(cleanInitialAvatar(username))}
-                className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-zinc-300 font-mono transition-colors"
+                className="px-2 py-0.5 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 text-[10px] text-zinc-700 dark:text-zinc-300 font-mono transition-colors"
                 title="Use Initials"
               >
                 Initials
@@ -217,10 +217,10 @@ const ProfileModal = ({ onClose }) => {
 
           {/* Display Name Field */}
           <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
+            <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block">
               Display Name
             </label>
-            <div className="relative flex items-center bg-white/[0.04] border border-white/10 hover:border-white/20 focus-within:border-white rounded-2xl transition-all shadow-inner">
+            <div className="relative flex items-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 focus-within:border-zinc-900 dark:focus-within:border-white rounded-2xl transition-all shadow-inner">
               <span className="pl-3.5 text-zinc-400">
                 <User size={15} />
               </span>
@@ -229,7 +229,7 @@ const ProfileModal = ({ onClose }) => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                className="w-full bg-transparent px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none font-medium"
+                className="w-full bg-transparent px-3 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none font-medium"
                 placeholder="Your Name"
               />
             </div>
@@ -240,10 +240,10 @@ const ProfileModal = ({ onClose }) => {
 
           {/* About / Bio Field */}
           <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
+            <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block">
               About / Bio
             </label>
-            <div className="relative flex items-center bg-white/[0.04] border border-white/10 hover:border-white/20 focus-within:border-white rounded-2xl transition-all shadow-inner">
+            <div className="relative flex items-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 focus-within:border-zinc-900 dark:focus-within:border-white rounded-2xl transition-all shadow-inner">
               <span className="pl-3.5 text-zinc-400">
                 <Info size={15} />
               </span>
@@ -251,7 +251,7 @@ const ProfileModal = ({ onClose }) => {
                 type="text"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-transparent px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none"
+                className="w-full bg-transparent px-3 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
                 placeholder="Hey there! I am using Pulse."
               />
             </div>
@@ -259,10 +259,10 @@ const ProfileModal = ({ onClose }) => {
 
           {/* Focus / Status Activity Field */}
           <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
+            <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block">
               Focus / Status
             </label>
-            <div className="relative flex items-center bg-white/[0.04] border border-white/10 hover:border-white/20 focus-within:border-white rounded-2xl transition-all shadow-inner">
+            <div className="relative flex items-center bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 focus-within:border-zinc-900 dark:focus-within:border-white rounded-2xl transition-all shadow-inner">
               <span className="pl-3.5 text-zinc-400">
                 <Activity size={15} />
               </span>
@@ -271,7 +271,7 @@ const ProfileModal = ({ onClose }) => {
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 placeholder="Available, Focus, Coding..."
-                className="w-full bg-transparent px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none"
+                className="w-full bg-transparent px-3 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
               />
             </div>
           </div>
@@ -281,39 +281,39 @@ const ProfileModal = ({ onClose }) => {
             <label className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
               Registered Email
             </label>
-            <div className="flex items-center bg-white/[0.02] border border-white/5 rounded-2xl px-3.5 py-2.5 text-xs text-zinc-400">
-              <Mail size={14} className="mr-2 text-zinc-500 shrink-0" />
+            <div className="flex items-center bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-2xl px-3.5 py-2.5 text-xs text-zinc-600 dark:text-zinc-400">
+              <Mail size={14} className="mr-2 text-zinc-400 shrink-0" />
               <span className="truncate font-mono text-[11px]">{authUser?.email || "user@example.com"}</span>
             </div>
           </div>
 
           {/* Footer Action Buttons */}
-          <div className="pt-2 border-t border-white/10 flex justify-end items-center gap-2.5">
+          <div className="pt-2 border-t border-black/10 dark:border-white/10 flex justify-end items-center gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-full text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/10 border border-white/10 transition-all active:scale-95"
+              className="px-5 py-2.5 rounded-full text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-black/5 border border-black/10 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/10 transition-all active:scale-95"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || savedSuccess}
-              className="px-6 py-2.5 rounded-full text-xs font-bold text-black bg-white hover:bg-zinc-200 active:scale-95 shadow-md flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+              className="px-6 py-2.5 rounded-full text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:text-black dark:bg-white dark:hover:bg-zinc-200 active:scale-95 shadow-md flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
             >
               {isSaving ? (
                 <>
-                  <Loader2 size={14} className="animate-spin text-black" />
+                  <Loader2 size={14} className="animate-spin text-white dark:text-black" />
                   <span>Saving...</span>
                 </>
               ) : savedSuccess ? (
                 <>
-                  <Check size={14} className="text-black" />
+                  <Check size={14} className="text-white dark:text-black" />
                   <span>Saved</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={13} className="text-black" />
+                  <Sparkles size={13} className="text-white dark:text-black" />
                   <span>Save Changes</span>
                 </>
               )}

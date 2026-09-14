@@ -193,7 +193,7 @@ const Sidebar = ({
       <div className="flex flex-col gap-2 pb-2">
         <div className="flex items-center justify-between px-1 pt-1">
           <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>
-            <h1 className="font-bold tracking-tight text-white text-xl leading-tight">Chats</h1>
+            <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">Chats</h1>
           </div>
 
           <div className="flex items-center gap-1">
@@ -201,7 +201,7 @@ const Sidebar = ({
             {onOpenStatus && (
               <button
                 onClick={onOpenStatus}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="Status Stories"
                 type="button"
               >
@@ -212,7 +212,7 @@ const Sidebar = ({
             {/* New Group Button */}
             <button
               onClick={handleOpenGroupModal}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="New Group"
               type="button"
             >
@@ -222,13 +222,13 @@ const Sidebar = ({
             {/* Add Contact Button */}
             <button
               onClick={onOpenAddFriend}
-              className="relative p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="relative p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="Add Contact"
               type="button"
             >
               <span className="material-symbols-outlined text-lg">person_add</span>
               {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-white text-black font-mono text-[9px] font-bold shadow-md animate-pulse">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold shadow-md animate-pulse">
                   {pendingCount}
                 </span>
               )}
@@ -238,7 +238,7 @@ const Sidebar = ({
             <div className="relative">
               <button
                 onClick={() => setShowOptionsDropdown(!showOptionsDropdown)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="More options"
                 type="button"
               >
@@ -246,11 +246,11 @@ const Sidebar = ({
               </button>
 
               {showOptionsDropdown && (
-                <div className="absolute right-0 top-9 w-52 rounded-2xl bg-[#14131a]/95 backdrop-blur-2xl border border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none text-white">
+                <div className="absolute right-0 top-9 w-52 rounded-2xl bg-white/95 dark:bg-[#14131a]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none text-zinc-900 dark:text-white">
                   {onOpenStarred && (
                     <button
                       onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:text-white hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">star</span>
                       <span>Starred Messages</span>
@@ -259,7 +259,7 @@ const Sidebar = ({
                   {onOpenSetStatus && (
                     <button
                       onClick={() => { onOpenSetStatus(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:text-white hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">sentiment_satisfied</span>
                       <span>Set Status Mood</span>
@@ -268,7 +268,7 @@ const Sidebar = ({
                   {setIsWallpaperOpen && (
                     <button
                       onClick={() => { setIsWallpaperOpen(true); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:text-white hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">wallpaper</span>
                       <span>Chat Wallpaper</span>
@@ -277,7 +277,7 @@ const Sidebar = ({
                   {handleInstallPWA && (
                     <button
                       onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:text-white hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">install_desktop</span>
                       <span>Install Pulse PWA</span>
@@ -286,7 +286,7 @@ const Sidebar = ({
                   {onToggleTheme && (
                     <button
                       onClick={() => { onToggleTheme(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:text-white hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">
                         {theme === "dark" ? "light_mode" : "dark_mode"}
@@ -296,10 +296,10 @@ const Sidebar = ({
                   )}
                   {logout && (
                     <>
-                      <div className="my-1 border-t border-white/10" />
+                      <div className="my-1 border-t border-black/10 dark:border-white/10" />
                       <button
                         onClick={() => { logout(); setShowOptionsDropdown(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-red-400 hover:bg-red-500/20 transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-red-500 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors text-left"
                       >
                         <span className="material-symbols-outlined text-sm">logout</span>
                         <span>Sign Out</span>
@@ -315,35 +315,34 @@ const Sidebar = ({
         {/* Presence Status Mood Bar */}
         <div
           onClick={onOpenSetStatus}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-all group"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-black/[0.03] hover:bg-black/[0.06] border border-black/10 dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 cursor-pointer transition-all group"
           title="Click to change your presence status"
         >
           <div className="flex items-center gap-1.5 truncate">
             <span className="text-xs">{statusEmoji}</span>
-            <span className="text-xs text-zinc-400 truncate font-normal">
-              <span className="text-white font-medium">{statusCategory}:</span> {statusDetail}
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate font-normal">
+              <span className="text-zinc-900 dark:text-white font-medium">{statusCategory}:</span> {statusDetail}
             </span>
           </div>
-          <span className="material-symbols-outlined text-xs text-zinc-500 group-hover:text-white transition-colors">
+          <span className="material-symbols-outlined text-xs text-zinc-400 group-hover:text-zinc-900 dark:text-zinc-500 dark:group-hover:text-white transition-colors">
             edit
           </span>
         </div>
 
         {/* Search Bar with ⌘K */}
         <div className="relative flex items-center w-full mt-1">
-          <span className="material-symbols-outlined absolute left-3 text-zinc-500 pointer-events-none text-base">
+          <span className="material-symbols-outlined absolute left-3 text-zinc-400 dark:text-zinc-500 pointer-events-none text-base">
             search
           </span>
           <input
             ref={searchInputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-11 py-2 rounded-full glass-input text-white placeholder:text-zinc-500 text-xs focus:outline-none focus:ring-1 focus:ring-white/40 transition-all bg-white/5 border border-white/10"
-            style={{ color: "#ffffff", caretColor: "#ffffff" }}
+            className="w-full pl-9 pr-11 py-2 rounded-full text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400/50 dark:focus:ring-white/40 transition-all bg-black/[0.04] dark:bg-white/5 border border-black/10 dark:border-white/10"
             placeholder="Search or start new chat (⌘K)..."
             type="text"
           />
-          <kbd className="absolute right-3 px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-zinc-400 font-mono text-[9px] pointer-events-none">
+          <kbd className="absolute right-3 px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 font-mono text-[9px] pointer-events-none">
             ⌘K
           </kbd>
         </div>
@@ -354,8 +353,8 @@ const Sidebar = ({
             onClick={() => setActiveFilter("all")}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "all"
-                ? "bg-white text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-400 hover:text-white hover:bg-white/5"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
             }`}
             type="button"
           >
@@ -367,14 +366,18 @@ const Sidebar = ({
             onClick={() => setActiveFilter("unread")}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "unread"
-                ? "bg-white text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-400 hover:text-white hover:bg-white/5"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
             }`}
             type="button"
           >
             <span>Unread</span>
             {totalUnreadCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-white text-black text-[9px] font-bold">
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                activeFilter === "unread"
+                  ? "bg-white text-zinc-900 dark:bg-black dark:text-white"
+                  : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+              }`}>
                 {totalUnreadCount}
               </span>
             )}
@@ -385,14 +388,18 @@ const Sidebar = ({
               onClick={() => setActiveFilter("requests")}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
                 activeFilter === "requests"
-                  ? "bg-white text-[#0d0c11] shadow-md font-bold"
-                  : "text-white bg-white/10 border border-white/20 hover:bg-white/20 font-semibold"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                  : "text-zinc-900 bg-black/5 border border-black/10 hover:bg-black/10 dark:text-white dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 font-semibold"
               }`}
               type="button"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-white animate-pulse" />
               <span>Requests</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-white text-black text-[9px] font-bold">
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                activeFilter === "requests"
+                  ? "bg-white text-zinc-900 dark:bg-black dark:text-white"
+                  : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+              }`}>
                 {pendingCount}
               </span>
             </button>
@@ -402,8 +409,8 @@ const Sidebar = ({
             onClick={() => setActiveFilter("groups")}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "groups"
-                ? "bg-white text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-400 hover:text-white hover:bg-white/5"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
             }`}
             type="button"
           >
@@ -415,8 +422,8 @@ const Sidebar = ({
             onClick={() => setActiveFilter("direct")}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "direct"
-                ? "bg-white text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-400 hover:text-white hover:bg-white/5"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
             }`}
             type="button"
           >
@@ -428,11 +435,11 @@ const Sidebar = ({
 
       {/* 2. Pending Friend Requests Banner List */}
       {incomingRequests && incomingRequests.length > 0 && (
-        <div className="my-2 p-2.5 rounded-2xl bg-white/[0.05] border border-white/20 backdrop-blur-xl shadow-glass flex flex-col gap-2 shrink-0 animate-fadeIn">
+        <div className="my-2 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/20 backdrop-blur-xl shadow-glass flex flex-col gap-2 shrink-0 animate-fadeIn">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-white animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
                 Friend Requests ({incomingRequests.length})
               </span>
             </div>
@@ -440,7 +447,7 @@ const Sidebar = ({
               <button
                 type="button"
                 onClick={onOpenAddFriend}
-                className="text-[10px] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                className="text-[10px] text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer"
               >
                 View all
               </button>
@@ -455,11 +462,11 @@ const Sidebar = ({
               return (
                 <div
                   key={req._id}
-                  className="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition-all flex items-center justify-between gap-2"
+                  className="p-2 rounded-xl bg-black/[0.02] border border-black/10 hover:bg-black/[0.05] dark:bg-white/[0.04] dark:border-white/10 dark:hover:bg-white/[0.08] transition-all flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img
-                      className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
+                      className="w-8 h-8 rounded-full object-cover shrink-0 border border-black/10 dark:border-white/10"
                       alt={sender.username || "Contact"}
                       src={
                         sender.profilePic ||
@@ -469,10 +476,10 @@ const Sidebar = ({
                       }
                     />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-semibold truncate text-white">
+                      <span className="text-xs font-semibold truncate text-zinc-900 dark:text-white">
                         {sender.username || "Unknown User"}
                       </span>
-                      <span className="text-[10px] text-zinc-400 truncate">
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
                         {sender.status || "Wants to connect"}
                       </span>
                     </div>
@@ -483,7 +490,7 @@ const Sidebar = ({
                       type="button"
                       onClick={() => handleAcceptRequest(req._id)}
                       disabled={isLoading}
-                      className="px-2.5 py-1 rounded-lg bg-white text-black text-[11px] font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shadow-sm flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-black text-[11px] font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shadow-sm flex items-center gap-1 cursor-pointer"
                       title="Accept Request"
                     >
                       <span className="material-symbols-outlined text-xs">check</span>
@@ -493,7 +500,7 @@ const Sidebar = ({
                       type="button"
                       onClick={() => handleRejectRequest(req._id)}
                       disabled={isLoading}
-                      className="p-1 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
+                      className="p-1 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-red-500/10 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
                       title="Decline"
                     >
                       <span className="material-symbols-outlined text-xs">close</span>
@@ -508,8 +515,8 @@ const Sidebar = ({
 
       {/* 3. Global User Search Results (When typing) */}
       {searchQuery.trim().length >= 2 && searchResults.length > 0 && (
-        <div className="mb-2 p-2 rounded-2xl bg-[#14131a]/90 border border-white/10 flex flex-col gap-1 shrink-0 max-h-48 overflow-y-auto custom-scrollbar">
-          <div className="text-[10px] font-mono text-zinc-400 uppercase font-semibold px-1">
+        <div className="mb-2 p-2 rounded-2xl bg-white/95 dark:bg-[#14131a]/90 border border-black/10 dark:border-white/10 shadow-xl flex flex-col gap-1 shrink-0 max-h-48 overflow-y-auto custom-scrollbar">
+          <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase font-semibold px-1">
             Global Search
           </div>
           {searchResults.map((user) => {
@@ -536,23 +543,23 @@ const Sidebar = ({
                     email: user.email,
                   });
                 }}
-                className="flex items-center justify-between p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer group"
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <img
                     src={user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=27272a&color=ffffff`}
                     alt={user.username}
-                    className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
+                    className="w-8 h-8 rounded-full object-cover border border-black/10 dark:border-white/10 shrink-0"
                   />
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block truncate">{user.username}</span>
-                    <span className="text-[10px] text-zinc-400 block truncate">{user.email}</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-white block truncate">{user.username}</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block truncate">{user.email}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
                   {isMe ? (
-                    <span className="text-[10px] text-zinc-500 font-mono px-2 py-0.5 rounded-full bg-white/5">You</span>
+                    <span className="text-[10px] text-zinc-500 font-mono px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">You</span>
                   ) : isAlreadyFriend ? (
                     <button
                       type="button"
@@ -566,15 +573,15 @@ const Sidebar = ({
                           email: user.email,
                         });
                       }}
-                      className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-bold shadow-sm hover:bg-zinc-200 transition-all active:scale-95 flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black text-[11px] font-bold shadow-sm hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all active:scale-95 flex items-center gap-1"
                       title="Open conversation"
                     >
                       <span className="material-symbols-outlined text-xs">chat</span>
                       <span>Chat</span>
                     </button>
                   ) : isPendingOutgoing ? (
-                    <div className="px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-zinc-300 text-[10px] font-medium flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs text-white">done</span>
+                    <div className="px-2.5 py-1 rounded-full bg-black/5 border border-black/10 dark:bg-white/10 dark:border-white/20 text-zinc-600 dark:text-zinc-300 text-[10px] font-medium flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs text-zinc-900 dark:text-white">done</span>
                       <span>Sent</span>
                     </div>
                   ) : isPendingIncoming ? (
@@ -585,7 +592,7 @@ const Sidebar = ({
                         if (req) handleAcceptRequest(req._id);
                       }}
                       disabled={isLoading}
-                      className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-bold shadow-sm hover:bg-zinc-200 transition-all active:scale-95 flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black text-[11px] font-bold shadow-sm hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all active:scale-95 flex items-center gap-1"
                       title="Accept request"
                     >
                       <span className="material-symbols-outlined text-xs">check</span>
@@ -598,7 +605,7 @@ const Sidebar = ({
                         await handleSendRequest(user._id);
                       }}
                       disabled={isLoading}
-                      className="px-3 py-1.5 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-semibold shadow-md transition-all active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold shadow-md transition-all active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-50"
                       title="Send Contact Request"
                     >
                       {isLoading ? (
@@ -632,7 +639,7 @@ const Sidebar = ({
         {/* Requests Tab Dedicated View */}
         {activeFilter === "requests" && (
           <div className="space-y-2 p-1">
-            <div className="px-1 py-1 flex items-center justify-between text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+            <div className="px-1 py-1 flex items-center justify-between text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               <span>Incoming Friend Requests</span>
               <span className="text-[9px] font-mono">{incomingRequests.length}</span>
             </div>
@@ -646,11 +653,11 @@ const Sidebar = ({
                 return (
                   <div
                     key={req._id}
-                    className="p-3 rounded-2xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] transition-all flex items-center justify-between gap-3 shadow-sm"
+                    className="p-3 rounded-2xl bg-black/[0.02] border border-black/10 hover:bg-black/[0.05] dark:bg-white/[0.05] dark:border-white/10 dark:hover:bg-white/[0.08] transition-all flex items-center justify-between gap-3 shadow-sm"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <img
-                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/10 shadow-sm"
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-black/10 dark:border-white/10 shadow-sm"
                         alt={sender.username || "User"}
                         src={
                           sender.profilePic ||
@@ -660,10 +667,10 @@ const Sidebar = ({
                         }
                       />
                       <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-white truncate">
+                        <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
                           {sender.username || "Unknown User"}
                         </span>
-                        <span className="text-[10px] text-zinc-400 truncate">
+                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
                           {sender.status || "Wants to connect"}
                         </span>
                       </div>
@@ -674,7 +681,7 @@ const Sidebar = ({
                         type="button"
                         onClick={() => handleAcceptRequest(req._id)}
                         disabled={isLoading}
-                        className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shadow-sm flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-black text-xs font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shadow-sm flex items-center gap-1 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-xs">check</span>
                         <span>Accept</span>
@@ -683,7 +690,7 @@ const Sidebar = ({
                         type="button"
                         onClick={() => handleRejectRequest(req._id)}
                         disabled={isLoading}
-                        className="p-1.5 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
+                        className="p-1.5 rounded-xl text-zinc-500 hover:text-red-500 hover:bg-red-500/10 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
                         title="Decline"
                       >
                         <span className="material-symbols-outlined text-sm">close</span>
@@ -699,7 +706,7 @@ const Sidebar = ({
         {/* Section Header: Groups */}
         {(activeFilter === "all" || activeFilter === "groups" || (activeFilter === "unread" && unreadRooms.length > 0)) &&
           (activeFilter === "unread" ? unreadRooms : filteredRooms).length > 0 && (
-            <div className="pt-2 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+            <div className="pt-2 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               <span>Groups</span>
               <span className="text-[9px] font-mono">
                 {(activeFilter === "unread" ? unreadRooms : filteredRooms).length}
@@ -734,39 +741,39 @@ const Sidebar = ({
                 }
                 className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
                   isSelected
-                    ? "bg-white text-[#0d0c11] shadow-lg border border-white font-semibold"
-                    : "hover:bg-white/5 text-zinc-300 hover:text-white border border-transparent"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
+                    : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
                 }`}
               >
                 {/* WhatsApp Group Icon (No hash #) */}
                 <div className={`relative shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-150 ${
                   isSelected
-                    ? "bg-[#0d0c11] text-white shadow-md font-bold scale-105"
-                    : "bg-white/5 border border-white/10 text-zinc-400 group-hover:text-white group-hover:scale-105"
+                    ? "bg-white text-zinc-900 dark:bg-[#0d0c11] dark:text-white shadow-md font-bold scale-105"
+                    : "bg-black/5 border border-black/10 text-zinc-600 group-hover:text-zinc-900 group-hover:scale-105 dark:bg-white/5 dark:border-white/10 dark:text-zinc-400 dark:group-hover:text-white"
                 }`}>
                   <span className="material-symbols-outlined text-xl">groups</span>
                 </div>
 
                 <div className="flex flex-col flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-[#0d0c11] font-bold" : "text-zinc-200 group-hover:text-white"}`}>
+                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"}`}>
                       {room.name.replace(/^#/, "")}
                     </span>
-                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-600 font-medium" : "text-zinc-500"}`}>
+                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
                       {timeStr || "Active"}
                     </span>
                   </div>
 
-                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-600" : "text-zinc-400"}`}>
+                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
                     {previewText ? (
                       <>
                         {isOutgoing && (
-                          <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-black" : "text-zinc-400"}`}>
+                          <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
                             done_all
                           </span>
                         )}
                         {senderUsername && (
-                          <span className={`font-medium shrink-0 ${isSelected ? "text-black" : "text-zinc-300"}`}>
+                          <span className={`font-medium shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-700 dark:text-zinc-300"}`}>
                             {senderUsername}:
                           </span>
                         )}
@@ -779,7 +786,9 @@ const Sidebar = ({
                 </div>
 
                 {unread > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-black text-white text-[10px] font-bold shadow-sm animate-pulse">
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
+                    isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
+                  }`}>
                     {unread}
                   </span>
                 )}
@@ -790,7 +799,7 @@ const Sidebar = ({
         {/* Section Header: Direct Chats */}
         {(activeFilter === "all" || activeFilter === "direct" || (activeFilter === "unread" && unreadFriends.length > 0)) &&
           (activeFilter === "unread" ? unreadFriends : filteredFriends).length > 0 && (
-            <div className="pt-3 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+            <div className="pt-3 pb-1 px-2 flex items-center justify-between text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               <span>Direct Chats</span>
               <span className="text-[9px] font-mono">
                 {(activeFilter === "unread" ? unreadFriends : filteredFriends).length}
@@ -822,12 +831,12 @@ const Sidebar = ({
                 }
                 className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
                   isSelected
-                    ? "bg-white text-[#0d0c11] shadow-lg border border-white font-semibold"
-                    : "hover:bg-white/5 text-zinc-300 hover:text-white border border-transparent"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
+                    : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
                 }`}
               >
                 {/* Circular Avatar with Online Ring */}
-                <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden bg-white/5 border border-white/10">
+                <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
                   <img
                     className="w-full h-full object-cover"
                     alt={friend.username}
@@ -839,29 +848,29 @@ const Sidebar = ({
                     }
                   />
                   <span
-                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-[#0e0d13] ${
+                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${
                       isOnline
-                        ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.85)]"
-                        : "bg-zinc-600"
+                        ? "bg-emerald-500 dark:bg-white shadow-[0_0_6px_rgba(16,185,129,0.5)] dark:shadow-[0_0_6px_rgba(255,255,255,0.85)]"
+                        : "bg-zinc-400 dark:bg-zinc-600"
                     }`}
                   />
                 </div>
 
                 <div className="flex flex-col flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-[#0d0c11] font-bold" : "text-zinc-200 group-hover:text-white"}`}>
+                    <span className={`text-xs font-semibold truncate ${isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"}`}>
                       {friend.username}
                     </span>
-                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-600 font-medium" : "text-zinc-500"}`}>
+                    <span className={`text-[10px] font-mono shrink-0 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-500"}`}>
                       {timeStr || (isOnline ? "Online" : "")}
                     </span>
                   </div>
 
-                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-600" : "text-zinc-400"}`}>
+                  <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
                     {previewText ? (
                       <>
                         {isOutgoing && (
-                          <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-black" : "text-zinc-400"}`}>
+                          <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
                             done_all
                           </span>
                         )}
@@ -877,12 +886,12 @@ const Sidebar = ({
 
                 {unread > 0 ? (
                   <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm animate-pulse ${
-                    isSelected ? "bg-black text-white" : "bg-white text-black"
+                    isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
                   }`}>
                     {unread}
                   </span>
                 ) : (
-                  <span className="material-symbols-outlined text-xs text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="material-symbols-outlined text-xs text-zinc-400 dark:text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
                     chat
                   </span>
                 )}

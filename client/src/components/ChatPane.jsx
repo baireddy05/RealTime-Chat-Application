@@ -60,12 +60,12 @@ const extractFirstUrl = (text) => {
 
 const ChatHeader = memo(() => (
   <div className="pt-6 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
-    <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--glass-heavy)] text-zinc-400 text-[11px] max-w-md text-center border border-[var(--glass-border)] shadow-sm">
-      <span className="material-symbols-outlined text-zinc-300 text-sm">lock</span>
+    <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/[0.04] dark:bg-[var(--glass-heavy)] text-zinc-600 dark:text-zinc-400 text-[11px] max-w-md text-center border border-black/10 dark:border-[var(--glass-border)] shadow-sm">
+      <span className="material-symbols-outlined text-zinc-500 dark:text-zinc-300 text-sm">lock</span>
       <span>Messages and calls are end-to-end encrypted.</span>
     </div>
     <div className="my-1.5">
-      <span className="px-3 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono text-[10px] tracking-wider uppercase border border-white/10">
+      <span className="px-3 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-mono text-[10px] tracking-wider uppercase border border-black/10 dark:border-white/10">
         Today
       </span>
     </div>
@@ -525,12 +525,12 @@ const ChatPane = ({ onBack }) => {
         >
           {onBack && (
             <button onClick={(e) => { e.stopPropagation(); onBack(); }}
-              className="xl:hidden p-2 text-zinc-400 hover:text-white rounded-xl hover:bg-white/10 flex-shrink-0 transition-colors mr-1" title="Back to conversations">
+              className="xl:hidden p-2 text-zinc-500 hover:text-zinc-900 rounded-xl hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 flex-shrink-0 transition-colors mr-1" title="Back to conversations">
               <span className="material-symbols-outlined text-lg">arrow_back</span>
             </button>
           )}
           {selectedChat.type === "room" ? (
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-white text-[#0d0c11] font-bold shrink-0 shadow-md">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] font-bold shrink-0 shadow-md">
               <span className="material-symbols-outlined text-xl">groups</span>
             </div>
           ) : (
@@ -538,19 +538,19 @@ const ChatPane = ({ onBack }) => {
               <img
                 src={selectedChat.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
                 alt={selectedChat.name}
-                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-white/10"
+                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-black/10 dark:border-white/10"
               />
-              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-[#0e0d13] ${isUserOnline ? "bg-white" : "bg-zinc-600"}`} />
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${isUserOnline ? "bg-emerald-500 dark:bg-white" : "bg-zinc-400 dark:bg-zinc-600"}`} />
             </div>
           )}
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2 truncate">
-              <h2 className="text-white font-semibold truncate text-base sm:text-lg tracking-tight">
+              <h2 className="text-zinc-900 dark:text-white font-semibold truncate text-base sm:text-lg tracking-tight">
                 {selectedChat.name.replace(/^#/, "")}
               </h2>
             </div>
-            <div className="flex items-center gap-1.5 text-zinc-400 text-xs truncate">
-              <span className="text-zinc-500 font-bold">•</span>
+            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs truncate">
+              <span className="text-zinc-400 dark:text-zinc-500 font-bold">•</span>
               <span className="truncate">
                 {selectedChat.type === "room"
                   ? `${selectedChat.members?.length || 1} participants • Group`
@@ -568,7 +568,7 @@ const ChatPane = ({ onBack }) => {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => handleStartCall("audio")}
-            className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+            className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
             title="Start Voice Call"
             type="button"
           >
@@ -576,15 +576,15 @@ const ChatPane = ({ onBack }) => {
           </button>
           <button
             onClick={() => handleStartCall("video")}
-            className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+            className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
             title="Start Video Call"
             type="button"
           >
             <span className="material-symbols-outlined text-lg">videocam</span>
           </button>
           {isSearchOpen ? (
-            <div className="flex items-center bg-[var(--glass-heavy)] border border-[var(--glass-border)] rounded-xl px-2.5 py-1 gap-1.5 animate-fadeIn">
-              <span className="material-symbols-outlined text-zinc-400 text-sm">search</span>
+            <div className="flex items-center bg-black/[0.04] dark:bg-[var(--glass-heavy)] border border-black/10 dark:border-[var(--glass-border)] rounded-xl px-2.5 py-1 gap-1.5 animate-fadeIn">
+              <span className="material-symbols-outlined text-zinc-500 dark:text-zinc-400 text-sm">search</span>
               <input
                 type="text"
                 placeholder="Search messages..."
@@ -595,11 +595,11 @@ const ChatPane = ({ onBack }) => {
                 }}
                 onKeyDown={handleSearchKeyDown}
                 autoFocus
-                className="bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none w-24 sm:w-36"
+                className="bg-transparent text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none w-24 sm:w-36"
               />
               {searchQuery && (
                 <div className="flex items-center gap-0.5">
-                  <span className="text-[10px] text-zinc-400 px-1 font-mono select-none">
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 px-1 font-mono select-none">
                     {searchMatches.length > 0
                       ? `${searchMatchIndex + 1}/${searchMatches.length}`
                       : "0"}
@@ -608,14 +608,14 @@ const ChatPane = ({ onBack }) => {
                     <div className="flex items-center">
                       <button
                         onClick={handlePrevMatch}
-                        className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
+                        className="p-1 rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
                         title="Previous match (Shift+Enter)"
                       >
                         <ChevronUp size={13} />
                       </button>
                       <button
                         onClick={handleNextMatch}
-                        className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
+                        className="p-1 rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
                         title="Next match (Enter)"
                       >
                         <ChevronDown size={13} />
@@ -630,7 +630,7 @@ const ChatPane = ({ onBack }) => {
                   setSearchQuery("");
                   setSearchMatchIndex(0);
                 }}
-                className="text-zinc-400 hover:text-white p-0.5 rounded transition-colors"
+                className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white p-0.5 rounded transition-colors"
                 title="Close search (Esc)"
               >
                 <X size={13} />
@@ -639,7 +639,7 @@ const ChatPane = ({ onBack }) => {
           ) : (
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+              className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
               title="Search in thread"
               type="button"
             >
@@ -653,7 +653,7 @@ const ChatPane = ({ onBack }) => {
                 e.stopPropagation();
                 setShowChatOptions((p) => !p);
               }}
-              className="p-2 rounded-xl bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 border border-white/5 transition-all"
+              className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
               title="Thread details"
               type="button"
             >
@@ -946,7 +946,7 @@ const ChatPane = ({ onBack }) => {
                             message.isDeleted
                               ? "bg-surface-container/40 text-outline italic"
                               : isMine
-                              ? "border border-white/40 shadow-sm"
+                              ? "border border-black/10 dark:border-white/40 shadow-sm"
                               : ""
                           } ${
                             message.isOptimistic || (isMine && index === currentList.length - 1 && (Date.now() - new Date(message.createdAt).getTime() < 3500))
@@ -958,20 +958,20 @@ const ChatPane = ({ onBack }) => {
                             <p className={`text-[11.5px] font-bold mb-1 tracking-tight ${getSenderColor(sender.username)}`}>{sender.username}</p>
                           )}
                           {message.isPinned && !message.isDeleted && (
-                            <div className={`flex items-center gap-1 text-[9px] font-medium mb-1 pb-1 border-b ${isMine ? "text-zinc-600 border-black/10" : "text-zinc-300 border-white/[0.10]"}`}>
+                            <div className="flex items-center gap-1 text-[9px] font-medium mb-1 pb-1 border-b border-current/15 opacity-75">
                               <Pin size={9} /> Pinned
                             </div>
                           )}
                           {message.isForwarded && !message.isDeleted && (
-                            <div className={`flex items-center gap-1 text-[9px] italic mb-1 ${isMine ? "text-zinc-600" : "opacity-60"}`}>
+                            <div className="flex items-center gap-1 text-[9px] italic mb-1 opacity-75">
                               <Forward size={10} /> Forwarded
                             </div>
                           )}
                           {message.replyTo && !message.isDeleted && (
                             <div onClick={() => message.replyTo.messageId && scrollToMessage(message.replyTo.messageId)}
-                              className={`mb-1.5 p-2 rounded-xl cursor-pointer transition-colors text-[11px] select-none ${isMine ? "bg-black/5 border-l-2 border-black/40 text-black" : "bg-[var(--glass-hover)] border-l-2 border-white/50 text-white"}`}>
-                              <span className={`font-semibold block text-[10px] ${isMine ? "text-black" : "text-white"}`}>{message.replyTo.senderName || "User"}</span>
-                              <p className={`truncate ${isMine ? "text-zinc-600" : "opacity-80"}`}>{message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
+                              className="mb-1.5 p-2 rounded-xl cursor-pointer transition-colors text-[11px] select-none bg-current/5 border-l-2 border-current/40">
+                              <span className="font-semibold block text-[10px] opacity-90">{message.replyTo.senderName || "User"}</span>
+                              <p className="truncate opacity-75">{message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
                             </div>
                           )}
                           {message.isDeleted ? (
@@ -985,18 +985,14 @@ const ChatPane = ({ onBack }) => {
                                 </div>
                               )}
                               {message.file && (
-                                <div className={`flex items-center justify-between p-2.5 rounded-xl transition-all border my-1 max-w-sm ${
-                                  isMine 
-                                    ? "bg-black/5 border-black/10 text-black" 
-                                    : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                                }`}>
+                                <div className="flex items-center justify-between p-2.5 rounded-xl transition-all border my-1 max-w-sm bg-current/5 border-current/10 hover:bg-current/10">
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/20 text-red-400 shrink-0">
+                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/20 text-red-500 dark:text-red-400 shrink-0">
                                       <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
                                     </div>
                                     <div className="flex flex-col min-w-0">
-                                      <span className="text-xs font-semibold truncate">{message.file.name}</span>
-                                      <span className={`text-[11px] font-mono ${isMine ? "text-zinc-600" : "text-zinc-400"}`}>
+                                      <span className="text-xs font-semibold truncate opacity-95">{message.file.name}</span>
+                                      <span className="text-[11px] font-mono opacity-70">
                                         {formatFileSize(message.file.size)} • Document
                                       </span>
                                     </div>
@@ -1006,11 +1002,7 @@ const ChatPane = ({ onBack }) => {
                                     target="_blank"
                                     rel="noreferrer"
                                     download={message.file.name}
-                                    className={`p-2 rounded-lg transition-all ml-2 shrink-0 ${
-                                      isMine
-                                        ? "bg-black/10 hover:bg-black/15 text-black"
-                                        : "bg-white/10 hover:bg-white/20 text-white"
-                                    }`}
+                                    className="p-2 rounded-lg transition-all ml-2 shrink-0 bg-current/10 hover:bg-current/20 text-current"
                                     title="Download Document"
                                   >
                                     <span className="material-symbols-outlined text-base">download</span>
@@ -1029,16 +1021,14 @@ const ChatPane = ({ onBack }) => {
                                   <div className="text-[13.5px] leading-relaxed break-words font-normal">
                                     <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
                                   </div>
-                                  <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 ${
-                                    isMine ? "text-[#52505b] font-medium" : "text-zinc-400"
-                                  }`}>
+                                  <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">
                                     {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}
                                     <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                     {isMine && !message.isDeleted && (
                                       message.isOptimistic ? (
-                                        <Clock size={11} className="text-[#52505b] animate-pulse" />
+                                        <Clock size={11} className="opacity-70 animate-pulse" />
                                       ) : (
-                                        <span className={`material-symbols-outlined text-sm ${isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"}`}>
+                                        <span className={`material-symbols-outlined text-sm ${isReadByRecipient ? "font-bold opacity-100" : "font-semibold opacity-70"}`}>
                                           done_all
                                         </span>
                                       )
@@ -1053,16 +1043,16 @@ const ChatPane = ({ onBack }) => {
                               })()}
 
                               {!message.text && (
-                                <div className="flex items-center justify-end gap-1 mt-1 select-none">
-                                  {message.isEdited && <span className={`text-[9px] italic ${isMine ? "text-[#52505b]" : "text-zinc-400 opacity-60"}`}>(edited)</span>}
-                                  <span className={`text-[10px] font-medium ${isMine ? "text-[#52505b]" : "text-zinc-400"}`}>
+                                <div className="flex items-center justify-end gap-1 mt-1 select-none opacity-70">
+                                  {message.isEdited && <span className="text-[9px] italic opacity-75">(edited)</span>}
+                                  <span className="text-[10px] font-medium">
                                     {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                   </span>
                                   {isMine && !message.isDeleted && (
                                     message.isOptimistic ? (
-                                      <Clock size={11} className="text-[#52505b] animate-pulse" />
+                                      <Clock size={11} className="opacity-70 animate-pulse" />
                                     ) : (
-                                      <CheckCheck size={13} className={isReadByRecipient ? "text-black font-bold" : "text-zinc-700 font-semibold"} />
+                                      <CheckCheck size={13} className={isReadByRecipient ? "font-bold opacity-100" : "font-semibold opacity-70"} />
                                     )
                                   )}
                                 </div>

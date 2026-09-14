@@ -127,13 +127,13 @@ const HomePage = () => {
             }}
           >
             {/* Ultra-wide Ambient Breathing Glow across the entire UI */}
-            <div className="absolute -top-[750px] -left-[750px] w-[1500px] h-[1500px] rounded-full bg-gradient-to-tr from-white/[0.08] via-white/[0.02] to-transparent blur-[120px] animate-home-logo-breath pointer-events-none" />
-            <div className="absolute -top-[200px] -left-[200px] w-[400px] h-[400px] rounded-full bg-white/[0.10] blur-[60px] animate-pulse pointer-events-none" />
+            <div className="absolute -top-[750px] -left-[750px] w-[1500px] h-[1500px] rounded-full bg-gradient-to-tr from-black/[0.03] via-black/[0.01] to-transparent dark:from-white/[0.08] dark:via-white/[0.02] dark:to-transparent blur-[120px] animate-home-logo-breath pointer-events-none" />
+            <div className="absolute -top-[200px] -left-[200px] w-[400px] h-[400px] rounded-full bg-black/[0.03] dark:bg-white/[0.10] blur-[60px] animate-pulse pointer-events-none" />
 
             {/* Concentric liquid-glass pulse shockwave rings radiating from the logo across the entire window */}
-            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border-2 border-white/35 shadow-[0_0_60px_rgba(255,255,255,0.15)] animate-home-logo-wave-1 pointer-events-none" />
-            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border border-white/25 shadow-[0_0_80px_rgba(255,255,255,0.10)] animate-home-logo-wave-2 pointer-events-none" />
-            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border border-white/15 shadow-[0_0_100px_rgba(255,255,255,0.06)] animate-home-logo-wave-3 pointer-events-none" />
+            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border-2 border-zinc-900/20 dark:border-white/35 shadow-[0_0_60px_rgba(0,0,0,0.06)] dark:shadow-[0_0_60px_rgba(255,255,255,0.15)] animate-home-logo-wave-1 pointer-events-none" />
+            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border border-zinc-900/15 dark:border-white/25 shadow-[0_0_80px_rgba(0,0,0,0.04)] dark:shadow-[0_0_80px_rgba(255,255,255,0.10)] animate-home-logo-wave-2 pointer-events-none" />
+            <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] rounded-full border border-zinc-900/10 dark:border-white/15 shadow-[0_0_100px_rgba(0,0,0,0.02)] dark:shadow-[0_0_100px_rgba(255,255,255,0.06)] animate-home-logo-wave-3 pointer-events-none" />
           </div>
         </div>
       )}
@@ -150,18 +150,18 @@ const HomePage = () => {
               setSelectedChat(null);
               setActiveNav("all-chats");
             }}
-            className="group relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-tr from-white to-zinc-400 p-0.5 shadow-md hover:scale-105 active:scale-95 transition-all"
+            className="group relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-tr from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 p-0.5 shadow-md hover:scale-105 active:scale-95 transition-all"
             type="button"
           >
-            <div className="w-full h-full rounded-[14px] bg-[#121117] flex items-center justify-center">
+            <div className="w-full h-full rounded-[14px] bg-white dark:bg-[#121117] flex items-center justify-center">
               <img alt="Pulse Logo" className="w-6 h-6 object-contain" src="/logo.svg" />
             </div>
-            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               Pulse Home
             </span>
           </button>
 
-          <div className="w-8 h-[1px] bg-white/10" />
+          <div className="w-8 h-[1px] bg-black/10 dark:bg-white/10" />
 
           {/* WhatsApp Core Navigation Items */}
           <div className="flex flex-col items-center gap-2">
@@ -172,21 +172,21 @@ const HomePage = () => {
               }}
               className={`group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                 activeNav === "chats"
-                  ? "bg-white text-[#0d0c11] shadow-sm font-bold"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
               }`}
               type="button"
             >
               {activeNav === "chats" && (
-                <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-white" />
+                <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
               )}
               <span className="material-symbols-outlined text-xl">chat</span>
               {totalUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white text-black font-mono text-[9px] flex items-center justify-center font-bold animate-pulse">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] flex items-center justify-center font-bold animate-pulse">
                   {totalUnreadCount}
                 </span>
               )}
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
                 Chats
               </span>
             </button>
@@ -196,12 +196,12 @@ const HomePage = () => {
               onClick={() => {
                 setIsStatusStoriesOpen(true);
               }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-all"
               type="button"
             >
               <span className="material-symbols-outlined text-xl">motion_photos_on</span>
-              <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-white ring-1 ring-[#09090b]" />
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+              <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
                 Status Stories
               </span>
             </button>
@@ -211,11 +211,11 @@ const HomePage = () => {
               onClick={() => {
                 setIsStarredOpen(true);
               }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-all"
               type="button"
             >
               <span className="material-symbols-outlined text-xl">star</span>
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
                 Starred Messages
               </span>
             </button>
@@ -225,11 +225,11 @@ const HomePage = () => {
               onClick={() => {
                 setIsCreateGroupOpen(true);
               }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-all"
               type="button"
             >
               <span className="material-symbols-outlined text-xl">group_add</span>
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
                 New Group
               </span>
             </button>
@@ -242,21 +242,21 @@ const HomePage = () => {
               }}
               className={`group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
                 activeNav === "contacts"
-                  ? "bg-white text-[#0d0c11] shadow-sm font-bold"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
               }`}
               type="button"
             >
               {activeNav === "contacts" && (
-                <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-white" />
+                <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
               )}
               <span className="material-symbols-outlined text-xl">person_add</span>
               {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white text-black font-mono text-[9px] flex items-center justify-center font-bold animate-pulse">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] flex items-center justify-center font-bold animate-pulse">
                   {pendingCount}
                 </span>
               )}
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
                 Contacts ({friends?.length || 0})
               </span>
             </button>
@@ -268,13 +268,13 @@ const HomePage = () => {
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="group relative flex items-center justify-center w-9 h-9 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="group relative flex items-center justify-center w-9 h-9 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-colors"
             type="button"
           >
             <span className="material-symbols-outlined text-lg">
               {theme === "dark" ? "light_mode" : "dark_mode"}
             </span>
-            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </span>
           </button>
@@ -284,7 +284,7 @@ const HomePage = () => {
             onClick={() => setIsProfileOpen(true)}
             className="group relative cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-white to-zinc-400 hover:scale-105 active:scale-95 transition-transform shadow-md">
+            <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-zinc-400 to-zinc-600 dark:from-white dark:to-zinc-400 hover:scale-105 active:scale-95 transition-transform shadow-md">
               <img
                 alt={authUser?.username || "Profile"}
                 className="w-full h-full rounded-[10px] object-cover"
@@ -296,8 +296,8 @@ const HomePage = () => {
                 }
               />
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-white ring-2 ring-[#0a0e14]" />
-            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-[#1c1b24] border border-white/20 text-white text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-[#1c1b24]">
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-white ring-2 ring-white dark:ring-[#0a0e14]" />
+            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               Profile & Settings
             </span>
           </div>
@@ -346,20 +346,20 @@ const HomePage = () => {
             <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center animate-fadeIn">
               {/* Central Glowing Hero Logo Emblem */}
               <div className="relative mb-6 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-3xl bg-white/20 blur-xl opacity-40 animate-pulse" />
+                <div className="absolute inset-0 rounded-3xl bg-black/5 dark:bg-white/20 blur-xl opacity-40 animate-pulse" />
                 <div
                   ref={logoRef}
-                  className="relative w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center justify-center z-10 hover:scale-105 transition-transform"
+                  className="relative w-20 h-20 rounded-3xl bg-white/80 dark:bg-white/10 backdrop-blur-2xl border border-black/10 dark:border-white/20 shadow-xl flex items-center justify-center z-10 hover:scale-105 transition-transform"
                 >
                   <img src="/logo.svg" alt="Pulse" className="w-12 h-12 object-contain" />
                 </div>
               </div>
 
               {/* Personalized Greeting */}
-              <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">
                 Pulse Web Messenger
               </h2>
-              <p className="text-sm text-zinc-400 max-w-md mb-8">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mb-8">
                 Send and receive messages, voice notes, photos, and documents securely.
               </p>
 
@@ -368,60 +368,60 @@ const HomePage = () => {
                 {/* 1. New Direct Chat */}
                 <button
                   onClick={() => setIsAddFriendOpen(true)}
-                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
+                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/70 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 border border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
                   type="button"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
                     <span className="material-symbols-outlined text-lg">chat</span>
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block truncate">New Direct Chat</span>
-                    <span className="text-[11px] text-zinc-400 block truncate">Message friends & contacts</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-white block truncate">New Direct Chat</span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block truncate">Message friends & contacts</span>
                   </div>
                 </button>
 
                 {/* 2. New Group Chat */}
                 <button
                   onClick={() => setIsCreateGroupOpen(true)}
-                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
+                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/70 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 border border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
                   type="button"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
                     <span className="material-symbols-outlined text-lg">group_add</span>
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block truncate">New Group Chat</span>
-                    <span className="text-[11px] text-zinc-400 block truncate">Create group with members</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-white block truncate">New Group Chat</span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block truncate">Create group with members</span>
                   </div>
                 </button>
 
                 {/* 3. Status Stories */}
                 <button
                   onClick={() => setIsStatusStoriesOpen(true)}
-                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
+                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/70 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 border border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
                   type="button"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
                     <span className="material-symbols-outlined text-lg">motion_photos_on</span>
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block truncate">Status Stories</span>
-                    <span className="text-[11px] text-zinc-400 block truncate">24-hour disappearing updates</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-white block truncate">Status Stories</span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block truncate">24-hour disappearing updates</span>
                   </div>
                 </button>
 
                 {/* 4. Starred Messages */}
                 <button
                   onClick={() => setIsStarredOpen(true)}
-                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
+                  className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/70 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 border border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
                   type="button"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform font-bold">
                     <span className="material-symbols-outlined text-lg">star</span>
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block truncate">Starred Messages</span>
-                    <span className="text-[11px] text-zinc-400 block truncate">View your saved messages</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-white block truncate">Starred Messages</span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block truncate">View your saved messages</span>
                   </div>
                 </button>
               </div>

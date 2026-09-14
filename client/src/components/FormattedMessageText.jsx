@@ -91,11 +91,7 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
         return (
           <code
             key={i}
-            className={`px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] ${
-              isMine
-                ? "bg-black/10 text-black border border-black/15 font-semibold"
-                : "bg-white/10 text-zinc-100 border border-white/15"
-            }`}
+            className="px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] bg-current/10 border border-current/15 font-semibold"
           >
             {inlineCode}
           </code>
@@ -114,11 +110,7 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
               href={urlSub}
               target="_blank"
               rel="noopener noreferrer"
-              className={`underline underline-offset-2 break-all transition-opacity ${
-                isMine
-                  ? "text-black font-semibold hover:opacity-70"
-                  : "text-white font-semibold hover:opacity-70"
-              }`}
+              className="underline underline-offset-2 break-all transition-opacity font-semibold opacity-95 hover:opacity-75"
               onClick={(e) => e.stopPropagation()}
             >
               {urlSub}
@@ -137,11 +129,7 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
             m.toLowerCase() === trimmed.toLowerCase() ? (
               <mark
                 key={k}
-                className={
-                  isMine
-                    ? "bg-black text-white font-bold px-1 rounded"
-                    : "bg-white text-black font-bold px-1 rounded"
-                }
+                className="bg-yellow-400/35 text-current font-bold px-1 rounded border border-yellow-500/30"
               >
                 {m}
               </mark>

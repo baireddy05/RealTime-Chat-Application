@@ -93,11 +93,7 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
 
   return (
     <div
-      className={`flex items-center gap-3 p-2.5 rounded-2xl min-w-[260px] max-w-[320px] select-none shadow-sm transition-all border ${
-        isMine
-          ? "bg-white/15 text-white border-white/20"
-          : "bg-[var(--glass-surface)] text-theme-main border-[var(--glass-border)] shadow-glass"
-      }`}
+      className="flex items-center gap-3 p-2.5 rounded-2xl min-w-[260px] max-w-[320px] select-none shadow-sm transition-all border bg-current/5 text-current border-current/10"
     >
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
@@ -105,11 +101,7 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
       <button
         type="button"
         onClick={togglePlay}
-        className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-90 shadow-md ${
-          isMine
-            ? "bg-white text-accent-primary hover:bg-white/90"
-            : "bg-gradient-to-tr from-accent-primary to-accent-secondary text-white hover:brightness-110"
-        }`}
+        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-90 shadow-md bg-current text-white dark:text-[#0d0c11]"
         title={isPlaying ? "Pause" : "Play voice note"}
       >
         {isPlaying ? (
@@ -137,13 +129,9 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
                 onClick={() => handleBarClick(idx)}
                 style={{ height: `${height}%` }}
                 className={`w-[3px] rounded-full transition-all duration-100 ${
-                  isMine
-                    ? isPlayed || isHovered
-                      ? "bg-white"
-                      : "bg-white/35"
-                    : isPlayed || isHovered
-                    ? "bg-[#8B5CF6]"
-                    : "bg-white/20 group-hover:bg-white/30"
+                  isPlayed || isHovered
+                    ? "bg-current opacity-95"
+                    : "bg-current opacity-25 group-hover:opacity-40"
                 }`}
               />
             );
@@ -170,11 +158,7 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
             <button
               type="button"
               onClick={toggleSpeed}
-              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all active:scale-95 ${
-                isMine
-                  ? "bg-white/25 text-white hover:bg-white/35"
-                  : "bg-accent-primary/15 text-accent-primary hover:bg-accent-primary/25 border border-accent-primary/30"
-              }`}
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all active:scale-95 bg-current/10 text-current hover:bg-current/20 border border-current/20"
               title="Change playback speed"
             >
               {playbackSpeed}x
@@ -185,9 +169,7 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
 
       {/* Audio Indicator */}
       <div
-        className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isMine ? "bg-white/20 text-white" : "bg-accent-primary/20 text-accent-primary"
-        }`}
+        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-current/10 text-current"
       >
         <Mic size={12} className={isPlaying ? "animate-pulse" : ""} />
       </div>

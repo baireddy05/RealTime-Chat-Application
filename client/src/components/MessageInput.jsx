@@ -865,7 +865,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowAttachMenu((prev) => !prev);
                 setShowEmojiPicker(false);
               }}
-              className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors ml-1"
+              className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-1"
               title="Attach file or media"
             >
               <span className="material-symbols-outlined text-xl">add_circle</span>
@@ -879,7 +879,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowEmojiPicker((prev) => !prev);
                 setShowAttachMenu(false);
               }}
-              className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="Insert Emoji"
             >
               <span className="material-symbols-outlined text-xl">mood</span>
@@ -906,8 +906,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <input
                 ref={inputRef}
                 type="text"
-                className="w-full bg-transparent text-white placeholder:text-zinc-500 text-sm focus:outline-none"
-                style={{ color: "#ffffff", caretColor: "#ffffff" }}
+                className="w-full bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-sm focus:outline-none"
                 placeholder={
                   scheduledFor
                     ? "Schedule a message..."
@@ -932,8 +931,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 }}
                 className={`p-1.5 rounded-full transition-colors flex items-center gap-1 ${
                   disappearingTimer
-                    ? "text-amber-400 bg-amber-500/20 font-bold"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    ? "text-amber-500 bg-amber-500/15 dark:text-amber-400 dark:bg-amber-500/20 font-bold"
+                    : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
                 }`}
                 title={disappearingTimer ? `Disappearing timer: ${disappearingTimer}s` : "Set Disappearing Message Timer"}
               >
@@ -951,8 +950,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 }}
                 className={`p-1.5 rounded-full transition-colors ${
                   scheduledFor
-                    ? "text-white bg-white/20 font-bold"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    ? "text-zinc-900 bg-black/10 dark:text-white dark:bg-white/20 font-bold"
+                    : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
                 }`}
                 title="Schedule Message"
               >
@@ -963,7 +962,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <button
                 type="button"
                 onClick={startRecording}
-                className="p-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="Record Audio Note"
               >
                 <span className="material-symbols-outlined text-xl">mic</span>
@@ -974,13 +973,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 ref={sendBtnRef}
                 type="submit"
                 disabled={!hasContent && !editingMessage}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-[#0d0c11] shadow-lg hover:scale-105 active:scale-95 transition-all mr-0.5 disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg hover:scale-105 active:scale-95 transition-all mr-0.5 disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
                 title="Send message"
               >
                 {isSending || isUploading ? (
-                  <Loader size={17} className="animate-spin text-black" />
+                  <Loader size={17} className="animate-spin text-white dark:text-black" />
                 ) : (
-                  <span className="material-symbols-outlined text-xl text-[#0d0c11] font-bold">send</span>
+                  <span className="material-symbols-outlined text-xl text-white dark:text-[#0d0c11] font-bold">send</span>
                 )}
               </button>
             </div>

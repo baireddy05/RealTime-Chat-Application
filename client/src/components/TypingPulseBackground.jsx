@@ -49,10 +49,10 @@ export default function TypingPulseBackground() {
   }, []);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none bg-[#0a090e]">
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none bg-[#f4f4f6] dark:bg-[#0a090e] transition-colors duration-300">
       {/* Calm resting background layer */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0a090e] via-[#0d0c13] to-[#0a090e] opacity-95" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-white/[0.015] blur-[140px] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#f4f4f6] via-[#ebebf0] to-[#f4f4f6] dark:from-[#0a090e] dark:via-[#0d0c13] dark:to-[#0a090e] opacity-95 transition-colors duration-300" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-black/[0.02] dark:bg-white/[0.015] blur-[140px] pointer-events-none" />
 
       {/* Exactly one wave per letter typed, radiating at reduced speed */}
       {pulses.map((pulse) => (
@@ -65,7 +65,7 @@ export default function TypingPulseBackground() {
           }}
         >
           {/* Exactly one single liquid-glass wave ring per letter typed */}
-          <div className="absolute -top-[250px] -left-[250px] w-[500px] h-[500px] rounded-full border-2 border-white/75 shadow-[0_0_40px_rgba(255,255,255,0.35)] animate-single-typing-wave" />
+          <div className="absolute -top-[250px] -left-[250px] w-[500px] h-[500px] rounded-full border-2 border-zinc-900/40 dark:border-white/75 shadow-[0_0_40px_rgba(0,0,0,0.12)] dark:shadow-[0_0_40px_rgba(255,255,255,0.35)] animate-single-typing-wave" />
         </div>
       ))}
     </div>
