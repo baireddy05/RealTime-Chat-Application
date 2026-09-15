@@ -101,6 +101,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const attachBtnRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
+  const timerMenuRef = useRef(null);
+  const timerBtnRef = useRef(null);
+  const scheduleMenuRef = useRef(null);
+  const scheduleBtnRef = useRef(null);
   const inputRef = useRef(null);
   const sendBtnRef = useRef(null);
 
@@ -160,9 +164,29 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       ) {
         setShowEmojiPicker(false);
       }
+
+      if (
+        showTimerMenu &&
+        timerMenuRef.current &&
+        !timerMenuRef.current.contains(e.target) &&
+        timerBtnRef.current &&
+        !timerBtnRef.current.contains(e.target)
+      ) {
+        setShowTimerMenu(false);
+      }
+
+      if (
+        showScheduleMenu &&
+        scheduleMenuRef.current &&
+        !scheduleMenuRef.current.contains(e.target) &&
+        scheduleBtnRef.current &&
+        !scheduleBtnRef.current.contains(e.target)
+      ) {
+        setShowScheduleMenu(false);
+      }
     };
 
-    if (showAttachMenu || showEmojiPicker) {
+    if (showAttachMenu || showEmojiPicker || showTimerMenu || showScheduleMenu) {
       document.addEventListener("mousedown", handleClickOutside, true);
       document.addEventListener("touchstart", handleClickOutside, true);
     }
@@ -171,7 +195,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("touchstart", handleClickOutside, true);
     };
-  }, [showAttachMenu, showEmojiPicker]);
+  }, [showAttachMenu, showEmojiPicker, showTimerMenu, showScheduleMenu]);
 
   useEffect(() => {
     return () => {
@@ -465,6 +489,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setReplyingTo(null);
     setScheduledFor(null);
 
+    // Keep mobile virtual keyboard open and input field focused
+    inputRef.current?.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    });
+
     if (currentImage) {
       setIsUploading(true);
       imageUrl = await uploadToCloudinary(currentImage.file);
@@ -717,7 +747,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
       {/* Disappearing Timer Menu Popover */}
       {showTimerMenu && (
-        <div className="absolute bottom-14 right-16 sm:right-24 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-2 shadow-glass w-48 animate-scaleIn space-y-1 text-theme-main text-xs">
+        <div ref={timerMenuRef} className="absolute bottom-14 right-16 sm:right-24 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-2 shadow-glass w-48 animate-scaleIn space-y-1 text-theme-main text-xs">
           <div className="px-2.5 py-1 text-[10px] font-semibold text-theme-muted uppercase tracking-wider flex items-center justify-between">
             <span>Disappearing Timer</span>
             <Flame size={12} className="text-orange-400" />
@@ -751,7 +781,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
       {/* Schedule Message Popover */}
       {showScheduleMenu && (
-        <div className="absolute bottom-14 right-8 sm:right-16 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-3 shadow-glass w-64 animate-scaleIn space-y-2 text-theme-main text-xs">
+        <div ref={scheduleMenuRef} className="absolute bottom-14 right-8 sm:right-16 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-3 shadow-glass w-64 animate-scaleIn space-y-2 text-theme-main text-xs">
           <div className="px-1 text-[11px] font-semibold text-accent-primary flex items-center justify-between">
             <span>Schedule Send</span>
             <Clock size={12} />
@@ -963,6 +993,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             {/* In-capsule controls: Disappearing Timer & Schedule Button */}
             <div className="flex items-center gap-0.5 shrink-0">
               <button
+                ref={timerBtnRef}
                 type="button"
                 onClick={() => {
                   setShowTimerMenu((prev) => !prev);
@@ -982,6 +1013,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               </button>
 
               <button
+                ref={scheduleBtnRef}
                 type="button"
                 onClick={() => {
                   setShowScheduleMenu((prev) => !prev);
@@ -1007,15 +1039,30 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 <span className="material-symbols-outlined text-xl">mic</span>
               </button>
 
-              {/* Primary Monochromatic Send Button with Spring Transition */}
+              {/* Primary Monochromatic Send Button with Persistent Keyboard Focus */}
               <button
                 ref={sendBtnRef}
                 type="submit"
-                disabled={!hasContent && !editingMessage}
-                className={`flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] transition-all duration-200 mr-0.5 cursor-pointer ${
+                aria-disabled={!hasContent && !editingMessage}
+                onMouseDown={(e) => {
+                  // Prevents button tap from stealing focus from the input field
+                  e.preventDefault();
+                }}
+                onTouchEnd={() => {
+                  // Keep mobile virtual keyboard open upon touch release
+                  inputRef.current?.focus({ preventScroll: true });
+                }}
+                onClick={(e) => {
+                  if (!hasContent && !editingMessage) {
+                    e.preventDefault();
+                    return;
+                  }
+                  inputRef.current?.focus({ preventScroll: true });
+                }}
+                className={`flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] transition-all duration-200 mr-0.5 ${
                   hasContent || editingMessage
-                    ? "scale-100 opacity-100 shadow-[0_4px_16px_rgba(0,0,0,0.25)] dark:shadow-[0_4px_16px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95"
-                    : "scale-95 opacity-30 cursor-not-allowed shadow-none"
+                    ? "scale-100 opacity-100 shadow-[0_4px_16px_rgba(0,0,0,0.25)] dark:shadow-[0_4px_16px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 cursor-pointer"
+                    : "scale-95 opacity-30 cursor-default shadow-none"
                 }`}
                 title="Send message"
               >

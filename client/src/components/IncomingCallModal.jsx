@@ -9,8 +9,14 @@ const IncomingCallModal = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none">
-      <div className="w-full max-w-sm glass-panel border border-[var(--glass-border)] rounded-3xl p-6 shadow-glass flex flex-col items-center text-center animate-scaleIn relative overflow-hidden bg-[var(--glass-heavy)] backdrop-blur-3xl text-theme-main">
+    <div 
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
+      onClick={rejectCall}
+    >
+      <div 
+        className="w-full max-w-sm glass-panel border border-[var(--glass-border)] rounded-3xl p-6 shadow-glass flex flex-col items-center text-center animate-scaleIn relative overflow-hidden bg-[var(--glass-heavy)] backdrop-blur-3xl text-theme-main"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Ambient background glow */}
         <div className="absolute -top-16 -right-16 w-36 h-36 rounded-full bg-accent-primary/20 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-16 -left-16 w-36 h-36 rounded-full bg-emerald-500/20 blur-2xl pointer-events-none" />

@@ -308,7 +308,9 @@ const ChatPane = ({ onBack }) => {
     );
   }
 
-  const displayedMessages = messages;
+  const displayedMessages = useMemo(() => {
+    return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [messages]);
 
   const handleNextMatch = () => {
     if (searchMatches.length === 0) return;

@@ -37,7 +37,10 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-md bg-[var(--glass-heavy)] border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[80vh] animate-scaleIn smooth-gpu"
         onClick={(e) => e.stopPropagation()}

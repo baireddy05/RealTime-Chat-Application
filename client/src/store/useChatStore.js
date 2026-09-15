@@ -401,19 +401,18 @@ export const useChatStore = create((set, get) => ({
         }));
       } else {
         set((state) => {
-          let replaced = false;
-          const updated = state.messages.map((m) => {
-            if (m._id === tempId || (m.isOptimistic && m.tempId === tempId)) {
-              replaced = true;
-              return msgDataWithDecrypted;
-            }
-            return m;
-          });
-          const alreadyExists = updated.some((m) => m._id === msgDataWithDecrypted._id);
+          // Remove the optimistic message completely
+          const withoutOptimistic = state.messages.filter(
+            (m) => m._id !== tempId && m.tempId !== tempId
+          );
+          // Check if the socket already added the real message
+          const alreadyExists = withoutOptimistic.some(
+            (m) => m._id === msgDataWithDecrypted._id
+          );
           return {
             messages: alreadyExists
-              ? (replaced ? updated : updated.filter((m) => m._id !== tempId))
-              : [...updated.filter((m) => m._id !== tempId), msgDataWithDecrypted],
+              ? withoutOptimistic
+              : [...withoutOptimistic, msgDataWithDecrypted],
             lastMessages: {
               ...state.lastMessages,
               [selectedChat.id]: msgDataWithDecrypted,

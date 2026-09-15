@@ -184,11 +184,15 @@ const StatusModal = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xl flex items-center justify-center animate-fadeIn p-4 select-none">
+    <div 
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xl flex items-center justify-center animate-fadeIn p-4 select-none"
+      onClick={onClose}
+    >
       {/* Story Viewer Overlay */}
       {activeViewer && activePerson && activeStory ? (
         <div
           className="relative w-full max-w-sm h-[580px] max-h-[88vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-5 md:p-6 animate-scaleIn select-none"
+          onClick={(e) => e.stopPropagation()}
           onMouseDown={() => setIsPaused(true)}
           onMouseUp={() => setIsPaused(false)}
           onTouchStart={() => setIsPaused(true)}
@@ -322,7 +326,10 @@ const StatusModal = ({ onClose }) => {
         </div>
       ) : (
         /* Status List & Creator Modal */
-        <div className="w-full max-w-md bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn text-theme-main">
+        <div 
+          className="w-full max-w-md bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn text-theme-main"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="border-b border-[var(--glass-border)] px-5 py-4 flex items-center justify-between bg-[var(--glass-hover)]">
             <div className="flex items-center gap-2">
