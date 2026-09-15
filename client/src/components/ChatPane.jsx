@@ -27,9 +27,35 @@ import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
 import { WALLPAPER_PRESETS } from "../lib/wallpapers";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
-import { Virtuoso } from "react-virtuoso";
 import { useBackHandler } from "../lib/backNavigation";
 
+const isDifferentDay = (d1, d2) => {
+  if (!d1 || !d2) return true;
+  const date1 = new Date(d1);
+  const date2 = new Date(d2);
+  return (
+    date1.getFullYear() !== date2.getFullYear() ||
+    date1.getMonth() !== date2.getMonth() ||
+    date1.getDate() !== date2.getDate()
+  );
+};
+
+const formatDateDivider = (dateStr) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+  });
+};
 
 const formatFileSize = (bytes) => {
   if (!bytes) return "";
@@ -59,22 +85,14 @@ const extractFirstUrl = (text) => {
   return match ? match[0] : null;
 };
 
-
 const ChatHeader = memo(() => (
-  <div className="pt-6 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
+  <div className="pt-4 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
     <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/[0.04] dark:bg-[var(--glass-heavy)] text-zinc-600 dark:text-zinc-400 text-[11px] max-w-md text-center border border-black/10 dark:border-[var(--glass-border)] shadow-sm">
       <span className="material-symbols-outlined text-zinc-500 dark:text-zinc-300 text-sm">lock</span>
       <span>Messages and calls are end-to-end encrypted.</span>
     </div>
-    <div className="my-1.5">
-      <span className="px-3 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 font-mono text-[10px] tracking-wider uppercase border border-black/10 dark:border-white/10">
-        Today
-      </span>
-    </div>
   </div>
 ));
-
-const ChatFooter = memo(() => <div className="h-6" />);
 
 const ChatPane = ({ onBack }) => {
   const { theme } = useThemeStore();
@@ -121,16 +139,14 @@ const ChatPane = ({ onBack }) => {
   useBackHandler(isSearchOpen, () => setIsSearchOpen(false), "chat-search-bar");
   useBackHandler(showChatOptions, () => setShowChatOptions(false), "chat-dropdown-options");
 
-  const messagesContainerRef = useRef(null);
   const scrollerElementRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const isAtBottomRef = useRef(true);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+  const [unreadBelowCount, setUnreadBelowCount] = useState(0);
   const loadedChatIdRef = useRef(null);
   const prevSelectedChatIdRef = useRef(selectedChat?.id);
   const messagesRef = useRef(messages);
-
-  const virtuosoComponents = useMemo(() => ({
-    Header: ChatHeader,
-    Footer: ChatFooter,
-  }), []);
 
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
 
@@ -150,61 +166,67 @@ const ChatPane = ({ onBack }) => {
 
   const prevMessagesCountRef = useRef(messages.length);
 
-  const scrollToBottom = useCallback((behavior = "auto") => {
-    const doScroll = () => {
-      const currentList = searchQuery.trim() ? searchMatches : messagesRef.current;
-      const count = currentList?.length || 0;
-      if (count === 0) return;
-      
-      if (messagesContainerRef.current) {
-        try {
-          messagesContainerRef.current.scrollToIndex({
-            index: count - 1,
-            align: "end",
-            behavior,
-          });
-        } catch {
-          // ignore
-        }
-      }
-      if (scrollerElementRef.current) {
-        scrollerElementRef.current.scrollTop = scrollerElementRef.current.scrollHeight + 5000;
-      }
-    };
-
-    doScroll();
-    requestAnimationFrame(doScroll);
-    setTimeout(doScroll, 30);
-    setTimeout(doScroll, 100);
-  }, [searchQuery, searchMatches]);
-
-  // Auto-scroll whenever a message is sent, received, or list length changes
-  useEffect(() => {
-    if (messages.length !== prevMessagesCountRef.current) {
-      prevMessagesCountRef.current = messages.length;
-      scrollToBottom("auto");
+  const scrollToBottom = useCallback((behavior = "smooth") => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior,
+        block: "end",
+      });
+    } else if (scrollerElementRef.current) {
+      scrollerElementRef.current.scrollTo({
+        top: scrollerElementRef.current.scrollHeight,
+        behavior,
+      });
     }
-  }, [messages.length, scrollToBottom]);
+    isAtBottomRef.current = true;
+    setShowScrollBottomBtn(false);
+    setUnreadBelowCount(0);
+  }, []);
 
-  // Ensure we snap to bottom when chat initially loads
+  const handleScroll = useCallback(() => {
+    const el = scrollerElementRef.current;
+    if (!el) return;
+    const threshold = 140;
+    const isBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+    isAtBottomRef.current = isBottom;
+    setShowScrollBottomBtn(!isBottom);
+    if (isBottom) {
+      setUnreadBelowCount(0);
+    }
+  }, []);
+
+  // When new messages are sent or received
+  useEffect(() => {
+    if (messages.length > prevMessagesCountRef.current) {
+      const latestMsg = messages[messages.length - 1];
+      const isMine = latestMsg?.senderId?._id === authUser?._id || latestMsg?.senderId === authUser?._id;
+
+      if (isMine || isAtBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottom("smooth"));
+      } else {
+        setUnreadBelowCount((c) => c + 1);
+      }
+    }
+    prevMessagesCountRef.current = messages.length;
+  }, [messages.length, authUser?._id, scrollToBottom]);
+
+  // Ensure we snap to bottom when chat initially loads or switches
   useEffect(() => {
     if (!isMessagesLoading && messages.length > 0) {
-      scrollToBottom("auto");
+      requestAnimationFrame(() => {
+        scrollToBottom("instant");
+      });
     }
   }, [selectedChat?.id, isMessagesLoading, scrollToBottom]);
 
   // Global event listener for instant scroll on manual send / receive
   useEffect(() => {
     const handleScrollReq = () => {
-      scrollToBottom("auto");
+      scrollToBottom("smooth");
     };
     window.addEventListener("pulse:scroll-to-bottom", handleScrollReq);
     return () => window.removeEventListener("pulse:scroll-to-bottom", handleScrollReq);
   }, [scrollToBottom]);
-
-  const handleTotalListHeightChanged = useCallback(() => {
-    // Rely on Virtuoso followOutput and alignToBottom instead of fighting it
-  }, []);
 
   useEffect(() => {
     if (!selectedChat) return;
@@ -846,66 +868,71 @@ const ChatPane = ({ onBack }) => {
             {searchQuery ? `No messages matching "${searchQuery}"` : "No messages yet. Start the conversation!"}
           </div>
         ) : (
-          <Virtuoso
-            key={selectedChat.id}
-            ref={messagesContainerRef}
-            scrollerRef={(el) => { scrollerElementRef.current = el; }}
-            className="flex-1 w-full h-full overflow-x-hidden custom-scrollbar"
-            data={searchQuery.trim() ? searchMatches : displayedMessages}
-            computeItemKey={(index, item) => item._id || `msg-${index}`}
-            initialTopMostItemIndex={searchQuery.trim() ? Math.max(searchMatches.length - 1, 0) : Math.max(displayedMessages.length - 1, 0)}
-            followOutput={(isAtBottom) => "auto"}
-            alignToBottom={true}
-            defaultItemHeight={60}
-            components={virtuosoComponents}
-            itemContent={(index, message) => {
-              const currentList = searchQuery.trim() ? searchMatches : displayedMessages;
-              const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
-              const sender = message.senderId;
-              const prevMessage = index > 0 ? currentList[index - 1] : null;
-              const prevSenderId = prevMessage ? (prevMessage.senderId?._id || prevMessage.senderId) : null;
-              const currentSenderId = message.senderId?._id || message.senderId;
-              const isSameSenderAsPrev = prevSenderId === currentSenderId;
+          <div
+            ref={scrollerElementRef}
+            onScroll={handleScroll}
+            className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-contain flex flex-col justify-start relative select-text"
+            style={{ overflowAnchor: "auto" }}
+          >
+            <ChatHeader />
+            <div className="flex flex-col min-h-0 w-full pb-3">
+              {(searchQuery.trim() ? searchMatches : displayedMessages).map((message, index, currentList) => {
+                const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
+                const sender = message.senderId;
+                const prevMessage = index > 0 ? currentList[index - 1] : null;
+                const prevSenderId = prevMessage ? (prevMessage.senderId?._id || prevMessage.senderId) : null;
+                const currentSenderId = message.senderId?._id || message.senderId;
+                const isSameSenderAsPrev = prevSenderId === currentSenderId;
 
-              const nextMessage = index < currentList.length - 1 ? currentList[index + 1] : null;
-              const nextSenderId = nextMessage ? (nextMessage.senderId?._id || nextMessage.senderId) : null;
-              const isSameSenderAsNext = nextSenderId === currentSenderId;
+                const nextMessage = index < currentList.length - 1 ? currentList[index + 1] : null;
+                const nextSenderId = nextMessage ? (nextMessage.senderId?._id || nextMessage.senderId) : null;
+                const isSameSenderAsNext = nextSenderId === currentSenderId;
 
-              // Authentic speech bubble curvature & corner tail
-              const bubbleRadius = isMine
-                ? `${isSameSenderAsPrev ? "rounded-tr-[8px]" : "rounded-tr-[20px]"} ${
-                    isSameSenderAsNext ? "rounded-br-[8px]" : "rounded-br-[4px]"
-                  } rounded-tl-[20px] rounded-bl-[20px]`
-                : `${isSameSenderAsPrev ? "rounded-tl-[8px]" : "rounded-tl-[20px]"} ${
-                    isSameSenderAsNext ? "rounded-bl-[8px]" : "rounded-bl-[4px]"
-                  } rounded-tr-[20px] rounded-br-[20px]`;
+                const showDateDivider = !prevMessage || isDifferentDay(prevMessage.createdAt, message.createdAt);
 
-              const reactionGroups = (message.reactions || []).reduce((acc, r) => {
-                acc[r.emoji] = acc[r.emoji] || { emoji: r.emoji, count: 0, users: [], hasReacted: false };
-                acc[r.emoji].count += 1;
-                acc[r.emoji].users.push(r.username || "User");
-                if (r.userId === authUser._id || r.userId?._id === authUser._id) acc[r.emoji].hasReacted = true;
-                return acc;
-              }, {});
+                // Authentic speech bubble curvature & corner tail
+                const bubbleRadius = isMine
+                  ? `${isSameSenderAsPrev ? "rounded-tr-[8px]" : "rounded-tr-[20px]"} ${
+                      isSameSenderAsNext ? "rounded-br-[8px]" : "rounded-br-[4px]"
+                    } rounded-tl-[20px] rounded-bl-[20px]`
+                  : `${isSameSenderAsPrev ? "rounded-tl-[8px]" : "rounded-tl-[20px]"} ${
+                      isSameSenderAsNext ? "rounded-bl-[8px]" : "rounded-bl-[4px]"
+                    } rounded-tr-[20px] rounded-br-[20px]`;
 
-              const readObj = (message.reads || []).find(r => r.userId === selectedChat.id);
-              const isReadByRecipient = selectedChat.type === "user" && (readObj || (message.readBy || []).includes(selectedChat.id));
-              const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat.id);
-              const isDeliveredToRecipient = selectedChat.type === "user" && !!deliveryObj;
-              
-              let statusTitle = `Sent: ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-              if (isDeliveredToRecipient && deliveryObj?.at) {
-                statusTitle += `\nDelivered: ${new Date(deliveryObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-              }
-              if (isReadByRecipient && readObj?.at) {
-                statusTitle += `\nSeen: ${new Date(readObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-              }
-              const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
-              const openUpwards = index >= 2;
-              const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
+                const reactionGroups = (message.reactions || []).reduce((acc, r) => {
+                  acc[r.emoji] = acc[r.emoji] || { emoji: r.emoji, count: 0, users: [], hasReacted: false };
+                  acc[r.emoji].count += 1;
+                  acc[r.emoji].users.push(r.username || "User");
+                  if (r.userId === authUser._id || r.userId?._id === authUser._id) acc[r.emoji].hasReacted = true;
+                  return acc;
+                }, {});
 
-              return (
-                <Fragment key={message._id}>
+                const readObj = (message.reads || []).find(r => r.userId === selectedChat.id);
+                const isReadByRecipient = selectedChat.type === "user" && (readObj || (message.readBy || []).includes(selectedChat.id));
+                const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat.id);
+                const isDeliveredToRecipient = selectedChat.type === "user" && !!deliveryObj;
+                
+                let statusTitle = `Sent: ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                if (isDeliveredToRecipient && deliveryObj?.at) {
+                  statusTitle += `\nDelivered: ${new Date(deliveryObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                }
+                if (isReadByRecipient && readObj?.at) {
+                  statusTitle += `\nSeen: ${new Date(readObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                }
+                const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
+                const openUpwards = index >= 2;
+                const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
+
+                return (
+                  <Fragment key={message._id}>
+                    {/* WhatsApp Dynamic Sticky Date Divider */}
+                    {showDateDivider && (
+                      <div className="my-2.5 flex items-center justify-center select-none sticky top-2 z-20 pointer-events-none">
+                        <span className="px-3 py-0.5 rounded-full bg-black/40 dark:bg-black/60 backdrop-blur-md text-white text-[10px] font-medium tracking-wide shadow-md border border-white/10">
+                          {formatDateDivider(message.createdAt)}
+                        </span>
+                      </div>
+                    )}
                   <div
                     id={`msg-${message._id}`}
                     onMouseEnter={() => setHoveredMessageId(message._id)}
@@ -1305,10 +1332,30 @@ const ChatPane = ({ onBack }) => {
                       )}
                     </div>
                   </div>
-                </Fragment>
-              );
-            }}
-          />
+                  </Fragment>
+                );
+              })}
+            </div>
+            {/* Scroll bottom sentinel */}
+            <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
+          </div>
+        )}
+
+        {/* WhatsApp Floating Scroll-to-Bottom Button */}
+        {showScrollBottomBtn && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom("smooth")}
+            className="absolute right-4 sm:right-6 bottom-4 z-30 flex items-center justify-center w-10 h-10 rounded-full bg-white/95 dark:bg-[#1e1d26]/95 text-zinc-700 dark:text-zinc-200 shadow-2xl border border-black/10 dark:border-white/10 hover:scale-110 active:scale-95 transition-all backdrop-blur-xl animate-fadeIn cursor-pointer"
+            title="Scroll to bottom"
+          >
+            <span className="material-symbols-outlined text-xl">arrow_downward</span>
+            {unreadBelowCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold flex items-center justify-center shadow-md animate-pulse">
+                {unreadBelowCount}
+              </span>
+            )}
+          </button>
         )}
       </div>
 
