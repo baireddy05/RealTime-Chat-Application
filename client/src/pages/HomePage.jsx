@@ -5,11 +5,12 @@ import ProfileModal from "../components/ProfileModal";
 import CallModal from "../components/CallModal";
 import IncomingCallModal from "../components/IncomingCallModal";
 import SetStatusModal from "../components/SetStatusModal";
-import WallpaperModal from "../components/WallpaperModal";
+import ChatThemeModal from "../components/ChatThemeModal";
 import AddFriendModal from "../components/AddFriendModal";
 import StatusModal from "../components/StatusModal";
 import StarredDrawer from "../components/StarredDrawer";
 import CreateGroupModal from "../components/CreateGroupModal";
+import SettingsModal from "../components/SettingsModal";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
@@ -20,7 +21,23 @@ import TypingPulseBackground from "../components/TypingPulseBackground";
 import { useBackHandler, backManager } from "../lib/backNavigation";
 
 const HomePage = () => {
-  const { selectedChat, setSelectedChat, rooms, getRooms, isWallpaperOpen, setIsWallpaperOpen, unreadCounts, isStarredOpen, setIsStarredOpen, subscribeToMessages, networkStatuses } = useChatStore();
+  const {
+    selectedChat,
+    setSelectedChat,
+    rooms,
+    getRooms,
+    isChatThemeOpen,
+    setIsChatThemeOpen,
+    unreadCounts,
+    isStarredOpen,
+    setIsStarredOpen,
+    subscribeToMessages,
+    networkStatuses,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    backgroundAnimationsEnabled,
+    typingShockwavesEnabled,
+  } = useChatStore();
   const { socket, authUser, logout } = useAuthStore();
   const { initSocketListeners } = useCallStore();
   const { friends, incomingRequests, getFriends, getFriendRequests } = useFriendStore();
@@ -55,7 +72,8 @@ const HomePage = () => {
   useBackHandler(isStatusStoriesOpen, () => setIsStatusStoriesOpen(false), "home-modal-stories");
   useBackHandler(isCreateGroupOpen, () => setIsCreateGroupOpen(false), "home-modal-create-group");
   useBackHandler(isStarredOpen, () => setIsStarredOpen(false), "home-modal-starred");
-  useBackHandler(isWallpaperOpen, () => setIsWallpaperOpen(false), "home-modal-wallpaper");
+  useBackHandler(isChatThemeOpen, () => setIsChatThemeOpen(false), "home-modal-chat-theme");
+  useBackHandler(isSettingsOpen, () => setIsSettingsOpen(false), "home-modal-settings");
 
   // Logo screen coordinate tracking for full UI background pulse waves
   const logoRef = useRef(null);
@@ -289,10 +307,10 @@ const HomePage = () => {
       }}
     >
       {/* 1. Dynamic Liquid Glass Pulse Shockwave Background */}
-      <TypingPulseBackground />
+      {backgroundAnimationsEnabled && typingShockwavesEnabled && <TypingPulseBackground />}
 
       {/* Full UI Background Pulse: Originates strictly from Home Logo across the entire window (Desktop only) */}
-      {!selectedChat && (
+      {!selectedChat && backgroundAnimationsEnabled && (
         <div className="hidden md:block fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <div
             className={`absolute pointer-events-none select-none ${
@@ -301,6 +319,7 @@ const HomePage = () => {
             style={{
               left: logoCoords ? `${logoCoords.x}px` : "65vw",
               top: logoCoords ? `${logoCoords.y}px` : "33vh",
+              opacity: logoCoords ? 1 : 0,
             }}
           >
             {/* Ultra-wide Ambient Breathing Glow across the entire UI */}
@@ -327,12 +346,10 @@ const HomePage = () => {
               setSelectedChat(null);
               setActiveNav("all-chats");
             }}
-            className="group relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-tr from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 p-0.5 shadow-md hover:scale-105 active:scale-95 transition-all"
+            className="group relative flex items-center justify-center w-12 h-12 rounded-2xl hover:bg-black/5 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all cursor-pointer"
             type="button"
           >
-            <div className="w-full h-full rounded-[14px] bg-white dark:bg-[#121117] flex items-center justify-center">
-              <img alt="Pulse Logo" className="w-6 h-6 object-contain" src="/logo.svg" />
-            </div>
+            <img alt="Pulse Logo" className="w-9 h-9 object-contain drop-shadow-sm transition-transform group-hover:scale-110" src="/logo.svg" />
             <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               Pulse Home
             </span>
@@ -442,8 +459,21 @@ const HomePage = () => {
           </div>
         </div>
 
-        {/* Bottom Stack: Theme, Profile */}
+        {/* Bottom Stack: Settings, Theme, Profile */}
         <div className="flex flex-col items-center gap-3">
+          {/* Settings Modal Toggle */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="group relative flex items-center justify-center w-9 h-9 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-colors cursor-pointer"
+            title="Settings"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-lg">settings</span>
+            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
+              Settings
+            </span>
+          </button>
+
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
@@ -554,12 +584,12 @@ const HomePage = () => {
             <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center animate-fadeIn">
               {/* Central Glowing Hero Logo Emblem */}
               <div className="relative mb-6 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-3xl bg-black/5 dark:bg-white/20 blur-xl opacity-40 animate-pulse" />
+                <div className="absolute inset-0 rounded-3xl bg-indigo-500/10 dark:bg-indigo-500/20 blur-2xl opacity-60 animate-pulse" />
                 <div
                   ref={logoRef}
-                  className="relative w-20 h-20 rounded-3xl bg-white/80 dark:bg-white/10 backdrop-blur-2xl border border-black/10 dark:border-white/20 shadow-xl flex items-center justify-center z-10 hover:scale-105 transition-transform"
+                  className="relative w-24 h-24 rounded-[2rem] bg-black/[0.03] dark:bg-white/[0.06] backdrop-blur-2xl shadow-xl flex items-center justify-center z-10 hover:scale-105 transition-transform"
                 >
-                  <img src="/logo.svg" alt="Pulse" className="w-12 h-12 object-contain" />
+                  <img src="/logo.svg" alt="Pulse" className="w-16 h-16 object-contain drop-shadow-md" />
                 </div>
               </div>
 
@@ -641,7 +671,7 @@ const HomePage = () => {
       {/* Modals & Overlays */}
       {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
       {isSetStatusOpen && <SetStatusModal onClose={() => setIsSetStatusOpen(false)} />}
-      {isWallpaperOpen && <WallpaperModal onClose={() => setIsWallpaperOpen(false)} />}
+      {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
       {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
       {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
       {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
@@ -653,6 +683,7 @@ const HomePage = () => {
           }}
         />
       )}
+      {isSettingsOpen && <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />}
 
       {/* WebRTC Video & Audio Call Overlays */}
       <CallModal />

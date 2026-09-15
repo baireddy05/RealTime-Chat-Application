@@ -35,38 +35,92 @@ export const useChatStore = create((set, get) => ({
   networkStatuses: [],
   myStatuses: [],
   isScheduledOpen: false,
-  isWallpaperOpen: false,
-  chatWallpapers: (() => {
+  isChatThemeOpen: false,
+  isSettingsOpen: false,
+  backgroundAnimationsEnabled: (() => {
     try {
-      return JSON.parse(localStorage.getItem("pulse-chat-wallpapers") || "{}");
+      const v = localStorage.getItem("pulse_bg_animations_enabled");
+      return v !== null ? JSON.parse(v) : true;
+    } catch {
+      return true;
+    }
+  })(),
+  typingShockwavesEnabled: (() => {
+    try {
+      const v = localStorage.getItem("pulse_typing_shockwaves_enabled");
+      return v !== null ? JSON.parse(v) : true;
+    } catch {
+      return true;
+    }
+  })(),
+  chatThemes: (() => {
+    try {
+      return JSON.parse(localStorage.getItem("pulse-chat-themes") || "{}");
     } catch {
       return {};
     }
   })(),
-  globalWallpaper: localStorage.getItem("pulse-global-wallpaper") || "default",
+  globalChatTheme: (() => {
+    try {
+      const saved = localStorage.getItem("pulse-global-chat-theme");
+      if (saved) {
+        return saved.startsWith("{") ? JSON.parse(saved) : saved;
+      }
+    } catch {}
+    return "default";
+  })(),
 
   setDisappearingTimer: (seconds) => set({ disappearingTimer: seconds }),
   setIsScheduledOpen: (val) => set({ isScheduledOpen: val }),
-  setIsWallpaperOpen: (val) => set({ isWallpaperOpen: val }),
-
-  setChatWallpaper: (chatId, wallpaperId) => {
-    const { chatWallpapers } = get();
-    const updated = { ...chatWallpapers, [chatId]: wallpaperId };
+  setIsChatThemeOpen: (val) => set({ isChatThemeOpen: val }),
+  setIsSettingsOpen: (val) => set({ isSettingsOpen: val }),
+  setBackgroundAnimationsEnabled: (val) => {
     try {
-      localStorage.setItem("pulse-chat-wallpapers", JSON.stringify(updated));
+      localStorage.setItem("pulse_bg_animations_enabled", JSON.stringify(val));
     } catch (e) {
       console.error(e);
     }
-    set({ chatWallpapers: updated });
+    set({ backgroundAnimationsEnabled: val });
+  },
+  setTypingShockwavesEnabled: (val) => {
+    try {
+      localStorage.setItem("pulse_typing_shockwaves_enabled", JSON.stringify(val));
+    } catch (e) {
+      console.error(e);
+    }
+    set({ typingShockwavesEnabled: val });
   },
 
-  setGlobalWallpaper: (wallpaperId) => {
+  setChatTheme: (chatId, themeConfigOrId) => {
+    const { chatThemes } = get();
+    const updated = { ...chatThemes, [chatId]: themeConfigOrId };
     try {
-      localStorage.setItem("pulse-global-wallpaper", wallpaperId);
+      localStorage.setItem("pulse-chat-themes", JSON.stringify(updated));
     } catch (e) {
       console.error(e);
     }
-    set({ globalWallpaper: wallpaperId });
+    set({ chatThemes: updated });
+  },
+
+  setGlobalChatTheme: (themeConfigOrId) => {
+    try {
+      const serialized =
+        typeof themeConfigOrId === "object"
+          ? JSON.stringify(themeConfigOrId)
+          : themeConfigOrId;
+      localStorage.setItem("pulse-global-chat-theme", serialized);
+    } catch (e) {
+      console.error(e);
+    }
+    set({ globalChatTheme: themeConfigOrId });
+  },
+
+  getEffectiveChatTheme: (chatId) => {
+    const { chatThemes, globalChatTheme } = get();
+    if (chatId && chatThemes[chatId]) {
+      return chatThemes[chatId];
+    }
+    return globalChatTheme || "default";
   },
 
   // Feature states

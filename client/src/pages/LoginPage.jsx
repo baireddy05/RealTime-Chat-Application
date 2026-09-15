@@ -68,16 +68,31 @@ const LoginPage = () => {
 
   return (
     <div className="flex h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-hidden select-none font-sans relative">
-      {/* ── Theme Toggle (Top Right for Mobile & Desktop) ── */}
-      <div className="absolute top-5 right-6 z-50">
-        <button
-          onClick={toggleTheme}
-          className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
-          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          type="button"
-        >
-          {theme === "dark" ? <Sun size={19} className="text-amber-400" /> : <Moon size={19} className="text-accent-primary" />}
-        </button>
+      {/* ── Top Header Navigation Bar (Theme Toggle & Back on Mobile) ── */}
+      <div className="absolute top-4 left-4 right-4 sm:top-5 sm:left-6 sm:right-6 flex items-center justify-between z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          {mobileShowForm && (
+            <button
+              onClick={() => setMobileShowForm(false)}
+              type="button"
+              className="lg:hidden p-2.5 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <ArrowLeft size={16} />
+              <span>Welcome</span>
+            </button>
+          )}
+        </div>
+
+        <div className="pointer-events-auto">
+          <button
+            onClick={toggleTheme}
+            className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            type="button"
+          >
+            {theme === "dark" ? <Sun size={19} className="text-amber-400" /> : <Moon size={19} className="text-accent-primary" />}
+          </button>
+        </div>
       </div>
 
       {/* ── MOBILE WELCOME SCREEN (Visible on mobile when not showing form) ── */}
@@ -112,12 +127,12 @@ const LoginPage = () => {
         <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-6 relative z-10">
           {/* Glowing Liquid Glass Logo Badge */}
           <div className="relative group mb-6">
-            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[2.2rem] blur-2xl opacity-90 animate-pulse" />
-            <div className="relative w-24 h-24 rounded-[2.2rem] bg-white/20 dark:bg-white/[0.08] border border-white/40 dark:border-white/20 shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden">
+            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[2.5rem] blur-2xl opacity-90 animate-pulse" />
+            <div className="relative w-28 h-28 rounded-[2.5rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden">
               <img
                 src="/logo.svg"
                 alt="Pulse Logo"
-                className="w-14 h-14 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)]"
+                className="w-18 h-18 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)]"
               />
             </div>
           </div>
@@ -254,12 +269,12 @@ const LoginPage = () => {
           }}
         >
           <div className="relative group mb-8">
-            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[2.5rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
-            <div className="relative w-28 h-28 rounded-[2.5rem] bg-white/20 dark:bg-white/[0.08] border border-white/40 dark:border-white/20 shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
+            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
+            <div className="relative w-32 h-32 rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
               <img
                 src="/logo.svg"
                 alt="Pulse Logo"
-                className="w-16 h-16 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
+                className="w-20 h-20 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
@@ -308,7 +323,7 @@ const LoginPage = () => {
           <div className="w-full max-w-[400px] mx-auto animate-slide-up">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-8 lg:hidden justify-center">
-              <img src="/logo.svg" alt="Pulse Logo" className="w-10 h-10 object-contain drop-shadow" />
+              <img src="/logo.svg" alt="Pulse Logo" className="w-12 h-12 object-contain drop-shadow" />
               <span className="text-2xl font-extrabold tracking-tight text-theme-main">Pulse</span>
             </div>
 

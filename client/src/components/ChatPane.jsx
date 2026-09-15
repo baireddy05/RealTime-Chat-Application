@@ -22,9 +22,9 @@ import {
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import ScheduledMessagesModal from "./ScheduledMessagesModal";
-import WallpaperModal from "./WallpaperModal";
+import ChatThemeModal from "./ChatThemeModal";
 import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
-import { WALLPAPER_PRESETS } from "../lib/wallpapers";
+import { resolveThemeStyles, WHATSAPP_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
 import { useBackHandler } from "../lib/backNavigation";
@@ -102,7 +102,7 @@ const ChatPane = ({ onBack }) => {
     togglePinMessage, toggleStarMessage, setReplyingTo, setEditingMessage,
     forwardingMessage, setForwardingMessage, isStarredOpen, setIsStarredOpen,
     isGroupInfoOpen, setIsGroupInfoOpen, typingUsers, soundMuted, toggleSound,
-    chatWallpapers, globalWallpaper, isWallpaperOpen, setIsWallpaperOpen,
+    isChatThemeOpen, setIsChatThemeOpen, getEffectiveChatTheme,
     isScheduledOpen, setIsScheduledOpen,
     scheduledMessages, getScheduledMessages,
     openThread, closeThread, isThreadOpen,
@@ -466,22 +466,9 @@ const ChatPane = ({ onBack }) => {
 
 
 
-  const currentChatWallpaper =
-    (selectedChat?.id && chatWallpapers[selectedChat.id]) || globalWallpaper || "default";
-  const wallpaperPreset = WALLPAPER_PRESETS.find((p) => p.id === currentChatWallpaper);
-  const wallpaperStyle = currentChatWallpaper.startsWith("http")
-    ? {
-        backgroundImage: `url(${currentChatWallpaper})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        opacity: 0.25,
-      }
-    : wallpaperPreset && wallpaperPreset.id !== "default"
-    ? {
-        background: wallpaperPreset.previewGradient,
-        opacity: 0.18,
-      }
-    : null;
+  const effectiveTheme = getEffectiveChatTheme(selectedChat?.id);
+  const isDarkTheme = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") !== "light";
+  const themeStyles = resolveThemeStyles(effectiveTheme, isDarkTheme);
 
   return (
     <div 
@@ -489,13 +476,41 @@ const ChatPane = ({ onBack }) => {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      style={{
+        "--bubble-outgoing-gradient": themeStyles.bubbleOutgoingGradient,
+        "--bubble-outgoing-text": themeStyles.bubbleOutgoingText,
+        "--bubble-incoming-surface": themeStyles.bubbleIncomingSurface,
+        "--bubble-incoming-text": themeStyles.bubbleIncomingText,
+      }}
       className="h-full w-full flex flex-col overflow-hidden relative text-on-surface bg-transparent"
     >
-      {/* Dynamic Wallpaper Backdrop Layer */}
-      {wallpaperStyle && (
+      {/* 1. Dynamic Wallpaper Backdrop Layer (Custom Image or Gradient) */}
+      {themeStyles.customWallpaperUrl ? (
         <div
-          className="absolute inset-0 z-0 pointer-events-none transition-all duration-700"
-          style={wallpaperStyle}
+          className="absolute inset-0 z-0 bg-cover bg-center pointer-events-none transition-all duration-500"
+          style={{
+            backgroundImage: `url(${themeStyles.customWallpaperUrl})`,
+            opacity: themeStyles.wallpaperOpacity ?? 0.3,
+          }}
+        />
+      ) : themeStyles.wallpaperGradient && themeStyles.wallpaperGradient !== "transparent" ? (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none transition-all duration-500"
+          style={{
+            background: themeStyles.wallpaperGradient,
+            opacity: 0.85,
+          }}
+        />
+      ) : null}
+
+      {/* 2. Optional WhatsApp SVG Doodle Overlay */}
+      {themeStyles.hasDoodles && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none opacity-20 dark:opacity-15 transition-opacity"
+          style={{
+            backgroundImage: `url("${WHATSAPP_DOODLE_SVG}")`,
+            backgroundSize: "280px 280px",
+          }}
         />
       )}
       {/* Liquid Glass Drag & Drop Overlay */}
@@ -750,15 +765,15 @@ const ChatPane = ({ onBack }) => {
                     </span>
                   </button>
 
-                  {/* Chat Wallpaper Option */}
+                  {/* Chat Theme Option */}
                   <button
                     onClick={() => {
-                      setIsWallpaperOpen(true);
+                      setIsChatThemeOpen(true);
                       setShowChatOptions(false);
                     }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors"
+                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors cursor-pointer"
                   >
-                    <Palette size={14} className="text-accent-primary" /> Chat Wallpaper
+                    <Palette size={14} className="text-accent-primary" /> Chat Theme
                   </button>
 
                   {/* Scheduled Messages Option */}
@@ -871,11 +886,12 @@ const ChatPane = ({ onBack }) => {
           <div
             ref={scrollerElementRef}
             onScroll={handleScroll}
-            className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-contain flex flex-col justify-start relative select-text"
+            className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-contain flex flex-col relative select-text"
             style={{ overflowAnchor: "auto" }}
           >
-            <ChatHeader />
-            <div className="flex flex-col min-h-0 w-full pb-3">
+            <div className="mt-auto flex flex-col w-full">
+              <ChatHeader />
+              <div className="flex flex-col min-h-0 w-full pb-3">
               {(searchQuery.trim() ? searchMatches : displayedMessages).map((message, index, currentList) => {
                 const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
                 const sender = message.senderId;
@@ -1336,8 +1352,9 @@ const ChatPane = ({ onBack }) => {
                 );
               })}
             </div>
-            {/* Scroll bottom sentinel */}
-            <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
+              {/* Scroll bottom sentinel */}
+              <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
+            </div>
           </div>
         )}
 
@@ -1408,7 +1425,7 @@ const ChatPane = ({ onBack }) => {
         <GroupInfoModal group={selectedChat} onClose={() => setIsGroupInfoOpen(false)} onSelectUser={(userChat) => setSelectedChat(userChat)} />
       )}
       {isScheduledOpen && <ScheduledMessagesModal isOpen={isScheduledOpen} onClose={() => setIsScheduledOpen(false)} />}
-      {isWallpaperOpen && <WallpaperModal isOpen={isWallpaperOpen} onClose={() => setIsWallpaperOpen(false)} />}
+      {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
       {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
       {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
     </div>

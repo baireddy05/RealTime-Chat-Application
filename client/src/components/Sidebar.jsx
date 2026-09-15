@@ -60,6 +60,7 @@ const Sidebar = ({
     setSelectedChat,
     unreadCounts,
     lastMessages,
+    setIsSettingsOpen,
   } = useChatStore();
 
   const { authUser, onlineUsers, socket } = useAuthStore();
@@ -564,6 +565,17 @@ const Sidebar = ({
                       <span>Switch Theme</span>
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                      setShowOptionsDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">settings</span>
+                    <span>Settings & Animations</span>
+                  </button>
+
                   {logout && (
                     <>
                       <div className="my-1 border-t border-black/10 dark:border-white/10" />

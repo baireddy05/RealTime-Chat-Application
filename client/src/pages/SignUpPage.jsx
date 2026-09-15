@@ -204,15 +204,15 @@ const SignUpPage = () => {
         >
           {/* Logo Badge with Glowing Liquid Glass */}
           <div className="relative group mb-8">
-            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[2.5rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
+            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
             
-            <div className="relative w-28 h-28 rounded-[2.5rem] bg-white/20 dark:bg-white/[0.08] border border-white/40 dark:border-white/20 shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
+            <div className="relative w-32 h-32 rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
               <div className="absolute -top-10 -left-10 w-24 h-24 bg-white/20 rounded-full blur-xl pointer-events-none" />
               
               <img
                 src="/logo.svg"
                 alt="Pulse Logo"
-                className="w-16 h-16 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
+                className="w-20 h-20 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
@@ -268,7 +268,7 @@ const SignUpPage = () => {
             
             {/* Mobile Header with Logo */}
             <div className="flex items-center gap-3 mb-8 lg:hidden justify-center">
-              <img src="/logo.svg" alt="Pulse Logo" className="w-10 h-10 object-contain drop-shadow" />
+              <img src="/logo.svg" alt="Pulse Logo" className="w-12 h-12 object-contain drop-shadow" />
               <span className="text-2xl font-extrabold tracking-tight text-theme-main">Pulse</span>
             </div>
 
