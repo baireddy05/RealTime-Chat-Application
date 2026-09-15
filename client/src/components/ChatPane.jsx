@@ -149,6 +149,13 @@ const ChatPane = ({ onBack }) => {
   const messagesRef = useRef(messages);
 
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
+  const selectedUserId = (selectedChat?.id || selectedChat?._id)?.toString();
+  const isUserOnline = selectedChat?.type === "user" && onlineUsersSet.has(selectedUserId);
+  const activeTypers = useMemo(() => {
+    if (!selectedChat?.id) return [];
+    const list = typingUsers[selectedChat.id] || [];
+    return list.filter((u) => u && u !== authUser?.username);
+  }, [typingUsers, selectedChat?.id, authUser?.username]);
 
   const searchMatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -467,7 +474,6 @@ const ChatPane = ({ onBack }) => {
     URL.revokeObjectURL(url);
   };
 
-  const activeTypers = typingUsers[selectedChat.id] || [];
   const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
   const currentPinned = pinnedMessages.length > 0 ? pinnedMessages[pinnedIndex % pinnedMessages.length] : null;
 
@@ -481,8 +487,6 @@ const ChatPane = ({ onBack }) => {
   };
 
   const handleDelete = (messageId) => setMessageToDelete(messageId);
-  const selectedUserId = (selectedChat?.id || selectedChat?._id)?.toString();
-  const isUserOnline = selectedChat?.type === "user" && onlineUsersSet.has(selectedUserId);
 
 
 
