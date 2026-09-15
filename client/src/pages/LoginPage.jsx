@@ -105,24 +105,6 @@ const LoginPage = () => {
         <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full blur-spot-1 pointer-events-none opacity-60" />
         <div className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full blur-spot-2 pointer-events-none opacity-60" />
 
-        {/* Top Badges */}
-        <div className="w-full flex items-center justify-between pt-2 relative z-10 pr-14">
-          <div className="px-3.5 py-1.5 rounded-2xl bg-white/10 dark:bg-white/[0.08] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-[11px] font-semibold tracking-wide text-zinc-900 dark:text-white/90">
-              Live Mesh Active
-            </span>
-          </div>
-
-          <div className="px-3 py-1.5 rounded-2xl bg-white/10 dark:bg-white/[0.08] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200">
-            <Zap className="w-3 h-3 text-amber-400" />
-            <span className="text-[11px] font-mono font-medium">&lt; 15ms latency</span>
-          </div>
-        </div>
-
         {/* Center Hero Card */}
         <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-6 relative z-10">
           {/* Glowing Liquid Glass Logo Badge */}
@@ -217,48 +199,6 @@ const LoginPage = () => {
             transform: `translate3d(${mouseState.nx * 50}px, ${mouseState.ny * 50}px, 0)`,
           }}
         />
-
-        {/* Floating Badges */}
-        <div
-          className="absolute top-16 left-16 z-20 transition-transform duration-500 ease-out pointer-events-none"
-          style={{
-            transform: `translate3d(${mouseState.nx * -28}px, ${mouseState.ny * -28}px, 20px)`,
-          }}
-        >
-          <div className="px-4 py-2 rounded-2xl bg-white/10 dark:bg-white/[0.06] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-2.5">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs font-semibold tracking-wide text-zinc-900 dark:text-white/90">
-              Live Mesh Active
-            </span>
-          </div>
-        </div>
-
-        <div
-          className="absolute top-28 right-20 z-20 transition-transform duration-500 ease-out pointer-events-none"
-          style={{
-            transform: `translate3d(${mouseState.nx * 32}px, ${mouseState.ny * 32}px, 30px)`,
-          }}
-        >
-          <div className="px-3.5 py-2 rounded-2xl bg-white/10 dark:bg-white/[0.06] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-mono font-medium">⚡ &lt; 15ms latency</span>
-          </div>
-        </div>
-
-        <div
-          className="absolute bottom-20 left-24 z-20 transition-transform duration-500 ease-out pointer-events-none"
-          style={{
-            transform: `translate3d(${mouseState.nx * -22}px, ${mouseState.ny * -22}px, 15px)`,
-          }}
-        >
-          <div className="px-3.5 py-2 rounded-2xl bg-white/10 dark:bg-white/[0.06] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
-            <Shield className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-xs font-medium">E2EE Protected</span>
-          </div>
-        </div>
 
         {/* Central 3D Card */}
         <div
