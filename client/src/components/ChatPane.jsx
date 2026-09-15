@@ -58,6 +58,15 @@ const extractFirstUrl = (text) => {
   return match ? match[0] : null;
 };
 
+const isOnlyEmojis = (str) => {
+  if (!str) return false;
+  const noSpace = str.replace(/[\s\n]/g, "");
+  if (!noSpace) return false;
+  // Regex that matches emoji characters
+  const emojiRegex = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)+$/u;
+  return emojiRegex.test(noSpace);
+};
+
 
 const ChatHeader = memo(() => (
   <div className="pt-6 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
@@ -867,6 +876,7 @@ const ChatPane = ({ onBack }) => {
               const isReadByRecipient = selectedChat.type === "user" && (message.readBy || []).includes(selectedChat.id);
               const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
               const openUpwards = index >= 2;
+              const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
 
               return (
                 <Fragment key={message._id}>
@@ -898,25 +908,27 @@ const ChatPane = ({ onBack }) => {
                         <div 
                           style={
                             !message.isDeleted
-                              ? isMine
-                                ? {
-                                    background: 'var(--bubble-outgoing-gradient)',
-                                    color: 'var(--bubble-outgoing-text)',
-                                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 rgba(255, 255, 255, 0.4)',
-                                  }
-                                : {
-                                    background: 'var(--bubble-incoming-surface)',
-                                    color: 'var(--bubble-incoming-text)',
-                                    backdropFilter: 'blur(24px)',
-                                    border: '1px solid var(--bubble-incoming-border)',
-                                    boxShadow: 'inset 0 1px 1px 0 rgba(255, 255, 255, 0.12)',
-                                  }
+                              ? isJustEmoji
+                                ? { background: 'transparent', color: isMine ? 'var(--bubble-outgoing-text)' : 'var(--bubble-incoming-text)', boxShadow: 'none', border: 'none' }
+                                : isMine
+                                  ? {
+                                      background: 'var(--bubble-outgoing-gradient)',
+                                      color: 'var(--bubble-outgoing-text)',
+                                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 rgba(255, 255, 255, 0.4)',
+                                    }
+                                  : {
+                                      background: 'var(--bubble-incoming-surface)',
+                                      color: 'var(--bubble-incoming-text)',
+                                      backdropFilter: 'blur(24px)',
+                                      border: '1px solid var(--bubble-incoming-border)',
+                                      boxShadow: 'inset 0 1px 1px 0 rgba(255, 255, 255, 0.12)',
+                                    }
                               : {}
                           }
-                          className={`py-2 px-3.5 ${bubbleRadius} relative transition-all w-fit max-w-full ${
+                          className={`${isJustEmoji ? "py-1 px-1" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full ${
                             message.isDeleted
                               ? "bg-surface-container/40 text-outline italic"
-                              : isMine
+                              : isMine && !isJustEmoji
                               ? "border border-black/10 dark:border-white/40 shadow-sm"
                               : ""
                           } ${
@@ -989,17 +1001,17 @@ const ChatPane = ({ onBack }) => {
                               )}
                               {message.text && (
                                 <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
-                                  <div className="text-[13.5px] leading-relaxed break-words font-normal">
+                                  <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[13.5px] leading-relaxed break-words font-normal"}`}>
                                     <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
                                   </div>
                                   <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">
                                     {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}
-                                    <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                    <span className={isJustEmoji ? "text-theme-muted drop-shadow-sm font-semibold" : ""}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                     {isMine && !message.isDeleted && (
                                       message.isOptimistic ? (
-                                        <Clock size={11} className="opacity-70 animate-pulse" />
+                                        <Clock size={11} className={`opacity-70 animate-pulse ${isJustEmoji ? "text-theme-muted drop-shadow-sm" : ""}`} />
                                       ) : (
-                                        <span className={`material-symbols-outlined text-sm ${isReadByRecipient ? "font-bold opacity-100" : "font-semibold opacity-70"}`}>
+                                        <span className={`material-symbols-outlined text-sm ${isJustEmoji ? "text-theme-muted drop-shadow-sm " : ""}${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold opacity-70"}`}>
                                           done_all
                                         </span>
                                       )
@@ -1230,10 +1242,10 @@ const ChatPane = ({ onBack }) => {
                         <div className="flex flex-wrap gap-1 mt-1">
                           {Object.values(reactionGroups).map((grp) => (
                             <button key={grp.emoji} onClick={() => reactToMessage(message._id, grp.emoji)} title={`Reacted by: ${grp.users.join(", ")}`}
-                              className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-all ${
+                              className={`flex items-center gap-1.5 text-[14px] px-2.5 py-1 rounded-full border transition-all shadow-sm ${
                                 grp.hasReacted ? "bg-accent-primary/20 border-accent-primary/40 text-accent-primary font-medium" : "bg-[var(--glass-surface)] border-[var(--glass-border)] text-theme-muted hover:bg-[var(--glass-hover)] hover:text-theme-main"
                               }`}>
-                              <span className="emoji-text">{grp.emoji}</span><span className="text-[10px]">{grp.count}</span>
+                              <span className="emoji-text">{grp.emoji}</span><span className="text-[11px] font-semibold opacity-80">{grp.count}</span>
                             </button>
                           ))}
                         </div>
