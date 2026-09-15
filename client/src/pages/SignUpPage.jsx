@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useBackHandler } from "../lib/backNavigation";
 import { Loader, Lock, Eye, EyeOff, AlertCircle, Mail, User, Sun, Moon, Zap, Shield, Activity, ArrowLeft } from "lucide-react";
 
 const SignUpPage = () => {
@@ -10,6 +11,10 @@ const SignUpPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const { signup, isSigningUp } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
+  const navigate = useNavigate();
+
+  // Mobile back button: SignUp → Welcome Screen
+  useBackHandler(true, () => navigate("/login", { state: { showForm: false } }), "signup-page-back");
 
   // Interactive mouse physics for the Pulse visual panel
   const [mouseState, setMouseState] = useState({
@@ -200,7 +205,7 @@ const SignUpPage = () => {
       </div>
 
       {/* ── Right Panel: Interactive Form ── */}
-      <div className="w-full lg:w-[45%] h-full flex flex-col relative glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] z-20">
+      <div className="fixed inset-0 lg:relative lg:inset-auto lg:w-[45%] h-full flex flex-col z-20 glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] bg-[rgb(var(--bg-app-rgb))]">
         
         {/* Top Header - Theme Toggle */}
         <div className="absolute top-6 right-8 z-50">
@@ -218,6 +223,7 @@ const SignUpPage = () => {
         <div className="lg:hidden absolute top-5 left-6 z-50">
           <Link
             to="/login"
+            state={{ showForm: false }}
             className="p-2.5 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold"
           >
             <ArrowLeft size={16} />
@@ -329,6 +335,7 @@ const SignUpPage = () => {
               Already have an account?{" "}
               <Link
                 to="/login"
+                state={{ showForm: true }}
                 className="text-zinc-900 dark:text-white font-bold hover:underline ml-1 transition-all"
               >
                 Sign In

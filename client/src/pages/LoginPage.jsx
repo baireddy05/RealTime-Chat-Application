@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useBackHandler } from "../lib/backNavigation";
 import {
   Loader,
   Lock,
@@ -20,13 +21,25 @@ import {
 } from "lucide-react";
 
 const LoginPage = () => {
+  const location = useLocation();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [mobileShowForm, setMobileShowForm] = useState(false);
+  const [mobileShowForm, setMobileShowForm] = useState(
+    Boolean(location.state?.showForm)
+  );
   const { login, isLoggingIn } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.showForm !== undefined) {
+      setMobileShowForm(Boolean(location.state.showForm));
+    }
+  }, [location.state]);
+
+  // Mobile back button: form → welcome screen
+  useBackHandler(mobileShowForm, () => setMobileShowForm(false), "login-form-back");
 
   // Interactive mouse physics for the Pulse visual panel
   const [mouseState, setMouseState] = useState({
@@ -260,17 +273,7 @@ const LoginPage = () => {
             : "hidden lg:flex w-full z-20"
         }`}
       >
-        {/* Mobile Back to Welcome button */}
-        <div className="lg:hidden absolute top-5 left-6 z-50">
-          <button
-            onClick={() => setMobileShowForm(false)}
-            type="button"
-            className="p-2.5 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold"
-          >
-            <ArrowLeft size={16} />
-            <span>Welcome</span>
-          </button>
-        </div>
+
 
         {/* Scrollable Form Container */}
         <div className="flex-1 overflow-y-auto flex flex-col justify-center px-5 sm:px-10 md:px-14 lg:px-20 py-12">

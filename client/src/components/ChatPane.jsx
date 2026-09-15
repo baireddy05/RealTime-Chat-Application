@@ -296,11 +296,18 @@ const ChatPane = ({ onBack }) => {
       alert("1-on-1 audio and video calls are supported for direct contacts. Please select a user to call.");
       return;
     }
+    const peerId = selectedChat.id || selectedChat._id;
+    if (!peerId) {
+      alert("Unable to find recipient user details.");
+      return;
+    }
     startCall({
       targetUser: {
-        _id: selectedChat.id,
-        name: selectedChat.name,
-        username: selectedChat.name,
+        _id: peerId,
+        id: peerId,
+        name: selectedChat.name || selectedChat.username,
+        username: selectedChat.username || selectedChat.name,
+        profilePic: selectedChat.avatar || selectedChat.profilePic || "",
         authName: authUser?.username,
       },
       callType: type,

@@ -47,29 +47,39 @@ const CallModal = () => {
     }, 1500);
   }, []);
 
+  const isConnected = callState === "connected";
+  const hasRemoteVideo = isConnected && callType === "video" && remoteStream && remoteStream.getVideoTracks().length > 0;
+
   // Bind local stream or screen share stream
   useEffect(() => {
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = isScreenSharing && screenStream ? screenStream : localStream;
+      const streamToBind = isScreenSharing && screenStream ? screenStream : localStream;
+      if (localVideoRef.current.srcObject !== streamToBind) {
+        localVideoRef.current.srcObject = streamToBind;
+      }
+      localVideoRef.current.play?.().catch(() => {});
     }
   }, [localStream, screenStream, isScreenSharing, callState]);
 
-  // Bind remote stream
+  // Bind remote stream (both audio and video elements)
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+      if (remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+      remoteVideoRef.current.play?.().catch(() => {});
     }
     if (remoteAudioRef.current && remoteStream) {
-      remoteAudioRef.current.srcObject = remoteStream;
+      if (remoteAudioRef.current.srcObject !== remoteStream) {
+        remoteAudioRef.current.srcObject = remoteStream;
+      }
+      remoteAudioRef.current.play?.().catch(() => {});
     }
-  }, [remoteStream, callState]);
+  }, [remoteStream, callState, isConnected, hasRemoteVideo]);
 
   if (callState !== "calling" && callState !== "connected") {
     return null;
   }
-
-  const isConnected = callState === "connected";
-  const hasRemoteVideo = isConnected && callType === "video" && remoteStream && remoteStream.getVideoTracks().length > 0;
 
   return (
     <div className="fixed inset-0 z-50 apple-ambient-bg flex flex-col items-center justify-between p-4 md:p-8 animate-fadeIn text-theme-main select-none backdrop-blur-3xl overflow-hidden">

@@ -8,6 +8,9 @@ const ICE_SERVERS = {
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
   ],
 };
 
@@ -49,6 +52,7 @@ export const useCallStore = create((set, get) => ({
         return;
       }
 
+      pendingIceCandidates = [];
       soundManager.playIncomingRing();
       notificationManager.sendNotification({
         title: `Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
@@ -74,14 +78,20 @@ export const useCallStore = create((set, get) => ({
       const pc = get().peerConnection;
       if (pc && signal) {
         try {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal));
-          // Process any queued ICE candidates
-          while (pendingIceCandidates.length > 0) {
-            const candidate = pendingIceCandidates.shift();
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          if (pc.signalingState !== "closed") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal));
+            // Process any queued ICE candidates
+            while (pendingIceCandidates.length > 0) {
+              const candidate = pendingIceCandidates.shift();
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+              } catch (e) {
+                console.warn("[PulseCall] Error adding queued ICE candidate:", e);
+              }
+            }
           }
         } catch (err) {
-          console.error("Error setting remote description on caller:", err);
+          console.error("[PulseCall] Error setting remote description on caller:", err);
         }
       }
 
@@ -96,7 +106,7 @@ export const useCallStore = create((set, get) => ({
     socket.on("callRejected", () => {
       soundManager.stopRinging();
       soundManager.playCallEndSound();
-      get().cleanupCall("Call declined");
+      get().cleanupCall();
     });
 
     socket.on("callEnded", () => {
@@ -108,19 +118,20 @@ export const useCallStore = create((set, get) => ({
     socket.on("callUnavailable", ({ message }) => {
       soundManager.stopRinging();
       soundManager.playCallEndSound();
-      alert(message || "User is unavailable");
+      alert(message || "User is currently offline or unavailable.");
       get().cleanupCall();
     });
 
     socket.on("iceCandidate", async ({ candidate }) => {
+      if (!candidate) return;
       const pc = get().peerConnection;
-      if (pc && pc.remoteDescription) {
+      if (pc && pc.remoteDescription && pc.remoteDescription.type && pc.signalingState !== "closed") {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (err) {
-          console.error("Error adding ICE candidate:", err);
+          console.warn("[PulseCall] Error adding ICE candidate:", err);
         }
-      } else if (candidate) {
+      } else {
         pendingIceCandidates.push(candidate);
       }
     });
@@ -138,10 +149,10 @@ export const useCallStore = create((set, get) => ({
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+        video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
       });
     } catch (err) {
-      console.warn("Could not obtain camera, trying audio only:", err);
+      console.warn("[PulseCall] Could not obtain video stream, falling back to audio:", err);
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         callType = "audio";
@@ -157,12 +168,21 @@ export const useCallStore = create((set, get) => ({
     // Add local tracks to peer connection
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-    // Handle remote tracks
+    // Handle remote tracks with React state reactivity
     const remoteStream = new MediaStream();
     pc.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach((track) => {
+          if (!remoteStream.getTracks().some((t) => t.id === track.id)) {
+            remoteStream.addTrack(track);
+          }
+        });
+      } else if (event.track) {
+        if (!remoteStream.getTracks().some((t) => t.id === event.track.id)) {
+          remoteStream.addTrack(event.track);
+        }
+      }
+      set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
     };
 
     // Handle ICE candidates
@@ -209,7 +229,7 @@ export const useCallStore = create((set, get) => ({
         },
       });
     } catch (error) {
-      console.error("Error creating WebRTC offer:", error);
+      console.error("[PulseCall] Error creating WebRTC offer:", error);
       get().cleanupCall();
     }
   },
@@ -224,10 +244,10 @@ export const useCallStore = create((set, get) => ({
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+        video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
       });
     } catch (err) {
-      console.warn("Could not obtain camera on answer, falling back to audio:", err);
+      console.warn("[PulseCall] Could not obtain camera on answer, falling back to audio:", err);
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       } catch {
@@ -242,12 +262,21 @@ export const useCallStore = create((set, get) => ({
     // Add local tracks
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-    // Handle remote tracks
+    // Handle remote tracks with React state reactivity
     const remoteStream = new MediaStream();
     pc.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach((track) => {
+          if (!remoteStream.getTracks().some((t) => t.id === track.id)) {
+            remoteStream.addTrack(track);
+          }
+        });
+      } else if (event.track) {
+        if (!remoteStream.getTracks().some((t) => t.id === event.track.id)) {
+          remoteStream.addTrack(event.track);
+        }
+      }
+      set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
     };
 
     pc.onicecandidate = (event) => {
@@ -265,7 +294,11 @@ export const useCallStore = create((set, get) => ({
       // Process any early buffered ICE candidates
       while (pendingIceCandidates.length > 0) {
         const candidate = pendingIceCandidates.shift();
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn("[PulseCall] Error adding buffered candidate on callee:", e);
+        }
       }
 
       const answer = await pc.createAnswer();
@@ -291,7 +324,7 @@ export const useCallStore = create((set, get) => ({
         isVideoOff: callType !== "video",
       });
     } catch (err) {
-      console.error("Error answering WebRTC call:", err);
+      console.error("[PulseCall] Error answering WebRTC call:", err);
       get().cleanupCall();
     }
   },

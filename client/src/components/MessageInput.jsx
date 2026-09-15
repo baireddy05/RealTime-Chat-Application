@@ -560,7 +560,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const hasContent = text.trim().length > 0 || imagePreview || documentFile;
 
   return (
-    <div className="bg-transparent px-3 md:px-5 pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-2 shrink-0 z-30">
+    <div className="bg-transparent px-2 sm:px-4 md:px-5 pb-2 sm:pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-2 shrink-0 z-30">
       {/* Replying Banner */}
       {replyingTo && (
         <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[var(--glass-hover)] border-l-2 border-accent-primary border border-[var(--glass-border)] animate-fadeIn">
@@ -819,6 +819,46 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <span>Share Contact</span>
           </button>
+          <div className="h-px bg-[var(--glass-border)] my-1" />
+          <button
+            type="button"
+            onClick={() => {
+              setShowGifPicker(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[16px]">gif_box</span>
+            </div>
+            <span>GIFs & Animations</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowTimerMenu(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center">
+              <Flame size={14} />
+            </div>
+            <span>Disappearing Timer</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowScheduleMenu(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+              <Clock size={14} />
+            </div>
+            <span>Schedule Message</span>
+          </button>
         </div>
       )}
 
@@ -989,7 +1029,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </div>
       ) : (
         <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
-          <div className={`flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass capsule-typing-pulse ${
+          <div className={`flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass capsule-typing-pulse ${
             isTypingPulse ? "active" : ""
           }`}>
             {/* Attachment Button */}
@@ -1002,7 +1042,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowEmojiPicker(false);
                 setShowGifPicker(false);
               }}
-              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 sm:ml-1"
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 shrink-0"
               title="Attach file or media"
             >
               <span className="material-symbols-outlined text-xl">add_circle</span>
@@ -1017,13 +1057,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowAttachMenu(false);
                 setShowGifPicker(false);
               }}
-              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors shrink-0"
               title="Insert Emoji"
             >
               <span className="material-symbols-outlined text-xl">mood</span>
             </button>
 
-            {/* GIF Picker Trigger */}
+            {/* GIF Picker Trigger (visible on tablet/desktop, accessible via Emoji tabs/Attach on mobile) */}
             <button
               ref={gifBtnRef}
               type="button"
@@ -1032,7 +1072,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowAttachMenu(false);
                 setShowEmojiPicker(false);
               }}
-              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors hidden sm:flex shrink-0"
               title="Insert GIF"
             >
               <span className="material-symbols-outlined text-xl">gif_box</span>
@@ -1054,17 +1094,17 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               onChange={handleDocumentChange}
             />
 
-            {/* Text Input Field with Typing Rhythm Indicator */}
-            <div className="flex-1 flex items-center px-1 sm:px-2 min-w-0 relative">
+            {/* Text Input Field with Typing Rhythm Indicator - MAX HORIZONTAL WIDTH */}
+            <div className="flex-1 flex items-center px-1.5 sm:px-2 min-w-0 relative">
               <textarea
                 ref={inputRef}
                 rows={1}
-                className="w-full bg-transparent py-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-sm focus:outline-none resize-none overflow-y-auto max-h-[120px] custom-scrollbar"
+                className="w-full bg-transparent py-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-[14.5px] leading-snug focus:outline-none resize-none overflow-y-auto max-h-[120px] custom-scrollbar"
                 placeholder={
                   scheduledFor
                     ? "Schedule a message..."
                     : disappearingTimer
-                    ? `Ephemeral message (${disappearingTimer}s)...`
+                    ? `Ephemeral (${disappearingTimer}s)...`
                     : editingMessage
                     ? "Edit message..."
                     : "Type a message..."
@@ -1092,8 +1132,9 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               )}
             </div>
 
-            {/* In-capsule controls: Disappearing Timer & Schedule Button */}
+            {/* In-capsule controls: Timer, Schedule, Mic & Send */}
             <div className="flex items-center gap-0.5 shrink-0">
+              {/* Disappearing Timer (shown if active, or on tablet/desktop) */}
               <button
                 ref={timerBtnRef}
                 type="button"
@@ -1101,10 +1142,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                   setShowTimerMenu((prev) => !prev);
                   setShowScheduleMenu(false);
                 }}
-                className={`p-2 rounded-full transition-colors flex items-center gap-1 ${
+                className={`p-1.5 sm:p-2 rounded-full transition-colors items-center gap-1 ${
                   disappearingTimer
-                    ? "text-amber-500 bg-amber-500/15 dark:text-amber-400 dark:bg-amber-500/20 font-bold"
-                    : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
+                    ? "flex text-amber-500 bg-amber-500/15 dark:text-amber-400 dark:bg-amber-500/20 font-bold"
+                    : "hidden sm:flex text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
                 }`}
                 title={disappearingTimer ? `Disappearing timer: ${disappearingTimer}s` : "Set Disappearing Message Timer"}
               >
@@ -1114,6 +1155,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 )}
               </button>
 
+              {/* Schedule Button (hidden on mobile, accessible via Attach menu) */}
               <button
                 ref={scheduleBtnRef}
                 type="button"
@@ -1121,7 +1163,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                   setShowScheduleMenu((prev) => !prev);
                   setShowTimerMenu(false);
                 }}
-                className={`p-2 rounded-full transition-colors hidden sm:flex ${
+                className={`p-1.5 sm:p-2 rounded-full transition-colors hidden sm:flex ${
                   scheduledFor
                     ? "text-zinc-900 bg-black/10 dark:text-white dark:bg-white/20 font-bold"
                     : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
@@ -1131,27 +1173,27 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 <Clock size={15} />
               </button>
 
-              {/* Voice Memo Trigger */}
+              {/* Voice Memo: visible on mobile only when text is empty */}
               <button
                 type="button"
                 onClick={startRecording}
-                className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                className={`p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ${
+                  hasContent || editingMessage ? "hidden sm:flex" : "flex"
+                }`}
                 title="Record Audio Note"
               >
                 <span className="material-symbols-outlined text-xl">mic</span>
               </button>
 
-              {/* Primary Monochromatic Send Button with Persistent Keyboard Focus */}
+              {/* Send Button: visible on mobile when text/media has content */}
               <button
                 ref={sendBtnRef}
                 type="submit"
                 aria-disabled={!hasContent && !editingMessage}
                 onMouseDown={(e) => {
-                  // Prevents button tap from stealing focus from the input field
                   e.preventDefault();
                 }}
                 onTouchEnd={() => {
-                  // Keep mobile virtual keyboard open upon touch release
                   inputRef.current?.focus({ preventScroll: true });
                 }}
                 onClick={(e) => {
@@ -1161,17 +1203,17 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                   }
                   inputRef.current?.focus({ preventScroll: true });
                 }}
-                className={`flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] transition-all duration-200 mr-0.5 ${
+                className={`items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] transition-all duration-200 mr-0.5 ${
                   hasContent || editingMessage
-                    ? "scale-100 opacity-100 shadow-[0_4px_16px_rgba(0,0,0,0.25)] dark:shadow-[0_4px_16px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 cursor-pointer"
-                    : "scale-95 opacity-30 cursor-default shadow-none"
+                    ? "flex scale-100 opacity-100 shadow-[0_4px_16px_rgba(0,0,0,0.25)] dark:shadow-[0_4px_16px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 cursor-pointer"
+                    : "hidden sm:flex scale-95 opacity-30 cursor-default shadow-none"
                 }`}
                 title="Send message"
               >
                 {isSending || isUploading ? (
-                  <Loader size={17} className="animate-spin text-white dark:text-black" />
+                  <Loader size={16} className="animate-spin text-white dark:text-black" />
                 ) : (
-                  <span className="material-symbols-outlined text-xl text-white dark:text-[#0d0c11] font-bold">send</span>
+                  <span className="material-symbols-outlined text-[19px] text-white dark:text-[#0d0c11] font-bold">send</span>
                 )}
               </button>
             </div>
