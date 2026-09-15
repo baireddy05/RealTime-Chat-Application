@@ -14,6 +14,7 @@ import {
   Laptop,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useThemeStore } from "../store/useThemeStore";
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const {
@@ -25,25 +26,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
     soundMuted,
     toggleSound,
   } = useChatStore();
+  const { theme, setTheme } = useThemeStore();
 
   const [activeTab, setActiveTab] = useState("appearance");
-  const [theme, setTheme] = useState(
-    () => document.documentElement.getAttribute("data-theme") || "dark"
-  );
   const [notificationsAllowed, setNotificationsAllowed] = useState(
     typeof Notification !== "undefined" && Notification.permission === "granted"
   );
 
-  useEffect(() => {
-    const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
-    setTheme(currentTheme);
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   const handleToggleTheme = (mode) => {
-    document.documentElement.setAttribute("data-theme", mode);
-    localStorage.setItem("theme", mode);
     setTheme(mode);
   };
 

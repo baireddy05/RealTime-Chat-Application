@@ -467,7 +467,7 @@ const ChatPane = ({ onBack }) => {
 
 
   const effectiveTheme = getEffectiveChatTheme(selectedChat?.id);
-  const isDarkTheme = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") !== "light";
+  const isDarkTheme = theme !== "light";
   const themeStyles = resolveThemeStyles(effectiveTheme, isDarkTheme);
 
   return (

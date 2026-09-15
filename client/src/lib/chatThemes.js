@@ -13,7 +13,7 @@ export const CHAT_THEME_PRESETS = [
     bubbleOutgoingDark: "linear-gradient(135deg, #ffffff 0%, #e4e4e7 100%)",
     bubbleOutgoingText: "#ffffff",
     bubbleOutgoingTextDark: "#09090b",
-    bubbleIncoming: "rgba(0, 0, 0, 0.04)",
+    bubbleIncoming: "rgba(255, 255, 255, 0.95)",
     bubbleIncomingDark: "rgba(255, 255, 255, 0.07)",
     bubbleIncomingText: "#18181b",
     bubbleIncomingTextDark: "#f4f4f5",
