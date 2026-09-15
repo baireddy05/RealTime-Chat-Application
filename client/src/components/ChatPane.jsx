@@ -964,10 +964,10 @@ const ChatPane = ({ onBack }) => {
 
                 return (
                   <Fragment key={message._id}>
-                    {/* Dynamic Sticky Date Divider */}
+                    {/* Dynamic Date Divider */}
                     {showDateDivider && (
-                      <div className="my-2.5 flex items-center justify-center select-none sticky top-2 z-20 pointer-events-none">
-                        <span className="px-3 py-0.5 rounded-full bg-black/40 dark:bg-black/60 backdrop-blur-md text-white text-[10px] font-medium tracking-wide shadow-md border border-white/10">
+                      <div className="my-3.5 flex items-center justify-center select-none w-full">
+                        <span className="px-3.5 py-1 rounded-xl bg-black/40 dark:bg-zinc-800/80 backdrop-blur-xl text-zinc-100 dark:text-zinc-200 text-[11px] font-semibold tracking-wide shadow-sm border border-white/10 dark:border-white/5">
                           {formatDateDivider(message.createdAt)}
                         </span>
                       </div>
