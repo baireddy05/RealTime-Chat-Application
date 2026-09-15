@@ -613,10 +613,10 @@ const Sidebar = ({
         </div>
 
         {/* WhatsApp-Standard Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1.5 pb-1">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1 select-none">
           <button
             onClick={() => setActiveFilter("all")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "all"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
@@ -629,7 +629,7 @@ const Sidebar = ({
 
           <button
             onClick={() => setActiveFilter("unread")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "unread"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
@@ -651,7 +651,7 @@ const Sidebar = ({
           {pendingCount > 0 && (
             <button
               onClick={() => setActiveFilter("requests")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
                 activeFilter === "requests"
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                   : "text-zinc-900 bg-black/5 border border-black/10 hover:bg-black/10 dark:text-white dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 font-semibold"
@@ -672,7 +672,7 @@ const Sidebar = ({
 
           <button
             onClick={() => setActiveFilter("groups")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "groups"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
@@ -685,7 +685,7 @@ const Sidebar = ({
 
           <button
             onClick={() => setActiveFilter("direct")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "direct"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
                 : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"

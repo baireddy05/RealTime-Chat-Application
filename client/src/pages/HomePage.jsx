@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatPane from "../components/ChatPane";
 import ProfileModal from "../components/ProfileModal";
@@ -61,26 +61,135 @@ const HomePage = () => {
   const logoRef = useRef(null);
   const [logoCoords, setLogoCoords] = useState(null);
 
-  useEffect(() => {
-    const updateLogoCoords = () => {
-      if (logoRef.current) {
-        const lRect = logoRef.current.getBoundingClientRect();
+  // WhatsApp-style Draggable Resizable Sidebar
+  const sidebarContainerRef = useRef(null);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pulse_sidebar_width");
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 310 && parsed <= 700) return parsed;
+      }
+    } catch (e) {}
+    return 360;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const resetSidebarWidth = useCallback(() => {
+    setSidebarWidth(360);
+    try {
+      localStorage.setItem("pulse_sidebar_width", "360");
+    } catch (e) {}
+  }, []);
+
+  const updateLogoCoords = useCallback(() => {
+    if (logoRef.current) {
+      const lRect = logoRef.current.getBoundingClientRect();
+      if (lRect.width > 0 && lRect.height > 0) {
         setLogoCoords({
           x: lRect.left + lRect.width / 2,
           y: lRect.top + lRect.height / 2,
         });
       }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e) => {
+      const clientX = e.clientX ?? (e.touches && e.touches[0]?.clientX);
+      if (clientX === undefined) return;
+
+      let railOffset = 76;
+      if (sidebarContainerRef.current) {
+        railOffset = sidebarContainerRef.current.getBoundingClientRect().left;
+      }
+
+      let newWidth = clientX - railOffset;
+      const minWidth = 310;
+      const maxWidth = Math.max(minWidth, Math.min(680, window.innerWidth - 360));
+
+      if (newWidth < minWidth) newWidth = minWidth;
+      if (newWidth > maxWidth) newWidth = maxWidth;
+
+      setSidebarWidth(newWidth);
+      try {
+        localStorage.setItem("pulse_sidebar_width", newWidth.toString());
+      } catch (err) {}
+
+      // Keep background pulse wave anchored strictly to the logo in real time
+      if (logoRef.current) {
+        const lRect = logoRef.current.getBoundingClientRect();
+        if (lRect.width > 0) {
+          setLogoCoords({
+            x: lRect.left + lRect.width / 2,
+            y: lRect.top + lRect.height / 2,
+          });
+        }
+      }
     };
 
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleMouseMove);
+    window.addEventListener("touchend", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleMouseMove);
+      window.removeEventListener("touchend", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing]);
+
+  // Keep sidebar within bounds when window resizes
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (typeof window !== "undefined" && window.innerWidth >= 768) {
+        const maxWidth = Math.max(310, Math.min(680, window.innerWidth - 360));
+        setSidebarWidth((prev) => (prev > maxWidth ? maxWidth : prev));
+      }
+    };
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, []);
+
+  // Recalculate logo coordinates whenever chat state, sidebar width, or window changes
+  useEffect(() => {
     updateLogoCoords();
-    // Delay slightly to account for initial layout settlement
-    const timer = setTimeout(updateLogoCoords, 100);
+    const timer = setTimeout(updateLogoCoords, 60);
     window.addEventListener("resize", updateLogoCoords);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("resize", updateLogoCoords);
     };
-  }, [selectedChat]);
+  }, [selectedChat, sidebarWidth, updateLogoCoords]);
+
+  // Use ResizeObserver for accurate tracking of the central hero logo
+  useEffect(() => {
+    if (!logoRef.current) return;
+    const ro = new ResizeObserver(() => {
+      updateLogoCoords();
+    });
+    ro.observe(logoRef.current);
+    return () => ro.disconnect();
+  }, [selectedChat, updateLogoCoords]);
 
   // Global real-time messaging and WebRTC calling listeners
   useEffect(() => {
@@ -173,7 +282,12 @@ const HomePage = () => {
   };
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200">
+    <div
+      className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200"
+      style={{
+        "--sidebar-width": `${sidebarWidth}px`,
+      }}
+    >
       {/* 1. Dynamic Liquid Glass Pulse Shockwave Background */}
       <TypingPulseBackground />
 
@@ -181,7 +295,9 @@ const HomePage = () => {
       {!selectedChat && (
         <div className="hidden md:block fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <div
-            className="absolute pointer-events-none select-none transition-all duration-300"
+            className={`absolute pointer-events-none select-none ${
+              isResizing ? "transition-none" : "transition-all duration-300"
+            }`}
             style={{
               left: logoCoords ? `${logoCoords.x}px` : "65vw",
               top: logoCoords ? `${logoCoords.y}px` : "33vh",
@@ -373,9 +489,13 @@ const HomePage = () => {
 
       {/* 2. Zone 2: Conversation Sidebar */}
       <div
-        className={`w-full md:w-80 lg:w-[340px] xl:w-[360px] h-full z-30 shrink-0 flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass overflow-hidden transition-all duration-200 ${
-          selectedChat ? "hidden md:flex" : "flex"
-        }`}
+        ref={sidebarContainerRef}
+        style={{
+          width: typeof window !== "undefined" && window.innerWidth >= 768 ? `${sidebarWidth}px` : undefined,
+        }}
+        className={`w-full md:w-[var(--sidebar-width)] h-full z-30 shrink-0 flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass overflow-hidden ${
+          isResizing ? "transition-none select-none pointer-events-none" : "transition-[width] duration-75 ease-out"
+        } ${selectedChat ? "hidden md:flex" : "flex"}`}
       >
         <Sidebar
           onChatSelect={() => {}}
@@ -398,9 +518,30 @@ const HomePage = () => {
         />
       </div>
 
+      {/* WhatsApp Draggable Resizer Separator (Desktop only) */}
+      <div
+        onMouseDown={startResizing}
+        onTouchStart={startResizing}
+        onDoubleClick={resetSidebarWidth}
+        title="Drag to resize sidebar • Double-click to reset"
+        className="hidden md:flex relative items-center justify-center w-0 shrink-0 z-40 select-none group cursor-col-resize h-full"
+      >
+        {/* Full-height hit area with hover indicator */}
+        <div className="absolute -left-2.5 -right-2.5 top-0 bottom-0 cursor-col-resize flex items-center justify-center">
+          {/* Visual Vertical Grip Line / Pill */}
+          <div
+            className={`w-1 rounded-full transition-all duration-200 ${
+              isResizing
+                ? "bg-zinc-900 dark:bg-white h-24 shadow-[0_0_12px_rgba(0,0,0,0.3)] dark:shadow-[0_0_12px_rgba(255,255,255,0.5)] scale-125"
+                : "bg-transparent group-hover:bg-zinc-400/60 dark:group-hover:bg-white/50 h-14 group-hover:h-20"
+            }`}
+          />
+        </div>
+      </div>
+
       {/* 3. Zone 3: Master Active Chat Workstation or WhatsApp Command Center */}
       <main
-        className={`flex-1 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-all duration-200 ${
+        className={`flex-1 min-w-0 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-all duration-200 ${
           !selectedChat ? "hidden md:flex" : "flex"
         }`}
       >
@@ -516,6 +657,11 @@ const HomePage = () => {
       {/* WebRTC Video & Audio Call Overlays */}
       <CallModal />
       <IncomingCallModal />
+
+      {/* Global Drag Overlay during split pane resizing */}
+      {isResizing && (
+        <div className="fixed inset-0 z-[100] cursor-col-resize select-none pointer-events-auto bg-transparent" />
+      )}
     </div>
   );
 };

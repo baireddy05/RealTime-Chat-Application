@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import { useFriendStore } from "./useFriendStore";
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
 import {
