@@ -1,15 +1,32 @@
 import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
-import { Link } from "react-router-dom";
-import { Loader, Lock, Eye, EyeOff, AlertCircle, Mail, Sun, Moon, Zap, Shield, Activity } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Loader,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Mail,
+  Sun,
+  Moon,
+  Zap,
+  Shield,
+  Activity,
+  ArrowLeft,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [mobileShowForm, setMobileShowForm] = useState(false);
   const { login, isLoggingIn } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
+  const navigate = useNavigate();
 
   // Interactive mouse physics for the Pulse visual panel
   const [mouseState, setMouseState] = useState({
@@ -50,9 +67,110 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-hidden select-none font-sans">
-      
-      {/* ── Left Panel: Interactive Pulse Experience ── */}
+    <div className="flex h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-hidden select-none font-sans relative">
+      {/* ── Theme Toggle (Top Right for Mobile & Desktop) ── */}
+      <div className="absolute top-5 right-6 z-50">
+        <button
+          onClick={toggleTheme}
+          className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          type="button"
+        >
+          {theme === "dark" ? <Sun size={19} className="text-amber-400" /> : <Moon size={19} className="text-accent-primary" />}
+        </button>
+      </div>
+
+      {/* ── MOBILE WELCOME SCREEN (Visible on mobile when not showing form) ── */}
+      <div
+        className={`lg:hidden fixed inset-0 z-30 flex flex-col justify-between p-6 overflow-hidden apple-ambient-bg transition-all duration-300 ${
+          mobileShowForm ? "opacity-0 pointer-events-none translate-y-6" : "opacity-100 pointer-events-auto translate-y-0"
+        }`}
+      >
+        {/* Ambient Glows */}
+        <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full blur-spot-1 pointer-events-none opacity-60" />
+        <div className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full blur-spot-2 pointer-events-none opacity-60" />
+
+        {/* Top Badges */}
+        <div className="w-full flex items-center justify-between pt-2 relative z-10 pr-14">
+          <div className="px-3.5 py-1.5 rounded-2xl bg-white/10 dark:bg-white/[0.08] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-[11px] font-semibold tracking-wide text-zinc-900 dark:text-white/90">
+              Live Mesh Active
+            </span>
+          </div>
+
+          <div className="px-3 py-1.5 rounded-2xl bg-white/10 dark:bg-white/[0.08] backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-glass flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200">
+            <Zap className="w-3 h-3 text-amber-400" />
+            <span className="text-[11px] font-mono font-medium">&lt; 15ms latency</span>
+          </div>
+        </div>
+
+        {/* Center Hero Card */}
+        <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-6 relative z-10">
+          {/* Glowing Liquid Glass Logo Badge */}
+          <div className="relative group mb-6">
+            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[2.2rem] blur-2xl opacity-90 animate-pulse" />
+            <div className="relative w-24 h-24 rounded-[2.2rem] bg-white/20 dark:bg-white/[0.08] border border-white/40 dark:border-white/20 shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden">
+              <img
+                src="/logo.svg"
+                alt="Pulse Logo"
+                className="w-14 h-14 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)]"
+              />
+            </div>
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-theme-main tracking-tight mb-3 leading-tight">
+            Connect seamlessly <br />
+            with{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">
+              Pulse
+            </span>
+          </h1>
+
+          <p className="text-[13.5px] text-theme-muted max-w-xs mx-auto leading-relaxed font-normal mb-5">
+            Experience the future of real-time communication with our beautifully crafted, ultra-fast messaging workspace.
+          </p>
+
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 dark:bg-white/[0.05] border border-white/15 dark:border-white/10 backdrop-blur-md">
+            <Activity className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+            <span className="text-[11px] text-theme-muted font-medium tracking-wide">
+              Ultra-Responsive Synchronous Engine
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom Actions & E2EE Badge */}
+        <div className="w-full flex flex-col items-center gap-3.5 relative z-10 pb-4">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-theme-muted mb-1">
+            <Shield className="w-3.5 h-3.5 text-indigo-400" />
+            <span>E2EE Protected & Secure</span>
+          </div>
+
+          <div className="w-full flex flex-col sm:flex-row gap-2.5 max-w-sm">
+            <button
+              onClick={() => setMobileShowForm(true)}
+              type="button"
+              className="w-full py-3.5 px-6 rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] font-bold text-sm shadow-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Sign In</span>
+              <ArrowRight size={16} />
+            </button>
+
+            <button
+              onClick={() => navigate("/signup")}
+              type="button"
+              className="w-full py-3.5 px-6 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 text-zinc-900 dark:text-white font-bold text-sm backdrop-blur-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Create Account</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop Left Panel: Interactive Pulse Experience ── */}
       <div
         ref={leftPanelRef}
         onMouseMove={handleMouseMove}
@@ -71,7 +189,7 @@ const LoginPage = () => {
           }}
         />
 
-        {/* Ambient Multi-layer Background Glow Spheres with Parallax */}
+        {/* Ambient Background Glow Spheres */}
         <div
           className="absolute top-[-10%] left-[-10%] w-[550px] h-[550px] rounded-full blur-spot-1 pointer-events-none z-0 transition-transform duration-700 ease-out opacity-75"
           style={{
@@ -85,7 +203,7 @@ const LoginPage = () => {
           }}
         />
 
-        {/* Interactive Floating Micro-Badges with 3D Parallax */}
+        {/* Floating Badges */}
         <div
           className="absolute top-16 left-16 z-20 transition-transform duration-500 ease-out pointer-events-none"
           style={{
@@ -127,72 +245,7 @@ const LoginPage = () => {
           </div>
         </div>
 
-        {/* Concentric Pulse Shockwave Rings radiating outward */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-          <div
-            className="absolute rounded-full border border-indigo-500/20 dark:border-indigo-400/15 animate-ping opacity-40"
-            style={{
-              width: "280px",
-              height: "280px",
-              animationDuration: "3s",
-              transform: `translate3d(${mouseState.nx * 15}px, ${mouseState.ny * 15}px, 0)`,
-            }}
-          />
-          <div
-            className="absolute rounded-full border border-purple-500/20 dark:border-purple-400/15 animate-pulse opacity-30"
-            style={{
-              width: "420px",
-              height: "420px",
-              animationDuration: "4s",
-              transform: `translate3d(${mouseState.nx * 10}px, ${mouseState.ny * 10}px, 0)`,
-            }}
-          />
-          <div
-            className="absolute rounded-full border border-cyan-500/15 dark:border-cyan-400/10 opacity-25"
-            style={{
-              width: "580px",
-              height: "580px",
-              transform: `translate3d(${mouseState.nx * 6}px, ${mouseState.ny * 6}px, 0)`,
-            }}
-          />
-        </div>
-
-        {/* Dynamic Real-time Heartbeat / Pulse Waveform traversing center */}
-        <div className="absolute w-full px-8 pointer-events-none z-10 flex items-center justify-center opacity-40 dark:opacity-30">
-          <svg
-            className="w-full max-w-lg h-24 overflow-visible"
-            viewBox="0 0 600 120"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <linearGradient id="loginWaveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#6366F1" stopOpacity="0.05" />
-                <stop offset="35%" stopColor="#6366F1" stopOpacity="0.8" />
-                <stop offset="50%" stopColor="#8B5CF6" stopOpacity="1" />
-                <stop offset="65%" stopColor="#06B6D4" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.05" />
-              </linearGradient>
-              <filter id="waveGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
-            {/* Base Waveform Line */}
-            <path
-              d="M 0 60 L 180 60 L 210 60 L 230 20 L 255 105 L 280 40 L 305 75 L 325 60 L 370 60 L 600 60"
-              stroke="url(#loginWaveGrad)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#waveGlow)"
-            />
-            {/* Pulse Waveform traveling bead */}
-            <circle cx="255" cy="105" r="4" fill="#06B6D4" className="animate-ping" />
-          </svg>
-        </div>
-
-        {/* ── Central 3D Interactive Card ── */}
+        {/* Central 3D Card */}
         <div
           className="relative z-10 flex flex-col items-center justify-center text-center p-10 max-w-xl transition-transform duration-200 ease-out"
           style={{
@@ -200,16 +253,9 @@ const LoginPage = () => {
             transformStyle: "preserve-3d",
           }}
         >
-          {/* Logo Badge with Glowing Liquid Glass */}
           <div className="relative group mb-8">
-            {/* Glowing Backdrop Aura */}
             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[2.5rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
-            
             <div className="relative w-28 h-28 rounded-[2.5rem] bg-white/20 dark:bg-white/[0.08] border border-white/40 dark:border-white/20 shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
-              {/* Inner subtle sheen reflection */}
-              <div className="absolute -top-10 -left-10 w-24 h-24 bg-white/20 rounded-full blur-xl pointer-events-none" />
-              
-              {/* Official Pulse Logo */}
               <img
                 src="/logo.svg"
                 alt="Pulse Logo"
@@ -220,14 +266,16 @@ const LoginPage = () => {
 
           <h1 className="text-5xl font-extrabold text-theme-main tracking-tight mb-5 leading-tight">
             Connect seamlessly <br />
-            with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">Pulse</span>
+            with{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">
+              Pulse
+            </span>
           </h1>
 
           <p className="text-base text-theme-muted max-w-md mx-auto leading-relaxed font-normal">
             Experience the future of real-time communication with our beautifully crafted, ultra-fast messaging workspace.
           </p>
 
-          {/* Activity status bar */}
           <div className="mt-8 flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 dark:bg-white/[0.04] border border-white/15 dark:border-white/10 backdrop-blur-md">
             <Activity className="w-4 h-4 text-indigo-400 animate-pulse" />
             <span className="text-xs text-theme-muted font-medium tracking-wide">
@@ -237,27 +285,28 @@ const LoginPage = () => {
         </div>
       </div>
 
-      {/* ── Right Panel: Interactive Form ── */}
-      <div className="w-full lg:w-[45%] h-full flex flex-col relative glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] z-20">
-        
-        {/* Top Header - Theme Toggle */}
-        <div className="absolute top-6 right-8 z-50">
+      {/* ── Form Panel (Always visible on desktop; on mobile shown when mobileShowForm is true) ── */}
+      <div
+        className={`w-full lg:w-[45%] h-full flex flex-col relative glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] z-20 transition-all duration-300 ${
+          mobileShowForm ? "flex" : "hidden lg:flex"
+        }`}
+      >
+        {/* Mobile Back to Welcome button */}
+        <div className="lg:hidden absolute top-5 left-6 z-50">
           <button
-            onClick={toggleTheme}
-            className="p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm"
-            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            onClick={() => setMobileShowForm(false)}
             type="button"
+            className="p-2.5 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold"
           >
-            {theme === "dark" ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-accent-primary" />}
+            <ArrowLeft size={16} />
+            <span>Welcome</span>
           </button>
         </div>
 
         {/* Scrollable Form Container */}
         <div className="flex-1 overflow-y-auto flex flex-col justify-center px-5 sm:px-10 md:px-14 lg:px-20 py-12">
-          
           <div className="w-full max-w-[400px] mx-auto animate-slide-up">
-            
-            {/* Mobile Header with Logo (Visible when left panel is hidden) */}
+            {/* Logo */}
             <div className="flex items-center gap-3 mb-8 lg:hidden justify-center">
               <img src="/logo.svg" alt="Pulse Logo" className="w-10 h-10 object-contain drop-shadow" />
               <span className="text-2xl font-extrabold tracking-tight text-theme-main">Pulse</span>
@@ -322,7 +371,6 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              {/* High-Contrast, Clearly Visible Sign In Button */}
               <button
                 type="submit"
                 disabled={isLoggingIn}
@@ -341,7 +389,6 @@ const LoginPage = () => {
                 Create an account
               </Link>
             </div>
-            
           </div>
         </div>
       </div>

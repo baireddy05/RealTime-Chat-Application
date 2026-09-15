@@ -379,7 +379,23 @@ export const useChatStore = create((set, get) => ({
   },
 
   markMessagesAsRead: async (chatId, type) => {
+    if (!chatId) return;
     try {
+      set((state) => ({
+        unreadCounts: {
+          ...state.unreadCounts,
+          [chatId]: 0,
+        },
+        rooms: (state.rooms || []).map((r) => ((r._id || r.id)?.toString() === chatId?.toString() ? { ...r, unreadCount: 0 } : r)),
+      }));
+
+      const friendStore = useFriendStore.getState();
+      if (friendStore?.friends) {
+        useFriendStore.setState({
+          friends: friendStore.friends.map((f) => ((f._id || f.id)?.toString() === chatId?.toString() ? { ...f, unreadCount: 0 } : f)),
+        });
+      }
+
       await axiosInstance.post(`/chat/${chatId}/read?type=${type}`);
     } catch (error) {
       console.error("Error marking messages as read:", error);

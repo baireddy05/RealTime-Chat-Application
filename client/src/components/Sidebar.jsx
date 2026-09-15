@@ -219,7 +219,10 @@ const Sidebar = ({
 
   // Compute Unread lists
   const unreadChats = useMemo(() => {
-    return allChats.filter((c) => (unreadCounts[c._id] || 0) > 0);
+    return allChats.filter((c) => {
+      const u = unreadCounts[c._id] !== undefined ? unreadCounts[c._id] : (c.unreadCount || 0);
+      return u > 0;
+    });
   }, [allChats, unreadCounts]);
 
   const totalUnreadCount = unreadChats.length;
@@ -240,7 +243,7 @@ const Sidebar = ({
   const renderRoomCard = (room) => {
     const roomId = (room._id || room.id)?.toString();
     const isSelected = (selectedChat?.id || selectedChat?._id)?.toString() === roomId;
-    const unread = unreadCounts[roomId] || room.unreadCount || 0;
+    const unread = unreadCounts[roomId] !== undefined ? unreadCounts[roomId] : (room.unreadCount || 0);
     const lastMsg = lastMessages[roomId] || room.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     const previewText = getMessageSnippet(lastMsg);
@@ -331,7 +334,7 @@ const Sidebar = ({
     const friendId = (friend._id || friend.id)?.toString();
     const isSelected = (selectedChat?.id || selectedChat?._id)?.toString() === friendId;
     const isOnline = onlineUsersSet.has(friendId);
-    const unread = unreadCounts[friendId] || friend.unreadCount || 0;
+    const unread = unreadCounts[friendId] !== undefined ? unreadCounts[friendId] : (friend.unreadCount || 0);
     const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     const previewText = getMessageSnippet(lastMsg);

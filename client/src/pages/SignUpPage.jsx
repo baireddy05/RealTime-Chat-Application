@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import { Link } from "react-router-dom";
-import { Loader, Lock, Eye, EyeOff, AlertCircle, Mail, User, Sun, Moon, Zap, Shield, Activity } from "lucide-react";
+import { Loader, Lock, Eye, EyeOff, AlertCircle, Mail, User, Sun, Moon, Zap, Shield, Activity, ArrowLeft } from "lucide-react";
 
 const SignUpPage = () => {
   const [formData, setFormData] = useState({ username: "", email: "", password: "" });
@@ -248,6 +248,17 @@ const SignUpPage = () => {
           >
             {theme === "dark" ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-accent-primary" />}
           </button>
+        </div>
+
+        {/* Mobile Back to Welcome button */}
+        <div className="lg:hidden absolute top-5 left-6 z-50">
+          <Link
+            to="/login"
+            className="p-2.5 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <ArrowLeft size={16} />
+            <span>Welcome</span>
+          </Link>
         </div>
 
         {/* Scrollable Form Container */}
