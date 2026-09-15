@@ -490,6 +490,17 @@
     will-change: transform, opacity;
   }
 
+  @media (max-width: 767px) {
+    .animate-home-logo-wave-1,
+    .animate-home-logo-wave-2,
+    .animate-home-logo-wave-3,
+    .animate-home-logo-breath,
+    .animate-single-typing-wave {
+      display: none !important;
+      animation: none !important;
+    }
+  }
+
   /* ── Smooth Message Box to Chat Transition Animations ── */
   @keyframes outgoingBubbleGlide {
     0% {

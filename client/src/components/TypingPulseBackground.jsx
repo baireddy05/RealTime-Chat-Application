@@ -7,6 +7,7 @@ export default function TypingPulseBackground() {
 
   useEffect(() => {
     const handleInput = (e) => {
+      if (window.innerWidth < 768) return;
       const target = e.target;
       if (!target) return;
       const isInput =
@@ -29,6 +30,7 @@ export default function TypingPulseBackground() {
     };
 
     const handleCustomPulse = (e) => {
+      if (window.innerWidth < 768) return;
       if (e.detail && typeof e.detail.x === "number" && typeof e.detail.y === "number") {
         const id = ++pulseIdRef.current;
         setPulses((prev) => [...prev.slice(-10), { id, x: e.detail.x, y: e.detail.y }]);
@@ -54,20 +56,22 @@ export default function TypingPulseBackground() {
       <div className="absolute inset-0 bg-gradient-to-b from-[#f4f4f6] via-[#ebebf0] to-[#f4f4f6] dark:from-[#0a090e] dark:via-[#0d0c13] dark:to-[#0a090e] opacity-95 transition-colors duration-300" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-black/[0.02] dark:bg-white/[0.015] blur-[140px] pointer-events-none" />
 
-      {/* Exactly one wave per letter typed, radiating at reduced speed */}
-      {pulses.map((pulse) => (
-        <div
-          key={pulse.id}
-          className="absolute pointer-events-none select-none"
-          style={{
-            left: `${pulse.x}px`,
-            top: `${pulse.y}px`,
-          }}
-        >
-          {/* Exactly one single liquid-glass wave ring per letter typed */}
-          <div className="absolute -top-[250px] -left-[250px] w-[500px] h-[500px] rounded-full border-2 border-zinc-900/40 dark:border-white/75 shadow-[0_0_40px_rgba(0,0,0,0.12)] dark:shadow-[0_0_40px_rgba(255,255,255,0.35)] animate-single-typing-wave" />
-        </div>
-      ))}
+      {/* Exactly one wave per letter typed (Desktop only) */}
+      <div className="hidden md:block">
+        {pulses.map((pulse) => (
+          <div
+            key={pulse.id}
+            className="absolute pointer-events-none select-none"
+            style={{
+              left: `${pulse.x}px`,
+              top: `${pulse.y}px`,
+            }}
+          >
+            {/* Exactly one single liquid-glass wave ring per letter typed */}
+            <div className="absolute -top-[250px] -left-[250px] w-[500px] h-[500px] rounded-full border-2 border-zinc-900/40 dark:border-white/75 shadow-[0_0_40px_rgba(0,0,0,0.12)] dark:shadow-[0_0_40px_rgba(255,255,255,0.35)] animate-single-typing-wave" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

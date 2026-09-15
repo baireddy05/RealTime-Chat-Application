@@ -140,9 +140,9 @@ const HomePage = () => {
       {/* 1. Dynamic Liquid Glass Pulse Shockwave Background */}
       <TypingPulseBackground />
 
-      {/* Full UI Background Pulse: Originates strictly from Home Logo across the entire window */}
+      {/* Full UI Background Pulse: Originates strictly from Home Logo across the entire window (Desktop only) */}
       {!selectedChat && (
-        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
+        <div className="hidden md:block fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <div
             className="absolute pointer-events-none select-none transition-all duration-300"
             style={{
