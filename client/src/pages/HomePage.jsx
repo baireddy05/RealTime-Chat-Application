@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatPane from "../components/ChatPane";
 import ProfileModal from "../components/ProfileModal";
