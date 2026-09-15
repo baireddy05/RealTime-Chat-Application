@@ -543,7 +543,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const hasContent = text.trim().length > 0 || imagePreview || documentFile;
 
   return (
-    <div className="bg-transparent px-3 md:px-5 pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-2">
+    <div className="bg-transparent px-3 md:px-5 pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-2 shrink-0 z-30">
       {/* Replying Banner */}
       {replyingTo && (
         <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[var(--glass-hover)] border-l-2 border-accent-primary border border-[var(--glass-border)] animate-fadeIn">

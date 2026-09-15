@@ -167,16 +167,19 @@ const ChatPane = ({ onBack }) => {
   const prevMessagesCountRef = useRef(messages.length);
 
   const scrollToBottom = useCallback((behavior = "smooth") => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior,
-        block: "end",
-      });
-    } else if (scrollerElementRef.current) {
-      scrollerElementRef.current.scrollTo({
-        top: scrollerElementRef.current.scrollHeight,
-        behavior,
-      });
+    if (scrollerElementRef.current) {
+      if (behavior === "instant" || behavior === "auto") {
+        scrollerElementRef.current.scrollTop = scrollerElementRef.current.scrollHeight;
+      } else {
+        scrollerElementRef.current.scrollTo({
+          top: scrollerElementRef.current.scrollHeight,
+          behavior,
+        });
+      }
+    }
+    // Maintain window at top on mobile
+    if (typeof window !== "undefined" && window.scrollY !== 0) {
+      window.scrollTo(0, 0);
     }
     isAtBottomRef.current = true;
     setShowScrollBottomBtn(false);
