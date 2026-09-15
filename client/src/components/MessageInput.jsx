@@ -53,6 +53,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [customScheduleDate, setCustomScheduleDate] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isTypingPulse, setIsTypingPulse] = useState(false);
+  const pulseTimeoutRef = useRef(null);
 
   // Mobile Back Navigation handlers for input popups and previews
   useBackHandler(showEmojiPicker, () => setShowEmojiPicker(false), "input-emoji-picker");
@@ -182,7 +184,22 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
   const handleTextChange = (e) => {
     const val = e.target.value;
+    const isAddingChar = val.length > text.length;
     setText(val);
+
+    // Satisfying, localized tactile keystroke pulse
+    setIsTypingPulse(true);
+    if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+    pulseTimeoutRef.current = setTimeout(() => {
+      setIsTypingPulse(false);
+    }, 280);
+
+    // Subtle micro-haptic tick on supported mobile devices
+    if (isAddingChar && typeof window !== "undefined" && window.navigator?.vibrate) {
+      try {
+        window.navigator.vibrate(6);
+      } catch {}
+    }
 
     try {
       if (!socket || !selectedChat) return;
@@ -865,7 +882,9 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </div>
       ) : (
         <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass">
+          <div className={`flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass capsule-typing-pulse ${
+            isTypingPulse ? "active" : ""
+          }`}>
             {/* Attachment Button */}
             <button
               ref={attachBtnRef}
@@ -911,7 +930,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               onChange={handleDocumentChange}
             />
 
-            {/* Text Input Field */}
+            {/* Text Input Field with Typing Rhythm Indicator */}
             <div className="flex-1 flex items-center px-1 sm:px-2 min-w-0 relative">
               <input
                 ref={inputRef}
@@ -929,6 +948,16 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 value={text}
                 onChange={handleTextChange}
               />
+              {text.length > 0 && (
+                <span
+                  aria-hidden="true"
+                  className={`w-1.5 h-1.5 rounded-full mx-1 shrink-0 transition-all duration-200 pointer-events-none ${
+                    isTypingPulse
+                      ? "bg-zinc-900 dark:bg-white scale-125 opacity-80 shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+                      : "bg-zinc-400 dark:bg-zinc-600 scale-90 opacity-25"
+                  }`}
+                />
+              )}
             </div>
 
             {/* In-capsule controls: Disappearing Timer & Schedule Button */}
@@ -978,12 +1007,16 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 <span className="material-symbols-outlined text-xl">mic</span>
               </button>
 
-              {/* Primary Monochromatic Send Button */}
+              {/* Primary Monochromatic Send Button with Spring Transition */}
               <button
                 ref={sendBtnRef}
                 type="submit"
                 disabled={!hasContent && !editingMessage}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg hover:scale-105 active:scale-95 transition-all mr-0.5 disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
+                className={`flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] transition-all duration-200 mr-0.5 cursor-pointer ${
+                  hasContent || editingMessage
+                    ? "scale-100 opacity-100 shadow-[0_4px_16px_rgba(0,0,0,0.25)] dark:shadow-[0_4px_16px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95"
+                    : "scale-95 opacity-30 cursor-not-allowed shadow-none"
+                }`}
                 title="Send message"
               >
                 {isSending || isUploading ? (

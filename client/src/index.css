@@ -501,6 +501,31 @@
     }
   }
 
+  /* Tactile Interactive Keystroke Ripple for Input Capsule (Mobile & Desktop) */
+  .capsule-typing-pulse {
+    transition: border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                background-color 0.22s ease,
+                transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: border-color, box-shadow;
+  }
+
+  .capsule-typing-pulse.active {
+    border-color: rgba(255, 255, 255, 0.38) !important;
+    border-top-color: rgba(255, 255, 255, 0.65) !important;
+    box-shadow: 0 4px 22px -2px rgba(0, 0, 0, 0.45), 
+                0 0 16px 1px rgba(255, 255, 255, 0.14), 
+                inset 0 1px 2px rgba(255, 255, 255, 0.35) !important;
+  }
+
+  :root[data-theme="light"] .capsule-typing-pulse.active {
+    border-color: rgba(0, 0, 0, 0.28) !important;
+    border-top-color: rgba(0, 0, 0, 0.42) !important;
+    box-shadow: 0 4px 18px -2px rgba(0, 0, 0, 0.08), 
+                0 0 12px 1px rgba(0, 0, 0, 0.05), 
+                inset 0 1px 1.5px #ffffff !important;
+  }
+
   /* ── Smooth Message Box to Chat Transition Animations ── */
   @keyframes outgoingBubbleGlide {
     0% {
