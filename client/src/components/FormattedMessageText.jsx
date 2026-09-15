@@ -153,7 +153,7 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
   };
 
   return (
-    <div className="space-y-1 select-text">
+    <div className="space-y-1 select-text break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap min-w-0 max-w-full">
       {parts.map((part, idx) => {
         if (part.type === "code") {
           return (
@@ -164,7 +164,11 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
             />
           );
         }
-        return <span key={idx}>{renderInlineText(part.content)}</span>;
+        return (
+          <span key={idx} className="break-words [overflow-wrap:anywhere] [word-break:break-word]">
+            {renderInlineText(part.content)}
+          </span>
+        );
       })}
     </div>
   );

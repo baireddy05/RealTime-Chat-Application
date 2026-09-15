@@ -1015,8 +1015,8 @@ const ChatPane = ({ onBack }) => {
                       </div>
                     )}
 
-                    <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] md:max-w-[70%]`}>
-                      <div className={`flex items-center gap-1.5 ${isMine ? "flex-row-reverse" : "flex-row"}`}>
+                    <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] md:max-w-[70%] min-w-0`}>
+                      <div className={`flex items-center gap-1.5 ${isMine ? "flex-row-reverse" : "flex-row"} max-w-full min-w-0`}>
                         {/* Speech Bubble */}
                         <div 
                           style={
@@ -1038,7 +1038,7 @@ const ChatPane = ({ onBack }) => {
                                     }
                               : {}
                           }
-                          className={`${isJustEmoji ? "py-1 px-1" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full ${
+                          className={`${isJustEmoji ? "py-1 px-1" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full min-w-0 ${
                             message.isDeleted
                               ? "bg-surface-container/40 text-outline italic"
                               : isMine && !isJustEmoji
@@ -1113,8 +1113,8 @@ const ChatPane = ({ onBack }) => {
                                 </div>
                               )}
                               {message.text && (
-                                <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
-                                  <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[15.5px] leading-relaxed break-words font-normal"}`}>
+                                <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1 max-w-full min-w-0">
+                                  <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[15.5px] leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap font-normal min-w-0 max-w-full"}`}>
                                     <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
                                   </div>
                                   <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">

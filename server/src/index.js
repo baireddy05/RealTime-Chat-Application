@@ -20,6 +20,26 @@ app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(cors(corsOptions));
 
+// Keep-Alive & Health Check Endpoints for Cronjobs / Monitoring
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "Pulse Chat Backend",
+    message: "Pulse Chat API is active and running ⚡",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get(["/health", "/api/health", "/ping"], (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "pong",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/upload", uploadRoutes);
