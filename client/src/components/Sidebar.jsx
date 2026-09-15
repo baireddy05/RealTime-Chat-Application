@@ -362,9 +362,9 @@ const Sidebar = ({
             : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
         }`}
       >
-        <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+        <div className="relative shrink-0 w-10 h-10">
           <img
-            className="w-full h-full object-cover"
+            className="w-full h-full rounded-full object-cover bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
             alt={friend.username}
             src={
               friend.profilePic ||
@@ -372,9 +372,9 @@ const Sidebar = ({
             }
           />
           <span
-            className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${
+            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 ${
               isOnline
-                ? "bg-emerald-500 dark:bg-white shadow-[0_0_6px_rgba(16,185,129,0.5)] dark:shadow-[0_0_6px_rgba(255,255,255,0.85)]"
+                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
                 : "bg-zinc-400 dark:bg-zinc-600"
             }`}
           />
@@ -445,7 +445,7 @@ const Sidebar = ({
               <button
                 type="button"
                 onClick={onOpenProfile}
-                className="md:hidden relative shrink-0 w-8 h-8 rounded-full overflow-hidden border border-black/10 dark:border-white/15 active:scale-95 transition-transform"
+                className="md:hidden relative shrink-0 w-8 h-8 active:scale-95 transition-transform cursor-pointer"
                 title="Open Profile & Status"
               >
                 <img
@@ -454,9 +454,9 @@ const Sidebar = ({
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=27272a&color=ffffff&bold=true`
                   }
                   alt={authUser?.username || "User"}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full rounded-full object-cover border border-black/10 dark:border-white/15"
                 />
-                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#121117] z-10" />
               </button>
             )}
             <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>

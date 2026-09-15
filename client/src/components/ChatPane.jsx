@@ -618,13 +618,13 @@ const ChatPane = ({ onBack }) => {
                   <span className="material-symbols-outlined text-xl">groups</span>
                 </div>
               ) : (
-                <div className="relative shrink-0">
+                <div className="relative shrink-0 w-9 h-9 sm:w-10 sm:h-10">
                   <img
                     src={selectedChat.profilePic || selectedChat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
                     alt={selectedChat.name}
-                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm border border-black/10 dark:border-white/10"
+                    className="w-full h-full rounded-full object-cover shadow-sm border border-black/10 dark:border-white/10"
                   />
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ring-2 ring-white dark:ring-[#0e0d13] ${isUserOnline ? "bg-emerald-500 dark:bg-white" : "bg-zinc-400 dark:bg-zinc-600"}`} />
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 ${isUserOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-zinc-400 dark:bg-zinc-600"}`} />
                 </div>
               )}
               <div className="flex flex-col min-w-0">
