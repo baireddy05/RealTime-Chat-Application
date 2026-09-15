@@ -107,7 +107,7 @@ const SetStatusModal = ({ onClose }) => {
 
           {/* Live Status Pill Preview */}
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 text-zinc-900 dark:text-white shadow-sm">
-            <span className="text-base">{selectedEmoji}</span>
+            <span className="text-base emoji-text">{selectedEmoji}</span>
             <span className="text-xs sm:text-sm text-zinc-900 dark:text-white font-medium max-w-[160px] truncate">
               {selectedTitle}: {statusText || "Available"}
             </span>
@@ -163,15 +163,16 @@ const SetStatusModal = ({ onClose }) => {
                   type="button"
                   onClick={() => handleSelectPreset(preset)}
                   className={`text-left p-3 rounded-2xl transition-all flex flex-col justify-between gap-1.5 border ${
+                  className={`text-left p-3 rounded-2xl transition-all flex flex-col justify-between gap-1.5 border group ${
                     isSelected
                       ? "bg-zinc-900 text-white dark:bg-white/15 dark:text-white border-zinc-900 dark:border-white/30 ring-1 ring-zinc-900/30 dark:ring-white/40 shadow-lg"
                       : "bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.03] dark:hover:bg-white/[0.07] text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border-black/5 dark:border-white/10 shadow-sm"
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-xl p-1.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+                    <div className="w-10 h-10 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-xl shadow-inner border border-black/5 dark:border-white/5 emoji-text group-hover:scale-110 transition-transform">
                       {preset.emoji}
-                    </span>
+                    </div>
                     <span className={`material-symbols-outlined text-base ${isSelected ? "text-white" : "text-zinc-400 dark:text-zinc-600"}`}>
                       {isSelected ? "check_circle" : "radio_button_unchecked"}
                     </span>

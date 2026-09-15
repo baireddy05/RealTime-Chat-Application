@@ -210,6 +210,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     const val = e.target.value;
     const isAddingChar = val.length > text.length;
     setText(val);
+    
+    // Auto-resize textarea
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
 
     // Satisfying, localized tactile keystroke pulse
     setIsTypingPulse(true);
@@ -483,6 +487,9 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
     
     setText("");
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
     removeImage();
     removeDocument();
     setShowEmojiPicker(false);
@@ -660,7 +667,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 key={idx}
                 type="button"
                 onClick={() => handleEmojiSelect(emoji)}
-                className="hover:scale-125 active:scale-95 transition-transform p-1 rounded-lg hover:bg-[var(--glass-hover)] text-base flex-shrink-0 flex items-center justify-center"
+                className="hover:scale-125 active:scale-95 transition-transform p-1 rounded-lg hover:bg-[var(--glass-hover)] text-base flex-shrink-0 flex items-center justify-center emoji-text"
               >
                 {emoji}
               </button>
@@ -962,10 +969,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
             {/* Text Input Field with Typing Rhythm Indicator */}
             <div className="flex-1 flex items-center px-1 sm:px-2 min-w-0 relative">
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
-                className="w-full bg-transparent py-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-sm focus:outline-none"
+                rows={1}
+                className="w-full bg-transparent py-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-sm focus:outline-none resize-none overflow-y-auto max-h-[120px] custom-scrollbar"
                 placeholder={
                   scheduledFor
                     ? "Schedule a message..."
@@ -977,6 +984,14 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 }
                 value={text}
                 onChange={handleTextChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (text.trim() || imagePreview || documentFile) {
+                      handleSendMessage(e);
+                    }
+                  }
+                }}
               />
               {text.length > 0 && (
                 <span

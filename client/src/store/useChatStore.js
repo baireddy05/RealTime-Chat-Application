@@ -31,6 +31,8 @@ export const useChatStore = create((set, get) => ({
   lastMessages: {}, // { [chatId]: messageObj }
   disappearingTimer: null, // null, 5, 60, 3600, 86400 (seconds)
   scheduledMessages: [],
+  networkStatuses: [],
+  myStatuses: [],
   isScheduledOpen: false,
   isWallpaperOpen: false,
   chatWallpapers: (() => {
@@ -99,6 +101,84 @@ export const useChatStore = create((set, get) => ({
   setForwardingMessage: (msg) => set({ forwardingMessage: msg }),
   setIsStarredOpen: (val) => set({ isStarredOpen: val }),
   setIsGroupInfoOpen: (val) => set({ isGroupInfoOpen: val }),
+
+  getStatuses: async () => {
+    try {
+      const res = await axiosInstance.get("/statuses");
+      const authUser = useAuthStore.getState().authUser;
+      const allStatuses = res.data;
+      
+      const myStatuses = allStatuses.filter((s) => s.userId._id === authUser._id || s.userId === authUser._id);
+      
+      // Group network statuses by user
+      const networkMap = {};
+      allStatuses.forEach((s) => {
+        const uId = s.userId._id || s.userId;
+        if (uId === authUser._id) return;
+        
+        if (!networkMap[uId]) {
+          networkMap[uId] = {
+            id: uId,
+            user: s.userId.username,
+            avatar: s.userId.profilePic,
+            stories: [],
+          };
+        }
+        networkMap[uId].stories.push({
+          id: s._id,
+          time: new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          text: s.text,
+          bg: s.bg,
+        });
+      });
+      
+      set({ 
+        myStatuses: myStatuses.map(s => ({
+          id: s._id,
+          time: new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          text: s.text,
+          bg: s.bg,
+        })),
+        networkStatuses: Object.values(networkMap) 
+      });
+    } catch (error) {
+      console.error("Error fetching statuses:", error);
+    }
+  },
+
+  uploadStatus: async (text, bg) => {
+    try {
+      const res = await axiosInstance.post("/statuses", { text, bg });
+      const authUser = useAuthStore.getState().authUser;
+      
+      const newStory = {
+        id: res.data._id,
+        time: new Date(res.data.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: res.data.text,
+        bg: res.data.bg,
+      };
+      
+      set((state) => ({
+        myStatuses: [newStory, ...state.myStatuses]
+      }));
+      return res.data;
+    } catch (error) {
+      console.error("Error uploading status:", error);
+      throw error;
+    }
+  },
+
+  deleteStatus: async (statusId) => {
+    try {
+      await axiosInstance.delete(`/statuses/${statusId}`);
+      set((state) => ({
+        myStatuses: state.myStatuses.filter((s) => s.id !== statusId)
+      }));
+    } catch (error) {
+      console.error("Error deleting status:", error);
+      throw error;
+    }
+  },
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -702,6 +782,53 @@ export const useChatStore = create((set, get) => ({
           : m
       );
       set({ messages: updated });
+    });
+
+    // Real-time status updates
+    socket.on("newStatus", (status) => {
+      const authUser = useAuthStore.getState().authUser;
+      const uId = status.userId._id || status.userId;
+      if (uId === authUser._id) return;
+
+      set((state) => {
+        let networkMap = [...state.networkStatuses];
+        const personIndex = networkMap.findIndex((p) => p.id === uId);
+        
+        const newStory = {
+          id: status._id,
+          time: new Date(status.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          text: status.text,
+          bg: status.bg,
+        };
+
+        if (personIndex >= 0) {
+          networkMap[personIndex].stories.push(newStory);
+        } else {
+          networkMap.push({
+            id: uId,
+            user: status.userId.username || "User",
+            avatar: status.userId.profilePic || "",
+            stories: [newStory],
+          });
+        }
+        return { networkStatuses: networkMap };
+      });
+    });
+
+    socket.on("deletedStatus", ({ statusId, userId }) => {
+      set((state) => {
+        return {
+          networkStatuses: state.networkStatuses.map((person) => {
+            if (person.id === userId) {
+              return {
+                ...person,
+                stories: person.stories.filter((s) => s.id !== statusId),
+              };
+            }
+            return person;
+          }).filter(person => person.stories.length > 0)
+        };
+      });
     });
 
     // Real-time message edited

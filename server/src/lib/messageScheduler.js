@@ -14,6 +14,7 @@ export const startMessageScheduler = () => {
 
       for (const msg of readyMessages) {
         msg.isScheduled = false;
+        msg.createdAt = now;
         await msg.save();
 
         if (msg.roomId) {

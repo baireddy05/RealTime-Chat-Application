@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.route.js";
 import chatRoutes from "./routes/chat.route.js";
 import uploadRoutes from "./routes/upload.route.js";
 import friendRoutes from "./routes/friend.route.js";
+import statusRoutes from "./routes/status.route.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -23,6 +24,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/friends", friendRoutes);
+app.use("/api/statuses", statusRoutes);
 
 import { startMessageScheduler } from "./lib/messageScheduler.js";
 

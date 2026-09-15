@@ -207,6 +207,7 @@ export const getMessages = async (req, res) => {
 
       const messages = await Message.find({ roomId: id, ...baseFilter })
         .populate("senderId", "username profilePic")
+        .sort({ createdAt: 1 })
         .lean();
       return res.status(200).json(messages);
     } else {
@@ -218,6 +219,7 @@ export const getMessages = async (req, res) => {
         ],
       })
         .populate("senderId", "username profilePic")
+        .sort({ createdAt: 1 })
         .lean();
       return res.status(200).json(messages);
     }

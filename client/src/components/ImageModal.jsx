@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Download,
@@ -111,7 +112,7 @@ const ImageModal = ({ imageUrl, onClose }) => {
     u.username.toLowerCase().includes(forwardSearch.toLowerCase())
   );
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-2xl animate-fadeIn">
       {/* Top Floating Controls */}
       <div className="absolute top-4 inset-x-3 md:inset-x-8 z-20 pointer-events-none flex flex-col items-center gap-2 md:flex-row md:justify-between">
@@ -375,7 +376,8 @@ const ImageModal = ({ imageUrl, onClose }) => {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 

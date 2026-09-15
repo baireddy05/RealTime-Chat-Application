@@ -148,19 +148,6 @@ const ChatPane = ({ onBack }) => {
   }, [messages]);
 
   const scrollToBottom = useCallback((behavior = "smooth") => {
-    // 1. Direct DOM scroller to guarantee scroll to the absolute bottom
-    const scroller = scrollerElementRef.current;
-    if (scroller) {
-      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-      if (maxScroll > 0) {
-        if (behavior === "smooth") {
-          scroller.scrollTo({ top: maxScroll + 500, behavior: "smooth" });
-        } else {
-          scroller.scrollTop = maxScroll + 500;
-        }
-      }
-    }
-    // 2. Virtuoso programmatic scroll
     if (messagesContainerRef.current) {
       try {
         messagesContainerRef.current.scrollToIndex({
@@ -172,70 +159,29 @@ const ChatPane = ({ onBack }) => {
         // ignore
       }
     }
-    // 3. Native scrollIntoView on last message element if available
-    const lastMsg = messagesRef.current?.[messagesRef.current.length - 1];
-    if (lastMsg) {
-      const el = document.getElementById(`msg-${lastMsg._id}`);
-      if (el) {
-        el.scrollIntoView({ behavior, block: "end" });
-      }
-    }
   }, []);
 
-  // Auto-scroll to bottom when messages change (new message sent or received)
-  const prevMessagesLengthRef = useRef(messages.length);
-  useEffect(() => {
-    const prevLen = prevMessagesLengthRef.current;
-    const currLen = messages.length;
-    prevMessagesLengthRef.current = currLen;
-
-    if (currLen > prevLen) {
-      scrollToBottom("auto");
-      const t1 = setTimeout(() => scrollToBottom("smooth"), 40);
-      const t2 = setTimeout(() => scrollToBottom("smooth"), 120);
-      const t3 = setTimeout(() => scrollToBottom("smooth"), 250);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
-    }
-  }, [messages.length, scrollToBottom]);
-
-  // Ensure scroll is at bottom when opening or switching a chat
+  // Auto-scroll on initial load or chat switch is handled by Virtuoso initialTopMostItemIndex
+  // Auto-scroll on new message is handled by Virtuoso followOutput="smooth"
+  
+  // Ensure we snap to bottom if chat initially loads and images might shift it
   useEffect(() => {
     if (!isMessagesLoading && messages.length > 0) {
       scrollToBottom("auto");
-      const t1 = setTimeout(() => scrollToBottom("auto"), 30);
-      const t2 = setTimeout(() => scrollToBottom("smooth"), 100);
-      const t3 = setTimeout(() => scrollToBottom("smooth"), 250);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
     }
-  }, [selectedChat?.id, isMessagesLoading, messages.length, scrollToBottom]);
+  }, [selectedChat?.id, isMessagesLoading, scrollToBottom]);
 
-  // Global event listener for instant scroll on send
+  // Global event listener for instant scroll on manual send
   useEffect(() => {
     const handleScrollReq = () => {
-      scrollToBottom("auto");
-      setTimeout(() => scrollToBottom("smooth"), 50);
-      setTimeout(() => scrollToBottom("smooth"), 150);
-      setTimeout(() => scrollToBottom("smooth"), 300);
+      scrollToBottom("smooth");
     };
     window.addEventListener("pulse:scroll-to-bottom", handleScrollReq);
     return () => window.removeEventListener("pulse:scroll-to-bottom", handleScrollReq);
   }, [scrollToBottom]);
 
   const handleTotalListHeightChanged = useCallback(() => {
-    const scroller = scrollerElementRef.current;
-    if (!scroller) return;
-    const distanceToBottom = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
-    if (distanceToBottom < 250) {
-      scroller.scrollTop = scroller.scrollHeight + 500;
-    }
+    // Rely on Virtuoso followOutput and alignToBottom instead of fighting it
   }, []);
 
   useEffect(() => {
@@ -1123,7 +1069,7 @@ const ChatPane = ({ onBack }) => {
                                         reactToMessage(message._id, emoji);
                                         setOpenMenuMessageId(null);
                                       }}
-                                      className="hover:scale-125 transition-transform text-base p-1 rounded-lg hover:bg-white/10"
+                                      className="hover:scale-125 transition-transform text-base p-1 rounded-lg hover:bg-white/10 emoji-text"
                                       title={`React ${emoji}`}
                                     >
                                       {emoji}
@@ -1287,7 +1233,7 @@ const ChatPane = ({ onBack }) => {
                               className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-all ${
                                 grp.hasReacted ? "bg-accent-primary/20 border-accent-primary/40 text-accent-primary font-medium" : "bg-[var(--glass-surface)] border-[var(--glass-border)] text-theme-muted hover:bg-[var(--glass-hover)] hover:text-theme-main"
                               }`}>
-                              <span>{grp.emoji}</span><span className="text-[10px]">{grp.count}</span>
+                              <span className="emoji-text">{grp.emoji}</span><span className="text-[10px]">{grp.count}</span>
                             </button>
                           ))}
                         </div>

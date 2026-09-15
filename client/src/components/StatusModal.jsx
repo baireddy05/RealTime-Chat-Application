@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Plus, Send, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
+import { useChatStore } from "../store/useChatStore";
 
 const STATUS_BG_COLORS = [
   "bg-gradient-to-tr from-sky-500 to-indigo-600",
@@ -10,12 +11,13 @@ const STATUS_BG_COLORS = [
   "bg-gradient-to-tr from-cyan-500 to-blue-600",
 ];
 
-const INITIAL_NETWORK_PERSONS = [];
-
 const StatusModal = ({ onClose }) => {
   const { authUser } = useAuthStore();
-  const [networkPersons] = useState(INITIAL_NETWORK_PERSONS);
-  const [myStories, setMyStories] = useState([]);
+  const { networkStatuses: networkPersons, myStatuses: myStories, uploadStatus, deleteStatus, getStatuses } = useChatStore();
+
+  useEffect(() => {
+    getStatuses();
+  }, [getStatuses]);
 
   const [activeViewer, setActiveViewer] = useState(null);
   const [storyProgress, setStoryProgress] = useState(0);
@@ -149,26 +151,26 @@ const StatusModal = ({ onClose }) => {
     return () => clearInterval(timer);
   }, [activeViewer, activeStory, isPaused, goToNextStory]);
 
-  const handleCreateStatus = (e) => {
+  const handleCreateStatus = async (e) => {
     e.preventDefault();
     if (!newStatusText.trim()) return;
 
-    const newStory = {
-      id: `my-status-${Date.now()}`,
-      time: "Just now",
-      text: newStatusText.trim(),
-      bg: selectedBg,
-    };
-
-    setMyStories((prev) => [newStory, ...prev]);
-    setNewStatusText("");
-    setIsCreatingStatus(false);
+    setIsCreatingStatus(true);
+    try {
+      await uploadStatus(newStatusText.trim(), selectedBg);
+      setNewStatusText("");
+    } catch (error) {
+      console.error("Failed to upload status", error);
+    } finally {
+      setIsCreatingStatus(false);
+    }
   };
 
-  const handleDeleteMyStory = (storyId, e) => {
+  const handleDeleteMyStory = async (storyId, e) => {
     e?.stopPropagation();
-    setMyStories((prev) => {
-      const updated = prev.filter((s) => s.id !== storyId);
+    try {
+      await deleteStatus(storyId);
+      const updated = myStories.filter((s) => s.id !== storyId);
       if (updated.length === 0) {
         setActiveViewer(null);
         setStoryProgress(0);
@@ -179,8 +181,9 @@ const StatusModal = ({ onClose }) => {
         }));
         setStoryProgress(0);
       }
-      return updated;
-    });
+    } catch (error) {
+      console.error("Failed to delete status", error);
+    }
   };
 
   return (

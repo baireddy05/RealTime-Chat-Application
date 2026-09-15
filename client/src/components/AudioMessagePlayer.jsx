@@ -101,7 +101,11 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
       <button
         type="button"
         onClick={togglePlay}
-        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-90 shadow-md bg-current text-white dark:text-[#0d0c11]"
+        className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-90 shadow-md ${
+          isMine
+            ? "bg-white text-blue-600 dark:bg-[#0d0c11] dark:text-blue-400"
+            : "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900"
+        }`}
         title={isPlaying ? "Pause" : "Play voice note"}
       >
         {isPlaying ? (
