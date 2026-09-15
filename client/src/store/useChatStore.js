@@ -713,6 +713,7 @@ export const useChatStore = create((set, get) => ({
             body,
             icon: processedMessage.senderId?.profilePic || "/favicon.ico",
           });
+          window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         } else {
           soundManager.playSendSound();
           window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));

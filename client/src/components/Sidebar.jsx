@@ -81,6 +81,23 @@ const Sidebar = ({
   const [isLocalCreateGroupOpen, setIsLocalCreateGroupOpen] = useState(false);
   const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
   const searchInputRef = useRef(null);
+  const optionsDropdownRef = useRef(null);
+
+  // Close options dropdown on outside click
+  useEffect(() => {
+    if (!showOptionsDropdown) return;
+    const handleClickOutside = (e) => {
+      if (optionsDropdownRef.current && !optionsDropdownRef.current.contains(e.target)) {
+        setShowOptionsDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showOptionsDropdown]);
 
   // Mobile Back Navigation handlers
   useBackHandler(isLocalCreateGroupOpen, () => setIsLocalCreateGroupOpen(false), "sidebar-create-group");
@@ -480,7 +497,7 @@ const Sidebar = ({
             </button>
 
             {/* Options Dropdown Menu */}
-            <div className="relative">
+            <div className="relative" ref={optionsDropdownRef}>
               <button
                 onClick={() => setShowOptionsDropdown(!showOptionsDropdown)}
                 className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
@@ -491,11 +508,13 @@ const Sidebar = ({
               </button>
 
               {showOptionsDropdown && (
-                <div className="absolute right-0 top-9 w-52 rounded-2xl bg-white/95 dark:bg-[#14131a]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none text-zinc-900 dark:text-white">
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowOptionsDropdown(false)} />
+                  <div className="absolute right-0 top-9 w-52 rounded-2xl bg-white/95 dark:bg-[#14131a]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none text-zinc-900 dark:text-white">
                   {onOpenProfile && (
                     <button
                       onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">person</span>
                       <span>My Profile</span>
@@ -504,7 +523,7 @@ const Sidebar = ({
                   {onOpenStarred && (
                     <button
                       onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">star</span>
                       <span>Starred Messages</span>
@@ -519,15 +538,6 @@ const Sidebar = ({
                       <span>Set Status Mood</span>
                     </button>
                   )}
-                  {setIsWallpaperOpen && (
-                    <button
-                      onClick={() => { setIsWallpaperOpen(true); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
-                    >
-                      <span className="material-symbols-outlined text-sm">wallpaper</span>
-                      <span>Chat Wallpaper</span>
-                    </button>
-                  )}
                   {handleInstallPWA && (
                     <button
                       onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
@@ -540,7 +550,7 @@ const Sidebar = ({
                   {onToggleTheme && (
                     <button
                       onClick={() => { onToggleTheme(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <span className="material-symbols-outlined text-sm">
                         {theme === "dark" ? "light_mode" : "dark_mode"}
@@ -561,6 +571,7 @@ const Sidebar = ({
                     </>
                   )}
                 </div>
+                </>
               )}
             </div>
           </div>

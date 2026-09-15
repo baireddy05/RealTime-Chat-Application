@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, Terminal } from "lucide-react";
+import { parseEmojiToHtml } from "../lib/emoji";
 
 export const CodeSnippetBlock = ({ code, language }) => {
   const [copied, setCopied] = useState(false);
@@ -80,7 +81,7 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
     });
   }
 
-  // Render normal text with links, inline code and search highlight
+  // Render normal text with links, inline code, search highlight, and Twemoji
   const renderInlineText = (str) => {
     // Split by inline code `...`
     const inlineParts = str.split(/(`[^`]+`)/g);
@@ -130,16 +131,23 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
               <mark
                 key={k}
                 className="bg-yellow-400/35 text-current font-bold px-1 rounded border border-yellow-500/30"
-              >
-                {m}
-              </mark>
+                dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
+              />
             ) : (
-              m
+              <span
+                key={k}
+                dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
+              />
             )
           );
         }
 
-        return urlSub;
+        return (
+          <span
+            key={j}
+            dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(urlSub) }}
+          />
+        );
       });
     });
   };

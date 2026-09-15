@@ -23,6 +23,7 @@ import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import ScheduledMessagesModal from "./ScheduledMessagesModal";
 import WallpaperModal from "./WallpaperModal";
+import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
 import { WALLPAPER_PRESETS } from "../lib/wallpapers";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
@@ -56,15 +57,6 @@ const extractFirstUrl = (text) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const match = text.match(urlRegex);
   return match ? match[0] : null;
-};
-
-const isOnlyEmojis = (str) => {
-  if (!str) return false;
-  const noSpace = str.replace(/[\s\n]/g, "");
-  if (!noSpace) return false;
-  // Regex that matches emoji characters
-  const emojiRegex = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)+$/u;
-  return emojiRegex.test(noSpace);
 };
 
 
@@ -156,35 +148,55 @@ const ChatPane = ({ onBack }) => {
     messagesRef.current = messages;
   }, [messages]);
 
-  const scrollToBottom = useCallback((behavior = "smooth") => {
-    if (messagesContainerRef.current) {
-      try {
-        const lastIndex = Math.max((searchQuery.trim() ? searchMatches.length : messagesRef.current.length) - 1, 0);
-        messagesContainerRef.current.scrollToIndex({
-          index: lastIndex,
-          align: "end",
-          behavior,
-        });
-      } catch {
-        // ignore
-      }
-    }
-  }, [searchQuery, searchMatches.length]);
+  const prevMessagesCountRef = useRef(messages.length);
 
-  // Auto-scroll on initial load or chat switch is handled by Virtuoso initialTopMostItemIndex
-  // Auto-scroll on new message is handled by Virtuoso followOutput="smooth"
-  
-  // Ensure we snap to bottom if chat initially loads and images might shift it
+  const scrollToBottom = useCallback((behavior = "auto") => {
+    const doScroll = () => {
+      const currentList = searchQuery.trim() ? searchMatches : messagesRef.current;
+      const count = currentList?.length || 0;
+      if (count === 0) return;
+      
+      if (messagesContainerRef.current) {
+        try {
+          messagesContainerRef.current.scrollToIndex({
+            index: count - 1,
+            align: "end",
+            behavior,
+          });
+        } catch {
+          // ignore
+        }
+      }
+      if (scrollerElementRef.current) {
+        scrollerElementRef.current.scrollTop = scrollerElementRef.current.scrollHeight + 5000;
+      }
+    };
+
+    doScroll();
+    requestAnimationFrame(doScroll);
+    setTimeout(doScroll, 30);
+    setTimeout(doScroll, 100);
+  }, [searchQuery, searchMatches]);
+
+  // Auto-scroll whenever a message is sent, received, or list length changes
+  useEffect(() => {
+    if (messages.length !== prevMessagesCountRef.current) {
+      prevMessagesCountRef.current = messages.length;
+      scrollToBottom("auto");
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // Ensure we snap to bottom when chat initially loads
   useEffect(() => {
     if (!isMessagesLoading && messages.length > 0) {
       scrollToBottom("auto");
     }
   }, [selectedChat?.id, isMessagesLoading, scrollToBottom]);
 
-  // Global event listener for instant scroll on manual send
+  // Global event listener for instant scroll on manual send / receive
   useEffect(() => {
     const handleScrollReq = () => {
-      scrollToBottom("smooth");
+      scrollToBottom("auto");
     };
     window.addEventListener("pulse:scroll-to-bottom", handleScrollReq);
     return () => window.removeEventListener("pulse:scroll-to-bottom", handleScrollReq);
@@ -842,7 +854,7 @@ const ChatPane = ({ onBack }) => {
             data={searchQuery.trim() ? searchMatches : displayedMessages}
             computeItemKey={(index, item) => item._id || `msg-${index}`}
             initialTopMostItemIndex={searchQuery.trim() ? Math.max(searchMatches.length - 1, 0) : Math.max(displayedMessages.length - 1, 0)}
-            followOutput={(isAtBottom) => isAtBottom ? "auto" : false}
+            followOutput={(isAtBottom) => "auto"}
             alignToBottom={true}
             defaultItemHeight={60}
             components={virtuosoComponents}
@@ -1103,10 +1115,10 @@ const ChatPane = ({ onBack }) => {
                                         reactToMessage(message._id, emoji);
                                         setOpenMenuMessageId(null);
                                       }}
-                                      className="hover:scale-125 transition-transform text-base p-1 rounded-lg hover:bg-white/10 emoji-text"
+                                      className="hover:scale-125 transition-transform p-1 rounded-lg hover:bg-white/10 quick-reaction-btn flex items-center justify-center"
                                       title={`React ${emoji}`}
                                     >
-                                      {emoji}
+                                      <EmojiSpan text={emoji} />
                                     </button>
                                   ))}
                                   <button
@@ -1264,10 +1276,10 @@ const ChatPane = ({ onBack }) => {
                         <div className="flex flex-wrap gap-1 mt-1">
                           {Object.values(reactionGroups).map((grp) => (
                             <button key={grp.emoji} onClick={() => reactToMessage(message._id, grp.emoji)} title={`Reacted by: ${grp.users.join(", ")}`}
-                              className={`flex items-center gap-1.5 text-[14px] px-2.5 py-1 rounded-full border transition-all shadow-sm ${
+                              className={`flex items-center gap-1.5 text-[14px] px-2.5 py-1 rounded-full border transition-all shadow-sm reaction-pill ${
                                 grp.hasReacted ? "bg-accent-primary/20 border-accent-primary/40 text-accent-primary font-medium" : "bg-[var(--glass-surface)] border-[var(--glass-border)] text-theme-muted hover:bg-[var(--glass-hover)] hover:text-theme-main"
                               }`}>
-                              <span className="emoji-text">{grp.emoji}</span><span className="text-[11px] font-semibold opacity-80">{grp.count}</span>
+                              <EmojiSpan text={grp.emoji} /><span className="text-[11px] font-semibold opacity-80">{grp.count}</span>
                             </button>
                           ))}
                         </div>
