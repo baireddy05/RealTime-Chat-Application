@@ -245,6 +245,10 @@ const ChatPane = ({ onBack }) => {
     });
   };
 
+  const displayedMessages = useMemo(() => {
+    return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [messages]);
+
   if (!selectedChat) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none relative bg-transparent overflow-hidden">
@@ -262,10 +266,6 @@ const ChatPane = ({ onBack }) => {
       </div>
     );
   }
-
-  const displayedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  }, [messages]);
 
   const handleNextMatch = () => {
     if (searchMatches.length === 0) return;

@@ -162,7 +162,6 @@ const SetStatusModal = ({ onClose }) => {
                   key={preset.title}
                   type="button"
                   onClick={() => handleSelectPreset(preset)}
-                  className={`text-left p-3 rounded-2xl transition-all flex flex-col justify-between gap-1.5 border ${
                   className={`text-left p-3 rounded-2xl transition-all flex flex-col justify-between gap-1.5 border group ${
                     isSelected
                       ? "bg-zinc-900 text-white dark:bg-white/15 dark:text-white border-zinc-900 dark:border-white/30 ring-1 ring-zinc-900/30 dark:ring-white/40 shadow-lg"
