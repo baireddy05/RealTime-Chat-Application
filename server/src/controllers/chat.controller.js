@@ -209,6 +209,14 @@ export const getMessages = async (req, res) => {
         .populate("senderId", "username profilePic")
         .sort({ createdAt: 1 })
         .lean();
+
+      // Mark un-delivered messages as delivered
+      await Message.updateMany(
+        { roomId: id, senderId: { $ne: myId }, "deliveries.userId": { $ne: myId } },
+        { $push: { deliveries: { userId: myId, at: new Date() } } }
+      );
+      io.to(id).emit("messageDelivered", { chatId: id, delivererId: myId, type: "room" });
+
       return res.status(200).json(messages);
     } else {
       const messages = await Message.find({
@@ -221,6 +229,16 @@ export const getMessages = async (req, res) => {
         .populate("senderId", "username profilePic")
         .sort({ createdAt: 1 })
         .lean();
+
+      await Message.updateMany(
+        { senderId: id, receiverId: myId, "deliveries.userId": { $ne: myId } },
+        { $push: { deliveries: { userId: myId, at: new Date() } } }
+      );
+      const senderSocketId = getReceiverSocketId(id);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageDelivered", { chatId: myId, delivererId: myId, type: "user" });
+      }
+
       return res.status(200).json(messages);
     }
   } catch (error) {
@@ -548,13 +566,19 @@ export const markMessagesAsRead = async (req, res) => {
     if (type === "room") {
       await Message.updateMany(
         { roomId: id, readBy: { $ne: myId } },
-        { $addToSet: { readBy: myId } }
+        { 
+          $addToSet: { readBy: myId },
+          $push: { reads: { userId: myId, at: new Date() } }
+        }
       );
       io.to(id).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
     } else {
       await Message.updateMany(
         { senderId: id, receiverId: myId, readBy: { $ne: myId } },
-        { $addToSet: { readBy: myId } }
+        { 
+          $addToSet: { readBy: myId },
+          $push: { reads: { userId: myId, at: new Date() } }
+        }
       );
       const senderSocketId = getReceiverSocketId(id);
       if (senderSocketId) {

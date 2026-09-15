@@ -534,7 +534,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         file: currentReply.file || null,
       } : undefined,
     });
-    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    // Fire after React state updates the DOM
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    }, 100);
   };
 
   const hasContent = text.trim().length > 0 || imagePreview || documentFile;

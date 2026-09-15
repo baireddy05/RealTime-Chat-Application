@@ -159,8 +159,9 @@ const ChatPane = ({ onBack }) => {
   const scrollToBottom = useCallback((behavior = "smooth") => {
     if (messagesContainerRef.current) {
       try {
+        const lastIndex = Math.max((searchQuery.trim() ? searchMatches.length : messagesRef.current.length) - 1, 0);
         messagesContainerRef.current.scrollToIndex({
-          index: "LAST",
+          index: lastIndex,
           align: "end",
           behavior,
         });
@@ -168,7 +169,7 @@ const ChatPane = ({ onBack }) => {
         // ignore
       }
     }
-  }, []);
+  }, [searchQuery, searchMatches.length]);
 
   // Auto-scroll on initial load or chat switch is handled by Virtuoso initialTopMostItemIndex
   // Auto-scroll on new message is handled by Virtuoso followOutput="smooth"
@@ -839,12 +840,11 @@ const ChatPane = ({ onBack }) => {
             scrollerRef={(el) => { scrollerElementRef.current = el; }}
             className="flex-1 w-full h-full overflow-x-hidden custom-scrollbar"
             data={searchQuery.trim() ? searchMatches : displayedMessages}
-            computeItemKey={(index, item) => item._id || index}
-            initialTopMostItemIndex={searchQuery.trim() ? searchMatches.length - 1 : (displayedMessages.length > 0 ? displayedMessages.length - 1 : 0)}
-            followOutput="smooth"
+            computeItemKey={(index, item) => item._id || `msg-${index}`}
+            initialTopMostItemIndex={searchQuery.trim() ? Math.max(searchMatches.length - 1, 0) : Math.max(displayedMessages.length - 1, 0)}
+            followOutput={(isAtBottom) => isAtBottom ? "auto" : false}
             alignToBottom={true}
-            defaultItemHeight={80}
-            totalListHeightChanged={handleTotalListHeightChanged}
+            defaultItemHeight={60}
             components={virtuosoComponents}
             itemContent={(index, message) => {
               const currentList = searchQuery.trim() ? searchMatches : displayedMessages;
@@ -875,7 +875,19 @@ const ChatPane = ({ onBack }) => {
                 if (r.userId === authUser._id || r.userId?._id === authUser._id) acc[r.emoji].hasReacted = true;
                 return acc;
               }, {});
-              const isReadByRecipient = selectedChat.type === "user" && (message.readBy || []).includes(selectedChat.id);
+
+              const readObj = (message.reads || []).find(r => r.userId === selectedChat.id);
+              const isReadByRecipient = selectedChat.type === "user" && (readObj || (message.readBy || []).includes(selectedChat.id));
+              const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat.id);
+              const isDeliveredToRecipient = selectedChat.type === "user" && !!deliveryObj;
+              
+              let statusTitle = `Sent: ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              if (isDeliveredToRecipient && deliveryObj?.at) {
+                statusTitle += `\nDelivered: ${new Date(deliveryObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              }
+              if (isReadByRecipient && readObj?.at) {
+                statusTitle += `\nSeen: ${new Date(readObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              }
               const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
               const openUpwards = index >= 2;
               const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
@@ -1003,7 +1015,7 @@ const ChatPane = ({ onBack }) => {
                               )}
                               {message.text && (
                                 <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
-                                  <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[13.5px] leading-relaxed break-words font-normal"}`}>
+                                  <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[15.5px] leading-relaxed break-words font-normal"}`}>
                                     <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
                                   </div>
                                   <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">
@@ -1011,10 +1023,13 @@ const ChatPane = ({ onBack }) => {
                                     <span className={isJustEmoji ? "text-theme-muted drop-shadow-sm font-semibold" : ""}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                     {isMine && !message.isDeleted && (
                                       message.isOptimistic ? (
-                                        <Clock size={11} className={`opacity-70 animate-pulse ${isJustEmoji ? "text-theme-muted drop-shadow-sm" : ""}`} />
+                                        <Clock size={11} className={`opacity-70 animate-pulse ${isJustEmoji ? "text-theme-muted drop-shadow-sm" : ""}`} title="Sending..." />
                                       ) : (
-                                        <span className={`material-symbols-outlined text-sm ${isJustEmoji ? "text-theme-muted drop-shadow-sm " : ""}${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold opacity-70"}`}>
-                                          done_all
+                                        <span 
+                                          title={statusTitle}
+                                          className={`material-symbols-outlined text-sm cursor-help ${isJustEmoji ? "text-theme-muted drop-shadow-sm " : ""}${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold opacity-70"}`}
+                                        >
+                                          {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
                                         </span>
                                       )
                                     )}
@@ -1035,9 +1050,14 @@ const ChatPane = ({ onBack }) => {
                                   </span>
                                   {isMine && !message.isDeleted && (
                                     message.isOptimistic ? (
-                                      <Clock size={11} className="opacity-70 animate-pulse" />
+                                      <Clock size={11} className="opacity-70 animate-pulse" title="Sending..." />
                                     ) : (
-                                      <CheckCheck size={13} className={isReadByRecipient ? "font-bold opacity-100" : "font-semibold opacity-70"} />
+                                      <span 
+                                        title={statusTitle}
+                                        className={`material-symbols-outlined text-sm cursor-help ${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold"}`}
+                                      >
+                                        {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
+                                      </span>
                                     )
                                   )}
                                 </div>

@@ -170,7 +170,32 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Message Delivery Receipt
+  socket.on("messageDelivered", async ({ messageId, senderId }) => {
+    try {
+      if (!messageId || !userId) return;
+      await import("../models/Message.model.js").then(({ default: Message }) => {
+        Message.findOneAndUpdate(
+          { _id: messageId, "deliveries.userId": { $ne: userId } },
+          { $push: { deliveries: { userId, at: new Date() } } }
+        ).exec();
+      });
+      const senderSocketId = getReceiverSocketId(senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageDelivered", { 
+          messageId, 
+          delivererId: userId,
+          chatId: userId,
+          type: "user" 
+        });
+      }
+    } catch (err) {
+      console.error("Error in messageDelivered event:", err);
+    }
+  });
+
   socket.on("userVisibilityChange", ({ isHidden }) => {
+    console.log(`Visibility changed for ${userId}: hidden = ${isHidden}`);
     if (isHidden) {
       hiddenUsers.add(userId);
     } else {

@@ -105,6 +105,10 @@ export const useAuthStore = create((set, get) => ({
       set({ onlineUsers: (userIds || []).map((id) => id?.toString()) });
     });
 
+    newSocket.on("connect", () => {
+      newSocket.emit("userVisibilityChange", { isHidden: document.hidden });
+    });
+
     if (visibilityHandler) {
       document.removeEventListener("visibilitychange", visibilityHandler);
     }

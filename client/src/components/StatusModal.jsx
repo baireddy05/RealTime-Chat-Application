@@ -138,6 +138,17 @@ const StatusModal = ({ onClose }) => {
   useEffect(() => {
     if (!activeViewer || !activeStory || isPaused) return;
 
+    if (activeViewer.type === "network" && activeStory.id) {
+      try {
+        const viewed = JSON.parse(localStorage.getItem("viewedStories") || "[]");
+        if (!viewed.includes(activeStory.id)) {
+          viewed.push(activeStory.id);
+          localStorage.setItem("viewedStories", JSON.stringify(viewed));
+          window.dispatchEvent(new Event("pulse:story-viewed"));
+        }
+      } catch (e) {}
+    }
+
     const timer = setInterval(() => {
       setStoryProgress((prev) => {
         if (prev >= 100) {

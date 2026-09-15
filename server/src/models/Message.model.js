@@ -52,6 +52,18 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    reads: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now }
+      }
+    ],
+    deliveries: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now }
+      }
+    ],
     replyTo: {
       messageId: {
         type: mongoose.Schema.Types.ObjectId,

@@ -695,6 +695,13 @@ export const useChatStore = create((set, get) => ({
         get().markMessagesAsRead(selectedChat.id, selectedChat.type);
 
         if (!isMyMessage) {
+          const socket = useAuthStore.getState().socket;
+          if (socket) {
+            socket.emit("messageDelivered", {
+              messageId: processedMessage._id,
+              senderId: processedMessage.senderId?._id || processedMessage.senderId
+            });
+          }
           soundManager.playReceiveSound();
           const senderName = processedMessage.senderId?.username || "Pulse User";
           const title = selectedChat.type === "room"
@@ -713,6 +720,13 @@ export const useChatStore = create((set, get) => ({
       } else {
         // Increment unread count for the non-active chat (e.g. mobile chats list view)
         if (!isMyMessage) {
+          const socket = useAuthStore.getState().socket;
+          if (socket) {
+            socket.emit("messageDelivered", {
+              messageId: processedMessage._id,
+              senderId: processedMessage.senderId?._id || processedMessage.senderId
+            });
+          }
           set((state) => ({
             unreadCounts: {
               ...state.unreadCounts,
@@ -915,14 +929,44 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
+    // Real-time message delivered receipts
+    socket.on("messageDelivered", ({ messageId, delivererId, chatId }) => {
+      const { messages, selectedChat } = get();
+      if (!selectedChat || selectedChat.id !== chatId) return;
+      const updated = messages.map((m) => {
+        if (messageId) {
+          if (m._id !== messageId) return m;
+        }
+        const deliveries = m.deliveries || [];
+        if (!deliveries.some(d => d.userId === delivererId)) {
+          return { ...m, deliveries: [...deliveries, { userId: delivererId, at: new Date().toISOString() }] };
+        }
+        return m;
+      });
+      set({ messages: updated });
+    });
+
     // Real-time read receipts
     socket.on("messagesRead", ({ chatId, readerId, type: _type }) => {
       const { messages, selectedChat } = get();
       if (!selectedChat || selectedChat.id !== chatId) return;
       const updated = messages.map((m) => {
         const readBy = m.readBy || [];
-        if (!readBy.includes(readerId)) {
-          return { ...m, readBy: [...readBy, readerId] };
+        const reads = m.reads || [];
+        let modified = false;
+        let newReadBy = [...readBy];
+        let newReads = [...reads];
+        
+        if (!newReadBy.includes(readerId)) {
+          newReadBy.push(readerId);
+          modified = true;
+        }
+        if (!newReads.some(r => r.userId === readerId)) {
+          newReads.push({ userId: readerId, at: new Date().toISOString() });
+          modified = true;
+        }
+        if (modified) {
+          return { ...m, readBy: newReadBy, reads: newReads };
         }
         return m;
       });

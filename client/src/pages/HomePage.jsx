@@ -20,7 +20,7 @@ import TypingPulseBackground from "../components/TypingPulseBackground";
 import { useBackHandler, backManager } from "../lib/backNavigation";
 
 const HomePage = () => {
-  const { selectedChat, setSelectedChat, rooms, getRooms, isWallpaperOpen, setIsWallpaperOpen, unreadCounts, isStarredOpen, setIsStarredOpen, subscribeToMessages } = useChatStore();
+  const { selectedChat, setSelectedChat, rooms, getRooms, isWallpaperOpen, setIsWallpaperOpen, unreadCounts, isStarredOpen, setIsStarredOpen, subscribeToMessages, networkStatuses } = useChatStore();
   const { socket, authUser, logout } = useAuthStore();
   const { initSocketListeners } = useCallStore();
   const { friends, incomingRequests, getFriends, getFriendRequests } = useFriendStore();
@@ -125,7 +125,44 @@ const HomePage = () => {
   }
 
   const pendingCount = incomingRequests?.length || 0;
-  const totalUnreadCount = Object.values(unreadCounts || {}).reduce((acc, c) => acc + (c || 0), 0);
+  
+  // Calculate unread chats (ignoring hidden rooms)
+  const unreadChatsCount = useMemo(() => {
+    let count = 0;
+    const validRooms = (rooms || []).filter((r) => {
+      const name = (r.name || "").toLowerCase().trim();
+      return name !== "#announcements" && name !== "announcements" && name !== "#dev-hangout" && name !== "dev-hangout";
+    });
+    
+    validRooms.forEach((r) => {
+      if ((unreadCounts?.[r._id] || 0) > 0) count++;
+    });
+    
+    (friends || []).forEach((f) => {
+      if ((unreadCounts?.[f._id] || 0) > 0) count++;
+    });
+    
+    return count;
+  }, [rooms, friends, unreadCounts]);
+
+  const [hasUnreadStories, setHasUnreadStories] = useState(false);
+  useEffect(() => {
+    const handleStoryViewed = () => {
+      try {
+        const viewed = JSON.parse(localStorage.getItem("viewedStories") || "[]");
+        const hasUnread = (networkStatuses || []).some(person => 
+          person.stories.some(story => !viewed.includes(story.id))
+        );
+        setHasUnreadStories(hasUnread);
+      } catch (e) {
+        setHasUnreadStories(false);
+      }
+    };
+    
+    handleStoryViewed(); // Initial check
+    window.addEventListener("pulse:story-viewed", handleStoryViewed);
+    return () => window.removeEventListener("pulse:story-viewed", handleStoryViewed);
+  }, [networkStatuses]);
 
   const handleInstallPWA = async () => {
     if (isInstallable) {
@@ -205,9 +242,9 @@ const HomePage = () => {
                 <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
               )}
               <span className="material-symbols-outlined text-xl">chat</span>
-              {totalUnreadCount > 0 && (
+              {unreadChatsCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] flex items-center justify-center font-bold animate-pulse">
-                  {totalUnreadCount}
+                  {unreadChatsCount}
                 </span>
               )}
               <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
@@ -224,7 +261,9 @@ const HomePage = () => {
               type="button"
             >
               <span className="material-symbols-outlined text-xl">motion_photos_on</span>
-              <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
+              {hasUnreadStories && (
+                <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
+              )}
               <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
                 Status Stories
               </span>

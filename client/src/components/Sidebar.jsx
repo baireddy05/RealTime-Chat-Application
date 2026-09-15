@@ -442,36 +442,36 @@ const Sidebar = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {/* WhatsApp 24-Hour Status Stories Button */}
+            {/* WhatsApp 24-Hour Status Stories Button (Mobile Only) */}
             {onOpenStatus && (
               <button
                 onClick={onOpenStatus}
-                className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                className="md:hidden p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                 title="Status Stories"
                 type="button"
               >
-                <span className="material-symbols-outlined text-xl md:text-lg">motion_photos_on</span>
+                <span className="material-symbols-outlined text-xl">motion_photos_on</span>
               </button>
             )}
 
-            {/* New Group Button */}
+            {/* New Group Button (Mobile Only) */}
             <button
               onClick={handleOpenGroupModal}
-              className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="md:hidden p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="New Group"
               type="button"
             >
-              <span className="material-symbols-outlined text-xl md:text-lg">group_add</span>
+              <span className="material-symbols-outlined text-xl">group_add</span>
             </button>
 
-            {/* Add Contact Button */}
+            {/* Add Contact Button (Mobile Only) */}
             <button
               onClick={onOpenAddFriend}
-              className="relative p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              className="md:hidden relative p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="Add Contact"
               type="button"
             >
-              <span className="material-symbols-outlined text-xl md:text-lg">person_add</span>
+              <span className="material-symbols-outlined text-xl">person_add</span>
               {pendingCount > 0 && (
                 <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold shadow-md animate-pulse">
                   {pendingCount}
