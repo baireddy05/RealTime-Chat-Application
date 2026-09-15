@@ -18,9 +18,11 @@ import {
   File,
   Clock,
   Flame,
+  Delete,
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
+import GifPicker from "./GifPicker";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -46,6 +48,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [previewModalImage, setPreviewModalImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showScheduleMenu, setShowScheduleMenu] = useState(false);
@@ -58,6 +61,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
   // Mobile Back Navigation handlers for input popups and previews
   useBackHandler(showEmojiPicker, () => setShowEmojiPicker(false), "input-emoji-picker");
+  useBackHandler(showGifPicker, () => setShowGifPicker(false), "input-gif-picker");
   useBackHandler(showAttachMenu, () => setShowAttachMenu(false), "input-attach-menu");
   useBackHandler(showTimerMenu, () => setShowTimerMenu(false), "input-timer-menu");
   useBackHandler(showScheduleMenu, () => setShowScheduleMenu(false), "input-schedule-menu");
@@ -101,6 +105,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const attachBtnRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
+  const gifPickerRef = useRef(null);
+  const gifBtnRef = useRef(null);
   const timerMenuRef = useRef(null);
   const timerBtnRef = useRef(null);
   const scheduleMenuRef = useRef(null);
@@ -137,6 +143,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     queueMicrotask(() => {
       setShowAttachMenu(false);
       setShowEmojiPicker(false);
+      setShowGifPicker(false);
       setImagePreview(null);
       setDocumentFile(null);
     });
@@ -166,6 +173,16 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       }
 
       if (
+        showGifPicker &&
+        gifPickerRef.current &&
+        !gifPickerRef.current.contains(e.target) &&
+        gifBtnRef.current &&
+        !gifBtnRef.current.contains(e.target)
+      ) {
+        setShowGifPicker(false);
+      }
+
+      if (
         showTimerMenu &&
         timerMenuRef.current &&
         !timerMenuRef.current.contains(e.target) &&
@@ -186,7 +203,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       }
     };
 
-    if (showAttachMenu || showEmojiPicker || showTimerMenu || showScheduleMenu) {
+    if (showAttachMenu || showEmojiPicker || showGifPicker || showTimerMenu || showScheduleMenu) {
       document.addEventListener("mousedown", handleClickOutside, true);
       document.addEventListener("touchstart", handleClickOutside, true);
     }
@@ -195,7 +212,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("touchstart", handleClickOutside, true);
     };
-  }, [showAttachMenu, showEmojiPicker, showTimerMenu, showScheduleMenu]);
+  }, [showAttachMenu, showEmojiPicker, showGifPicker, showTimerMenu, showScheduleMenu]);
 
   useEffect(() => {
     return () => {
@@ -652,14 +669,31 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <Smile size={16} className="text-accent-primary" />
               <span className="text-xs font-semibold text-theme-main tracking-tight">All Emojis</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker(false)}
-              className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
-              title="Close emoji picker"
-            >
-              <X size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setText((prev) => {
+                    const chars = Array.from(prev);
+                    chars.pop();
+                    return chars.join('');
+                  });
+                  if (inputRef.current) emitPulseShockwave(inputRef.current);
+                }}
+                className="text-theme-muted hover:text-red-400 p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
+                title="Backspace"
+              >
+                <Delete size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(false)}
+                className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
+                title="Close emoji picker"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
 
           {/* Quick reactions strip */}
@@ -690,6 +724,39 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               skinTonesDisabled={false}
             />
           </div>
+        </div>
+      )}
+
+      {/* GIF & Sticker Picker Popover */}
+      {showGifPicker && (
+        <div
+          ref={gifPickerRef}
+          id="gif-picker-popover"
+          className="absolute bottom-14 left-2 sm:left-4 z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] max-w-[calc(100vw-16px)]"
+          style={{ width: "350px" }}
+        >
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base text-accent-primary">gif_box</span>
+              <span className="text-xs font-semibold text-theme-main tracking-tight">GIFs & Stickers</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGifPicker(false)}
+              className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
+              title="Close picker"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <GifPicker 
+            onGifSelect={async (gifUrl) => {
+              setShowGifPicker(false);
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              await sendMessage({ text: "", image: gifUrl });
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            }} 
+          />
         </div>
       )}
 
@@ -933,6 +1000,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               onClick={() => {
                 setShowAttachMenu((prev) => !prev);
                 setShowEmojiPicker(false);
+                setShowGifPicker(false);
               }}
               className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 sm:ml-1"
               title="Attach file or media"
@@ -947,11 +1015,27 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               onClick={() => {
                 setShowEmojiPicker((prev) => !prev);
                 setShowAttachMenu(false);
+                setShowGifPicker(false);
               }}
               className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               title="Insert Emoji"
             >
               <span className="material-symbols-outlined text-xl">mood</span>
+            </button>
+
+            {/* GIF Picker Trigger */}
+            <button
+              ref={gifBtnRef}
+              type="button"
+              onClick={() => {
+                setShowGifPicker((prev) => !prev);
+                setShowAttachMenu(false);
+                setShowEmojiPicker(false);
+              }}
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+              title="Insert GIF"
+            >
+              <span className="material-symbols-outlined text-xl">gif_box</span>
             </button>
 
             <input

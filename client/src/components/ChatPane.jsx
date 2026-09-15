@@ -1182,8 +1182,8 @@ const ChatPane = ({ onBack }) => {
                               <div
                                 onClick={(e) => e.stopPropagation()}
                                 className={`absolute ${openUpwards ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${
-                                  isMine ? "right-0" : "left-0"
-                                } z-50 min-w-[210px] p-1.5 rounded-2xl bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] shadow-2xl animate-scaleIn select-none`}
+                                  isMine ? "right-0" : "left-0 sm:left-0 max-sm:right-0 max-sm:left-auto"
+                                } z-50 min-w-[210px] p-1.5 rounded-2xl bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-32px)]`}
                               >
                                 {/* Quick Reactions row */}
                                 <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-white/5 rounded-xl border border-white/5">

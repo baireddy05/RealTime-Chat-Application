@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@giphy/js-fetch-api": "^5.8.0",
+    "@giphy/react-components": "^10.1.2",
     "@twemoji/api": "^17.0.3",
     "axios": "^1.20.0",
     "emoji-picker-react": "^4.20.7",

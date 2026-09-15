@@ -254,8 +254,8 @@ const LoginPage = () => {
 
       {/* ── Form Panel (Always visible on desktop; on mobile shown when mobileShowForm is true) ── */}
       <div
-        className={`w-full lg:w-[45%] h-full flex flex-col relative glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] z-20 transition-all duration-300 ${
-          mobileShowForm ? "flex" : "hidden lg:flex"
+        className={`lg:w-[45%] h-full flex flex-col relative glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] z-40 transition-all duration-300 ${
+          mobileShowForm ? "fixed inset-0 lg:relative lg:inset-auto w-full" : "hidden lg:flex w-full"
         }`}
       >
         {/* Mobile Back to Welcome button */}
