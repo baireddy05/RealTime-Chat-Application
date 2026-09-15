@@ -51,7 +51,6 @@ const Sidebar = ({
   statusDetail = "Available",
   handleInstallPWA,
   logout,
-  setIsWallpaperOpen,
 }) => {
   const {
     rooms,

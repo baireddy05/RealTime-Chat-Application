@@ -544,7 +544,6 @@ const HomePage = () => {
           statusDetail={statusDetail}
           handleInstallPWA={handleInstallPWA}
           logout={logout}
-          setIsWallpaperOpen={setIsWallpaperOpen}
         />
       </div>
 

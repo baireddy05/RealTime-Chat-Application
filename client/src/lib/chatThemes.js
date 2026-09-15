@@ -164,7 +164,9 @@ export const getThemeById = (themeId) => {
 };
 
 export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
-  if (!themeConfigOrId) return getThemeById("default");
+  if (!themeConfigOrId) {
+    return resolveThemeStyles("default", isDark);
+  }
 
   // If it's a string matching a preset ID
   if (typeof themeConfigOrId === "string") {
@@ -177,27 +179,27 @@ export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
       bubbleOutgoingText: isDark ? preset.bubbleOutgoingTextDark : preset.bubbleOutgoingText,
       bubbleIncomingSurface: isDark ? preset.bubbleIncomingDark : preset.bubbleIncoming,
       bubbleIncomingText: isDark ? preset.bubbleIncomingTextDark : preset.bubbleIncomingText,
-      wallpaperGradient: preset.wallpaperGradient,
-      hasDoodles: preset.hasDoodles,
+      wallpaperGradient: preset.wallpaperGradient || "transparent",
+      hasDoodles: preset.hasDoodles ?? true,
       customWallpaperUrl: null,
       wallpaperOpacity: 0.25,
     };
   }
 
   // If it's a custom theme object
-  const preset = getThemeById(themeConfigOrId.presetId || "default");
+  const preset = getThemeById(themeConfigOrId?.presetId || "default");
   return {
-    id: themeConfigOrId.presetId || "custom",
-    name: themeConfigOrId.name || preset.name,
-    accentColor: themeConfigOrId.accentColor || preset.accentColor,
+    id: themeConfigOrId?.presetId || "custom",
+    name: themeConfigOrId?.name || preset.name,
+    accentColor: themeConfigOrId?.accentColor || preset.accentColor,
     bubbleOutgoingGradient:
-      themeConfigOrId.customBubbleColor || (isDark ? preset.bubbleOutgoingDark : preset.bubbleOutgoing),
+      themeConfigOrId?.customBubbleColor || (isDark ? preset.bubbleOutgoingDark : preset.bubbleOutgoing),
     bubbleOutgoingText: isDark ? preset.bubbleOutgoingTextDark : preset.bubbleOutgoingText,
     bubbleIncomingSurface: isDark ? preset.bubbleIncomingDark : preset.bubbleIncoming,
     bubbleIncomingText: isDark ? preset.bubbleIncomingTextDark : preset.bubbleIncomingText,
-    wallpaperGradient: preset.wallpaperGradient,
-    hasDoodles: themeConfigOrId.hasDoodles ?? preset.hasDoodles,
-    customWallpaperUrl: themeConfigOrId.customWallpaperUrl || null,
-    wallpaperOpacity: themeConfigOrId.wallpaperOpacity ?? 0.35,
+    wallpaperGradient: preset.wallpaperGradient || "transparent",
+    hasDoodles: themeConfigOrId?.hasDoodles ?? preset.hasDoodles,
+    customWallpaperUrl: themeConfigOrId?.customWallpaperUrl || null,
+    wallpaperOpacity: themeConfigOrId?.wallpaperOpacity ?? 0.35,
   };
 };
