@@ -834,10 +834,12 @@ const ChatPane = ({ onBack }) => {
           </div>
         ) : (
           <Virtuoso
+            key={selectedChat.id}
             ref={messagesContainerRef}
             scrollerRef={(el) => { scrollerElementRef.current = el; }}
             className="flex-1 w-full h-full overflow-x-hidden custom-scrollbar"
             data={searchQuery.trim() ? searchMatches : displayedMessages}
+            computeItemKey={(index, item) => item._id || index}
             initialTopMostItemIndex={searchQuery.trim() ? searchMatches.length - 1 : (displayedMessages.length > 0 ? displayedMessages.length - 1 : 0)}
             followOutput="smooth"
             alignToBottom={true}

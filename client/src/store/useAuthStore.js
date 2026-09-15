@@ -4,6 +4,8 @@ import { io } from "socket.io-client";
 
 const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || "http://localhost:5000";
 
+let visibilityHandler = null;
+
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
@@ -102,12 +104,26 @@ export const useAuthStore = create((set, get) => ({
     newSocket.on("getOnlineUsers", (userIds) => {
       set({ onlineUsers: (userIds || []).map((id) => id?.toString()) });
     });
+
+    if (visibilityHandler) {
+      document.removeEventListener("visibilitychange", visibilityHandler);
+    }
+    visibilityHandler = () => {
+      if (newSocket.connected) {
+        newSocket.emit("userVisibilityChange", { isHidden: document.hidden });
+      }
+    };
+    document.addEventListener("visibilitychange", visibilityHandler);
   },
 
   disconnectSocket: () => {
     if (get().socket) {
       get().socket.disconnect();
       set({ socket: null, onlineUsers: [] });
+    }
+    if (visibilityHandler) {
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      visibilityHandler = null;
     }
   },
 }));

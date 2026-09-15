@@ -23,6 +23,7 @@ const io = new Server(server, {
 
 // Store user socket mappings for private messaging and online status
 const userSocketMap = {}; // { userId: socketId }
+const hiddenUsers = new Set(); // { userId }
 
 export const getReceiverSocketId = (receiverId) => {
   if (!receiverId) return undefined;
@@ -64,7 +65,8 @@ io.on("connection", (socket) => {
   if (userId) {
     userSocketMap[userId] = socket.id;
     // Broadcast online status to all users
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    const getVisibleUsers = () => Object.keys(userSocketMap).filter(id => !hiddenUsers.has(id));
+    io.emit("getOnlineUsers", getVisibleUsers());
 
     // Auto-join user to all their rooms so they receive group messages in real-time
     Room.find({ members: userId })
@@ -168,11 +170,23 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("userVisibilityChange", ({ isHidden }) => {
+    if (isHidden) {
+      hiddenUsers.add(userId);
+    } else {
+      hiddenUsers.delete(userId);
+    }
+    const getVisibleUsers = () => Object.keys(userSocketMap).filter(id => !hiddenUsers.has(id));
+    io.emit("getOnlineUsers", getVisibleUsers());
+  });
+
   socket.on("disconnect", () => {
     console.log("A user disconnected:", socket.id);
     if (userId && userSocketMap[userId] === socket.id) {
       delete userSocketMap[userId];
-      io.emit("getOnlineUsers", Object.keys(userSocketMap));
+      hiddenUsers.delete(userId);
+      const getVisibleUsers = () => Object.keys(userSocketMap).filter(id => !hiddenUsers.has(id));
+      io.emit("getOnlineUsers", getVisibleUsers());
     }
   });
 });
