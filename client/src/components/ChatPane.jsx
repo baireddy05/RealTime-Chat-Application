@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo, memo, Fragment } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, Fragment } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -165,15 +165,19 @@ const ChatPane = ({ onBack }) => {
   }, [messages]);
 
   const prevMessagesCountRef = useRef(messages.length);
+  const isInitialChatLoadRef = useRef(true);
 
-  const scrollToBottom = useCallback((behavior = "smooth") => {
-    if (scrollerElementRef.current) {
+  const scrollToBottom = useCallback((behavior = "auto") => {
+    const el = scrollerElementRef.current;
+    if (el) {
       if (behavior === "instant" || behavior === "auto") {
-        scrollerElementRef.current.scrollTop = scrollerElementRef.current.scrollHeight;
+        el.style.scrollBehavior = "auto";
+        el.scrollTop = el.scrollHeight;
       } else {
-        scrollerElementRef.current.scrollTo({
-          top: scrollerElementRef.current.scrollHeight,
-          behavior,
+        el.style.scrollBehavior = "smooth";
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior: "smooth",
         });
       }
     }
@@ -198,8 +202,19 @@ const ChatPane = ({ onBack }) => {
     }
   }, []);
 
-  // When new messages are sent or received
-  useEffect(() => {
+  // Snap instantly on chat load / switch, smooth scroll only on subsequent new messages
+  useLayoutEffect(() => {
+    if (isMessagesLoading || !selectedChat?.id) return;
+
+    if (isInitialChatLoadRef.current) {
+      if (messages.length > 0 || !isMessagesLoading) {
+        scrollToBottom("instant");
+        isInitialChatLoadRef.current = false;
+        prevMessagesCountRef.current = messages.length;
+      }
+      return;
+    }
+
     if (messages.length > prevMessagesCountRef.current) {
       const latestMsg = messages[messages.length - 1];
       const isMine = latestMsg?.senderId?._id === authUser?._id || latestMsg?.senderId === authUser?._id;
@@ -211,16 +226,7 @@ const ChatPane = ({ onBack }) => {
       }
     }
     prevMessagesCountRef.current = messages.length;
-  }, [messages.length, authUser?._id, scrollToBottom]);
-
-  // Ensure we snap to bottom when chat initially loads or switches
-  useEffect(() => {
-    if (!isMessagesLoading && messages.length > 0) {
-      requestAnimationFrame(() => {
-        scrollToBottom("instant");
-      });
-    }
-  }, [selectedChat?.id, isMessagesLoading, scrollToBottom]);
+  }, [messages, isMessagesLoading, selectedChat?.id, authUser?._id, scrollToBottom]);
 
   // Auto scroll when incoming typing bubble appears
   useEffect(() => {
@@ -242,6 +248,8 @@ const ChatPane = ({ onBack }) => {
     if (!selectedChat) return;
     if (loadedChatIdRef.current !== selectedChat.id) {
       loadedChatIdRef.current = selectedChat.id;
+      isInitialChatLoadRef.current = true;
+      prevMessagesCountRef.current = 0;
       getMessages(selectedChat.id, selectedChat.type);
       getScheduledMessages(selectedChat.id, selectedChat.type);
     }
@@ -250,6 +258,8 @@ const ChatPane = ({ onBack }) => {
   useEffect(() => {
     if (prevSelectedChatIdRef.current !== selectedChat?.id) {
       prevSelectedChatIdRef.current = selectedChat?.id;
+      isInitialChatLoadRef.current = true;
+      prevMessagesCountRef.current = 0;
       setIsSearchOpen(false);
       setSearchQuery("");
       setSearchMatchIndex(0);
