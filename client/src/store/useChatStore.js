@@ -992,13 +992,27 @@ export const useChatStore = create((set, get) => ({
 
     // Real-time message deletion
     socket.on("messageDeleted", ({ messageId }) => {
-      const { messages } = get();
+      const { messages, lastMessages } = get();
       const updated = messages.map((m) =>
         m._id === messageId
-          ? { ...m, isDeleted: true, text: "This message was deleted", image: null, audio: null, file: null, reactions: [] }
+          ? { ...m, isDeleted: true, text: "This message was deleted", decryptedText: "This message was deleted", image: null, audio: null, file: null, reactions: [] }
           : m
       );
-      set({ messages: updated });
+      const newLastMessages = { ...lastMessages };
+      Object.keys(newLastMessages).forEach((key) => {
+        if (newLastMessages[key]?._id === messageId) {
+          newLastMessages[key] = {
+            ...newLastMessages[key],
+            isDeleted: true,
+            text: "This message was deleted",
+            decryptedText: "This message was deleted",
+            image: null,
+            audio: null,
+            file: null,
+          };
+        }
+      });
+      set({ messages: updated, lastMessages: newLastMessages });
     });
 
     // Real-time message pinning
@@ -1037,13 +1051,27 @@ export const useChatStore = create((set, get) => ({
   deleteMessage: async (messageId) => {
     try {
       await axiosInstance.delete(`/chat/message/${messageId}`);
-      const { messages } = get();
+      const { messages, lastMessages } = get();
       const updated = messages.map((m) =>
         m._id === messageId
-          ? { ...m, isDeleted: true, text: "This message was deleted", image: null, audio: null, file: null, reactions: [] }
+          ? { ...m, isDeleted: true, text: "This message was deleted", decryptedText: "This message was deleted", image: null, audio: null, file: null, reactions: [] }
           : m
       );
-      set({ messages: updated });
+      const newLastMessages = { ...lastMessages };
+      Object.keys(newLastMessages).forEach((key) => {
+        if (newLastMessages[key]?._id === messageId) {
+          newLastMessages[key] = {
+            ...newLastMessages[key],
+            isDeleted: true,
+            text: "This message was deleted",
+            decryptedText: "This message was deleted",
+            image: null,
+            audio: null,
+            file: null,
+          };
+        }
+      });
+      set({ messages: updated, lastMessages: newLastMessages });
       return { success: true };
     } catch (error) {
       console.error("Error deleting message:", error);

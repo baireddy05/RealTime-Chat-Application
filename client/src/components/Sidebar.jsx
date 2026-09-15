@@ -22,6 +22,9 @@ const formatTimeRelative = (dateStr) => {
 
 const getMessageSnippet = (msg) => {
   if (!msg) return "";
+  if (msg.isDeleted || msg.text === "This message was deleted" || msg.decryptedText === "This message was deleted") {
+    return "🚫 This message was deleted";
+  }
   if (msg.audio) return "🎤 Voice note";
   if (msg.image) return "📷 Photo";
   if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;

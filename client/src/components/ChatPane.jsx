@@ -1312,17 +1312,7 @@ const ChatPane = ({ onBack }) => {
         )}
       </div>
 
-      {/* Typing indicator */}
-      {activeTypers.length > 0 && (
-        <div className="px-5 py-2 flex items-center gap-2 text-[12px] text-accent-primary bg-[var(--glass-surface)] backdrop-blur-xl border-t border-[var(--glass-border)] animate-fadeIn">
-          <div className="flex gap-1 items-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:-0.3s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:-0.15s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce" />
-          </div>
-          <span>{activeTypers.join(", ")} {activeTypers.length === 1 ? "is" : "are"} typing...</span>
-        </div>
-      )}
+
 
       {/* Pending scheduled messages banner */}
       {scheduledMessages && scheduledMessages.length > 0 && (
