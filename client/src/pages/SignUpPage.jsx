@@ -190,6 +190,12 @@ const SignUpPage = () => {
               Ultra-Responsive Synchronous Engine
             </span>
           </div>
+
+          {/* Creator Credits */}
+          <div className="mt-6 flex items-center justify-center gap-1.5 text-[11.5px] text-theme-muted select-none">
+            <span>Created by</span>
+            <span className="font-semibold text-theme-main">Byreddy Rithwik Reddy</span>
+          </div>
         </div>
       </div>
 

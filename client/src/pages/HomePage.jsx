@@ -662,6 +662,12 @@ const HomePage = () => {
                   </div>
                 </button>
               </div>
+
+              {/* Creator Credits */}
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500 select-none">
+                <span>Created by</span>
+                <span className="font-semibold text-zinc-600 dark:text-zinc-300">Byreddy Rithwik Reddy</span>
+              </div>
             </div>
           </div>
         )}
