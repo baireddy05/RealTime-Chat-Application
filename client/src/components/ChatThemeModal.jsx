@@ -17,7 +17,7 @@ import {
 import { useChatStore } from "../store/useChatStore";
 import {
   CHAT_THEME_PRESETS,
-  WHATSAPP_DOODLE_SVG,
+  CHAT_DOODLE_SVG,
   getThemeById,
   resolveThemeStyles,
 } from "../lib/chatThemes";
@@ -62,7 +62,7 @@ const CURATED_WALLPAPERS = [
 ];
 
 const CUSTOM_BUBBLE_GRADIENTS = [
-  { id: "emerald", name: "WhatsApp Green", gradient: "linear-gradient(135deg, #005c4b, #008069)" },
+  { id: "emerald", name: "Emerald Glow", gradient: "linear-gradient(135deg, #005c4b, #008069)" },
   { id: "navy", name: "Royal Blue", gradient: "linear-gradient(135deg, #1d4ed8, #2563eb)" },
   { id: "purple", name: "Deep Violet", gradient: "linear-gradient(135deg, #6d28d9, #7c3aed)" },
   { id: "rose", name: "Crimson Rose", gradient: "linear-gradient(135deg, #be123c, #e11d48)" },
@@ -418,11 +418,11 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
                   />
                 </div>
 
-                {/* WhatsApp Doodles Pattern Toggle */}
+                {/* Chat Doodles Pattern Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
                   <div className="space-y-0.5">
                     <div className="text-xs font-bold text-zinc-900 dark:text-white">
-                      WhatsApp Doodle Pattern
+                      Chat Doodle Pattern
                     </div>
                     <div className="text-[11px] text-zinc-500">
                       Overlay classic subtle chat doodles
@@ -583,12 +583,12 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
               />
             )}
 
-            {/* 2. Optional WhatsApp SVG Doodle Overlay */}
+            {/* 2. Optional SVG Doodle Overlay */}
             {styles.hasDoodles && (
               <div
                 className="absolute inset-0 z-0 pointer-events-none opacity-25 dark:opacity-20 transition-opacity"
                 style={{
-                  backgroundImage: `url("${WHATSAPP_DOODLE_SVG}")`,
+                  backgroundImage: `url("${CHAT_DOODLE_SVG}")`,
                   backgroundSize: "280px 280px",
                 }}
               />

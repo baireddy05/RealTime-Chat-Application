@@ -1,7 +1,7 @@
-// WhatsApp-Standard Chat Themes & Acoustic Visual Presets for Pulse Chat
+// Standard Chat Themes & Acoustic Visual Presets for Pulse Chat
 
-// Subtle SVG Doodle pattern inspired by WhatsApp chat background
-export const WHATSAPP_DOODLE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" fill="none" viewBox="0 0 280 280"><g opacity="0.16" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M25 40a15 15 0 1030 0 15 15 0 10-30 0zM35 35l10 10M45 35l-10 10M110 30h25a8 8 0 018 8v12a8 8 0 01-8 8h-15l-10 6v-6h0a8 8 0 010-16M195 25l12 20 22 4-16 16 4 22-22-12-22 12 4-22-16-16 22-4zM25 120c8 0 14 6 14 14v10a14 14 0 01-28 0v-10c0-8 6-14 14-14zM100 115a18 18 0 1136 0 18 18 0 01-36 0zM118 105v20M108 115h20M200 130a15 15 0 0125-5l5 25-25-5a15 15 0 01-5-15zM40 210l15-15 15 15-15 15zM120 200c0-10 8-18 18-18s18 8 18 18c0 12-18 25-18 25s-18-13-18-25zM210 205h30v25h-30zM225 195v10"/></g></svg>`;
+// Subtle SVG Doodle pattern for chat background
+export const CHAT_DOODLE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" fill="none" viewBox="0 0 280 280"><g opacity="0.16" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M25 40a15 15 0 1030 0 15 15 0 10-30 0zM35 35l10 10M45 35l-10 10M110 30h25a8 8 0 018 8v12a8 8 0 01-8 8h-15l-10 6v-6h0a8 8 0 010-16M195 25l12 20 22 4-16 16 4 22-22-12-22 12 4-22-16-16 22-4zM25 120c8 0 14 6 14 14v10a14 14 0 01-28 0v-10c0-8 6-14 14-14zM100 115a18 18 0 1136 0 18 18 0 01-36 0zM118 105v20M108 115h20M200 130a15 15 0 0125-5l5 25-25-5a15 15 0 01-5-15zM40 210l15-15 15 15-15 15zM120 200c0-10 8-18 18-18s18 8 18 18c0 12-18 25-18 25s-18-13-18-25zM210 205h30v25h-30zM225 195v10"/></g></svg>`;
 
 export const CHAT_THEME_PRESETS = [
   {
@@ -22,9 +22,9 @@ export const CHAT_THEME_PRESETS = [
     previewGradient: "linear-gradient(135deg, #18181b, #71717a)",
   },
   {
-    id: "whatsapp-emerald",
-    name: "WhatsApp Emerald",
-    description: "Classic WhatsApp emerald green bubbles with atmospheric tone",
+    id: "emerald-glow",
+    name: "Emerald Glow",
+    description: "Classic emerald green bubbles with atmospheric tone",
     accentColor: "#10b981",
     bubbleOutgoing: "linear-gradient(135deg, #005c4b 0%, #008069 100%)",
     bubbleOutgoingDark: "linear-gradient(135deg, #005c4b 0%, #008069 100%)",
@@ -160,7 +160,8 @@ export const CHAT_THEME_PRESETS = [
 ];
 
 export const getThemeById = (themeId) => {
-  return CHAT_THEME_PRESETS.find((t) => t.id === themeId) || CHAT_THEME_PRESETS[0];
+  const normalizedId = themeId && themeId.includes("emerald") ? "emerald-glow" : themeId;
+  return CHAT_THEME_PRESETS.find((t) => t.id === normalizedId) || CHAT_THEME_PRESETS[0];
 };
 
 export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {

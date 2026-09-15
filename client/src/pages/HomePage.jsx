@@ -79,7 +79,7 @@ const HomePage = () => {
   const logoRef = useRef(null);
   const [logoCoords, setLogoCoords] = useState(null);
 
-  // WhatsApp-style Draggable Resizable Sidebar
+  // Draggable Resizable Sidebar
   const sidebarContainerRef = useRef(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
@@ -357,7 +357,7 @@ const HomePage = () => {
 
           <div className="w-8 h-[1px] bg-black/10 dark:bg-white/10" />
 
-          {/* WhatsApp Core Navigation Items */}
+          {/* Core Navigation Items */}
           <div className="flex flex-col items-center gap-2">
             {/* Chats */}
             <button
@@ -385,7 +385,7 @@ const HomePage = () => {
               </span>
             </button>
 
-            {/* WhatsApp 24-Hour Status Stories */}
+            {/* 24-Hour Status Stories */}
             <button
               onClick={() => {
                 setIsStatusStoriesOpen(true);
@@ -493,10 +493,10 @@ const HomePage = () => {
             onClick={() => setIsProfileOpen(true)}
             className="group relative cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-zinc-400 to-zinc-600 dark:from-white dark:to-zinc-400 hover:scale-105 active:scale-95 transition-transform shadow-md">
+            <div className="relative w-9 h-9 rounded-full overflow-hidden border border-black/10 dark:border-white/15 hover:scale-105 active:scale-95 transition-transform shadow-sm">
               <img
                 alt={authUser?.username || "Profile"}
-                className="w-full h-full rounded-[10px] object-cover"
+                className="w-full h-full rounded-full object-cover"
                 src={
                   authUser?.profilePic ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -547,7 +547,7 @@ const HomePage = () => {
         />
       </div>
 
-      {/* WhatsApp Draggable Resizer Separator (Desktop only) */}
+      {/* Draggable Resizer Separator (Desktop only) */}
       <div
         onMouseDown={startResizing}
         onTouchStart={startResizing}
@@ -568,7 +568,7 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* 3. Zone 3: Master Active Chat Workstation or WhatsApp Command Center */}
+      {/* 3. Zone 3: Master Active Chat Workstation or Command Center */}
       <main
         className={`flex-1 min-w-0 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-all duration-200 ${
           !selectedChat ? "hidden md:flex" : "flex"
@@ -577,7 +577,7 @@ const HomePage = () => {
         {selectedChat ? (
           <ChatPane onBack={() => setSelectedChat(null)} />
         ) : (
-          /* WhatsApp Web Style Command Center */
+          /* Web Style Command Center */
           <div className="flex-1 h-full flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden select-none">
             {/* Foreground Content: Central Logo, greeting, and quick launch cards */}
             <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center animate-fadeIn">
@@ -600,7 +600,7 @@ const HomePage = () => {
                 Send and receive messages, voice notes, photos, and documents securely.
               </p>
 
-              {/* 4 WhatsApp Quick Launch Cards */}
+              {/* 4 Quick Launch Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-8">
                 {/* 1. New Direct Chat */}
                 <button

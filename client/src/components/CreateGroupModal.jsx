@@ -31,7 +31,7 @@ const CreateGroupModal = ({ onClose }) => {
     setIsLoading(true);
     setError("");
 
-    // Clean name: remove any leading # so groups are WhatsApp style
+    // Clean name: remove any leading #
     const cleanName = name.trim().replace(/^#+/, "");
 
     const res = await createRoom({

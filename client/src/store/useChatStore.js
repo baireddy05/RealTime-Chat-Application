@@ -138,7 +138,7 @@ export const useChatStore = create((set, get) => ({
   isThreadOpen: false,
   isThreadLoading: false,
 
-  // Feature 5: End-to-End Encryption (Default on like WhatsApp)
+  // Feature 5: End-to-End Encryption (Default on)
   isE2eeEnabled: true,
   toggleE2ee: () => {},
   setIsE2eeEnabled: () => {},
@@ -379,7 +379,7 @@ export const useChatStore = create((set, get) => ({
       const originalText = textToSend;
       let isEncrypted = false;
 
-      // Encrypt all outgoing message text by default like WhatsApp
+      // Encrypt all outgoing message text by default
       if (textToSend) {
         const key = getConversationKey(selectedChat, authUser?._id);
         textToSend = await encryptMessage(textToSend, key);
@@ -485,7 +485,7 @@ export const useChatStore = create((set, get) => ({
     try {
       let isEncrypted = false;
 
-      // Encrypt all outgoing message text by default like WhatsApp
+      // Encrypt all outgoing message text by default
       if (textToSend) {
         const key = getConversationKey(selectedChat, authUser?._id);
         textToSend = await encryptMessage(textToSend, key);

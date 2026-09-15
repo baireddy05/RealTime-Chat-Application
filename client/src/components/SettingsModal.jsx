@@ -248,7 +248,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </button>
                 </div>
                 <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                  Select WhatsApp-style curated color presets, custom message bubble colors, or upload personalized chat wallpapers.
+                  Select curated color presets, custom message bubble colors, or upload personalized chat wallpapers.
                 </p>
               </div>
             </>

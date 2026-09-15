@@ -175,7 +175,7 @@ const ProfileModal = ({ onClose }) => {
             </div>
             <div>
               <h3 className="font-bold text-sm text-zinc-900 dark:text-white tracking-tight">Profile & Identity</h3>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Your WhatsApp presence and details</p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Your profile presence and details</p>
             </div>
           </div>
           <button
@@ -278,7 +278,7 @@ const ProfileModal = ({ onClose }) => {
               />
             </div>
             <p className="text-[10px] text-zinc-500 pl-1">
-              This name will be visible to your WhatsApp contacts.
+              This name will be visible to your contacts.
             </p>
           </div>
 

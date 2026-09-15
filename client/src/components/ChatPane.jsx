@@ -24,7 +24,7 @@ import LinkPreview from "./LinkPreview";
 import ScheduledMessagesModal from "./ScheduledMessagesModal";
 import ChatThemeModal from "./ChatThemeModal";
 import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
-import { resolveThemeStyles, WHATSAPP_DOODLE_SVG } from "../lib/chatThemes";
+import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
 import { useBackHandler } from "../lib/backNavigation";
@@ -221,6 +221,13 @@ const ChatPane = ({ onBack }) => {
       });
     }
   }, [selectedChat?.id, isMessagesLoading, scrollToBottom]);
+
+  // Auto scroll when incoming typing bubble appears
+  useEffect(() => {
+    if (activeTypers.length > 0 && isAtBottomRef.current) {
+      scrollToBottom("smooth");
+    }
+  }, [activeTypers.length, scrollToBottom]);
 
   // Global event listener for instant scroll on manual send / receive
   useEffect(() => {
@@ -506,12 +513,12 @@ const ChatPane = ({ onBack }) => {
         />
       ) : null}
 
-      {/* 2. Optional WhatsApp SVG Doodle Overlay */}
+      {/* 2. Optional SVG Doodle Overlay */}
       {themeStyles.hasDoodles && (
         <div
           className="absolute inset-0 z-0 pointer-events-none opacity-20 dark:opacity-15 transition-opacity"
           style={{
-            backgroundImage: `url("${WHATSAPP_DOODLE_SVG}")`,
+            backgroundImage: `url("${CHAT_DOODLE_SVG}")`,
             backgroundSize: "280px 280px",
           }}
         />
@@ -639,13 +646,26 @@ const ChatPane = ({ onBack }) => {
                 <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs truncate">
                   <span className="text-zinc-400 dark:text-zinc-500 font-bold">•</span>
                   <span className="truncate">
-                    {selectedChat.type === "room"
-                      ? `${selectedChat.members?.length || 1} participants • Group`
-                      : activeTypers.length > 0
-                      ? "typing..."
-                      : isUserOnline
-                      ? "online"
-                      : "offline"}
+                    {activeTypers.length > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold inline-flex items-center gap-1 animate-fadeIn">
+                        {selectedChat.type === "room" ? (
+                          <span className="truncate">{activeTypers.join(", ")} {activeTypers.length === 1 ? "is" : "are"} typing</span>
+                        ) : (
+                          <span>typing</span>
+                        )}
+                        <span className="inline-flex items-center gap-0.5 shrink-0 ml-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-1" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-2" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
+                        </span>
+                      </span>
+                    ) : selectedChat.type === "room" ? (
+                      `${selectedChat.members?.length || 1} participants • Group`
+                    ) : isUserOnline ? (
+                      "online"
+                    ) : (
+                      "offline"
+                    )}
                   </span>
                 </div>
               </div>
@@ -944,7 +964,7 @@ const ChatPane = ({ onBack }) => {
 
                 return (
                   <Fragment key={message._id}>
-                    {/* WhatsApp Dynamic Sticky Date Divider */}
+                    {/* Dynamic Sticky Date Divider */}
                     {showDateDivider && (
                       <div className="my-2.5 flex items-center justify-center select-none sticky top-2 z-20 pointer-events-none">
                         <span className="px-3 py-0.5 rounded-full bg-black/40 dark:bg-black/60 backdrop-blur-md text-white text-[10px] font-medium tracking-wide shadow-md border border-white/10">
@@ -1354,6 +1374,44 @@ const ChatPane = ({ onBack }) => {
                   </Fragment>
                 );
               })}
+              {/* Real-time Incoming Typing Indicator Speech Bubble */}
+              {activeTypers.length > 0 && (
+                <div className="flex items-end gap-2 px-4 sm:px-6 md:px-8 my-2 animate-messageIn select-none">
+                  {selectedChat.type === "room" ? (
+                    <div className="w-8 h-8 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center text-[11px] font-bold shrink-0 shadow-sm border border-black/10 dark:border-white/10 mb-0.5">
+                      {(activeTypers[0] || "U").slice(0, 2).toUpperCase()}
+                    </div>
+                  ) : (
+                    <img
+                      src={
+                        selectedChat.profilePic ||
+                        selectedChat.avatar ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`
+                      }
+                      alt={selectedChat.name}
+                      className="w-8 h-8 rounded-full object-cover shadow-sm border border-black/10 dark:border-white/10 shrink-0 mb-0.5"
+                    />
+                  )}
+                  <div className="flex flex-col items-start max-w-[80%]">
+                    {selectedChat.type === "room" && (
+                      <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 ml-1 mb-1 truncate">
+                        {activeTypers.join(", ")}
+                      </span>
+                    )}
+                    <div
+                      className="px-4 py-3 rounded-2xl rounded-bl-[4px] shadow-sm flex items-center gap-1.5 backdrop-blur-xl border border-black/5 dark:border-white/10"
+                      style={{
+                        backgroundColor: themeStyles.bubbleIncomingSurface,
+                        color: themeStyles.bubbleIncomingText,
+                      }}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-zinc-600 dark:bg-zinc-300 animate-typing-dot-1" />
+                      <span className="w-2 h-2 rounded-full bg-zinc-600 dark:bg-zinc-300 animate-typing-dot-2" />
+                      <span className="w-2 h-2 rounded-full bg-zinc-600 dark:bg-zinc-300 animate-typing-dot-3" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
               {/* Scroll bottom sentinel */}
               <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
@@ -1361,7 +1419,7 @@ const ChatPane = ({ onBack }) => {
           </div>
         )}
 
-        {/* WhatsApp Floating Scroll-to-Bottom Button */}
+        {/* Floating Scroll-to-Bottom Button */}
         {showScrollBottomBtn && (
           <button
             type="button"

@@ -60,6 +60,7 @@ const Sidebar = ({
     unreadCounts,
     lastMessages,
     setIsSettingsOpen,
+    typingUsers,
   } = useChatStore();
 
   const { authUser, onlineUsers, socket } = useAuthStore();
@@ -164,7 +165,7 @@ const Sidebar = ({
   const pendingCount = incomingRequests?.length || 0;
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
 
-  // Clean WhatsApp groups: exclude Discord seed channels
+  // Clean groups: exclude Discord seed channels
   const filteredRooms = useMemo(() => {
     const nonDiscord = (rooms || []).filter((r) => {
       const name = (r.name || "").toLowerCase().trim();
@@ -254,6 +255,8 @@ const Sidebar = ({
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
     const senderUsername = isOutgoing ? "You" : lastMsg?.senderId?.username || "";
+    const typers = (typingUsers[roomId] || []).filter((u) => u && u !== authUser?.username);
+    const isTyping = typers.length > 0;
 
     return (
       <div
@@ -294,7 +297,16 @@ const Sidebar = ({
             </span>
 
             <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
-              {previewText ? (
+              {isTyping ? (
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold animate-fadeIn min-w-0">
+                  <span className="truncate">{typers.join(", ")} {typers.length === 1 ? "is" : "are"} typing</span>
+                  <span className="inline-flex items-center gap-0.5 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-1" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-2" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
+                  </span>
+                </div>
+              ) : previewText ? (
                 <>
                   {isOutgoing && (
                     <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
@@ -344,6 +356,8 @@ const Sidebar = ({
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
+    const typers = (typingUsers[friendId] || []).filter((u) => u && u !== authUser?.username);
+    const isTyping = typers.length > 0;
 
     return (
       <div
@@ -391,7 +405,16 @@ const Sidebar = ({
             </span>
 
             <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
-              {previewText ? (
+              {isTyping ? (
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold animate-fadeIn min-w-0">
+                  <span>typing</span>
+                  <span className="inline-flex items-center gap-0.5 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-1" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-2" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
+                  </span>
+                </div>
+              ) : previewText ? (
                 <>
                   {isOutgoing && (
                     <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
@@ -437,7 +460,7 @@ const Sidebar = ({
       aria-label="Chats List"
       className="h-full flex flex-col p-3 text-on-surface select-none overflow-hidden transition-colors duration-200 bg-transparent"
     >
-      {/* 1. Sleek Top WhatsApp Header Bar with Actions */}
+      {/* 1. Sleek Top Header Bar with Actions */}
       <div className="flex flex-col gap-2 pb-2">
         <div className="flex items-center justify-between px-1 pt-1">
           <div className="flex items-center gap-2.5">
@@ -465,7 +488,7 @@ const Sidebar = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {/* WhatsApp 24-Hour Status Stories Button (Mobile Only) */}
+            {/* 24-Hour Status Stories Button (Mobile Only) */}
             {onOpenStatus && (
               <button
                 onClick={onOpenStatus}
@@ -623,7 +646,7 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* WhatsApp-Standard Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
+        {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1 select-none">
           <button
             onClick={() => setActiveFilter("all")}
@@ -899,7 +922,7 @@ const Sidebar = ({
         </div>
       )}
 
-      {/* 4. WhatsApp Conversation List */}
+      {/* 4. Conversation List */}
       <div className="flex-1 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar space-y-1">
         {/* Empty States */}
         {activeFilter === "unread" && totalUnreadCount === 0 && (
