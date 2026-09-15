@@ -184,11 +184,19 @@ export const useChatStore = create((set, get) => ({
 
       const decryptedMessages = await Promise.all(
         res.data.map(async (m) => {
+          let msg = m;
           if (m.isEncrypted || isEncryptedMessage(m.text)) {
             const dec = await decryptMessage(m.text, key);
-            return { ...m, decryptedText: dec };
+            msg = { ...msg, decryptedText: dec };
           }
-          return m;
+          // Also decrypt the reply-to text if it looks encrypted
+          if (msg.replyTo?.text && isEncryptedMessage(msg.replyTo.text)) {
+            try {
+              const decReply = await decryptMessage(msg.replyTo.text, key);
+              msg = { ...msg, replyTo: { ...msg.replyTo, decryptedText: decReply } };
+            } catch {}
+          }
+          return msg;
         })
       );
 

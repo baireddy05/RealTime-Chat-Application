@@ -546,7 +546,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 Replying to {replyingTo.senderId?.username || replyingTo.senderName || "User"}
               </span>
               <p className="text-xs text-theme-muted truncate">
-                {replyingTo.text || (replyingTo.image ? "Photo" : replyingTo.file ? replyingTo.file.name : "Attachment")}
+                {replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "Photo" : replyingTo.file ? replyingTo.file.name : "Attachment")}
               </p>
             </div>
           </div>

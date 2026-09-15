@@ -113,8 +113,8 @@ const ImageModal = ({ imageUrl, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-2xl animate-fadeIn">
-      {/* Top Floating Control Pill */}
-      <div className="absolute top-4 inset-x-4 md:inset-x-8 flex items-center justify-between z-20 pointer-events-none">
+      {/* Top Floating Controls */}
+      <div className="absolute top-4 inset-x-3 md:inset-x-8 z-20 pointer-events-none flex flex-col items-center gap-2 md:flex-row md:justify-between">
         <div className="bg-[var(--glass-heavy)] backdrop-blur-xl border border-[var(--glass-border)] rounded-full px-4 py-1.5 text-xs text-theme-muted pointer-events-auto flex items-center gap-2 shadow-glass">
           <span className="w-1.5 h-1.5 rounded-full bg-status-online" />
           <span className="font-medium text-theme-main">Photos</span>
@@ -122,48 +122,48 @@ const ImageModal = ({ imageUrl, onClose }) => {
         </div>
 
         {/* Toolbar Buttons Floating Pill */}
-        <div className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-full p-1.5 flex items-center gap-1 shadow-glass pointer-events-auto">
+        <div className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-full p-1 md:p-1.5 flex items-center gap-0.5 md:gap-1 shadow-glass pointer-events-auto">
           <button
             onClick={handleZoomOut}
             title="Zoom Out ( - )"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
           >
-            <ZoomOut size={16} />
+            <ZoomOut size={15} />
           </button>
 
           <button
             onClick={handleZoomIn}
             title="Zoom In ( + )"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
           >
-            <ZoomIn size={16} />
+            <ZoomIn size={15} />
           </button>
 
-          <div className="w-[1px] h-4 bg-[var(--glass-border)] mx-0.5" />
+          <div className="w-[1px] h-4 bg-[var(--glass-border)] mx-0.5 hidden md:block" />
 
           <button
             onClick={handleRotateCcw}
             title="Rotate Left 90°"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors hidden sm:flex"
           >
-            <RotateCcw size={16} />
+            <RotateCcw size={15} />
           </button>
 
           <button
             onClick={handleRotateCw}
             title="Rotate Right 90°"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors hidden sm:flex"
           >
-            <RotateCw size={16} />
+            <RotateCw size={15} />
           </button>
 
           {(scale !== 1 || rotation !== 0) && (
             <button
               onClick={handleReset}
               title="Reset Zoom & Rotation"
-              className="p-2 hover:bg-[var(--glass-hover)] text-accent-primary rounded-full transition-colors"
+              className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-accent-primary rounded-full transition-colors"
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={15} />
             </button>
           )}
 
@@ -173,17 +173,17 @@ const ImageModal = ({ imageUrl, onClose }) => {
             onClick={handleDownload}
             disabled={isDownloading}
             title="Save Image"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
           >
-            {isDownloading ? <Loader2 size={16} className="animate-spin text-accent-primary" /> : <Download size={16} />}
+            {isDownloading ? <Loader2 size={15} className="animate-spin text-accent-primary" /> : <Download size={15} />}
           </button>
 
           <button
             onClick={() => setIsForwardOpen(true)}
             title="Share"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-accent-primary rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-accent-primary rounded-full transition-colors"
           >
-            <Forward size={16} />
+            <Forward size={15} />
           </button>
 
           <a
@@ -191,9 +191,9 @@ const ImageModal = ({ imageUrl, onClose }) => {
             target="_blank"
             rel="noopener noreferrer"
             title="Open Original"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors hidden sm:flex"
           >
-            <ExternalLink size={16} />
+            <ExternalLink size={15} />
           </a>
 
           <div className="w-[1px] h-4 bg-[var(--glass-border)] mx-0.5" />
@@ -201,7 +201,7 @@ const ImageModal = ({ imageUrl, onClose }) => {
           <button
             onClick={onClose}
             title="Close"
-            className="p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
+            className="p-1.5 md:p-2 hover:bg-[var(--glass-hover)] text-theme-muted hover:text-theme-main rounded-full transition-colors"
           >
             <X size={16} />
           </button>

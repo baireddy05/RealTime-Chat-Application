@@ -996,7 +996,7 @@ const ChatPane = ({ onBack }) => {
                             <div onClick={() => message.replyTo.messageId && scrollToMessage(message.replyTo.messageId)}
                               className="mb-1.5 p-2 rounded-xl cursor-pointer transition-colors text-[11px] select-none bg-current/5 border-l-2 border-current/40">
                               <span className="font-semibold block text-[10px] opacity-90">{message.replyTo.senderName || "User"}</span>
-                              <p className="truncate opacity-75">{message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
+                              <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
                             </div>
                           )}
                           {message.isDeleted ? (
