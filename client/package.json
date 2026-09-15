@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@twemoji/api": "^17.0.3",
+    "@vercel/speed-insights": "^2.0.0",
     "axios": "^1.20.0",
     "emoji-picker-react": "^4.20.7",
     "lucide-react": "^1.39.0",

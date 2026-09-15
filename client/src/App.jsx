@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import { Loader } from "lucide-react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
@@ -27,6 +28,7 @@ function App() {
         <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" replace />} />
         <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" replace />} />
       </Routes>
+      <SpeedInsights />
     </div>
   );
 }
