@@ -19,6 +19,7 @@ import {
   Clock,
   Flame,
   Delete,
+  Sparkles,
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
