@@ -310,7 +310,7 @@ const Sidebar = ({
                 <>
                   {isOutgoing && (
                     <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                      done_all
+                      done
                     </span>
                   )}
                   {senderUsername && (
@@ -356,6 +356,8 @@ const Sidebar = ({
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
+    const isRead = lastMsg && ((lastMsg.reads || []).some(r => r.userId === friendId) || (lastMsg.readBy || []).includes(friendId));
+    const isDelivered = lastMsg && (lastMsg.deliveries || []).some(d => d.userId === friendId);
     const typers = (typingUsers[friendId] || []).filter((u) => u && u !== authUser?.username);
     const isTyping = typers.length > 0;
 
@@ -417,8 +419,8 @@ const Sidebar = ({
               ) : previewText ? (
                 <>
                   {isOutgoing && (
-                    <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                      done_all
+                    <span className={`material-symbols-outlined text-[13px] shrink-0 ${isRead ? "text-blue-500 font-bold" : isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
+                      {isRead || isDelivered ? "done_all" : "done"}
                     </span>
                   )}
                   <span className="truncate">{previewText}</span>

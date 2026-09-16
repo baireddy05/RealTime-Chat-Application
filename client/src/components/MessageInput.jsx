@@ -661,7 +661,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         <div
           ref={emojiPickerRef}
           id="emoji-picker-popover"
-          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] w-[calc(100vw-16px)] sm:w-[350px] max-w-[360px]"
+          className="absolute bottom-full mb-2 max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:w-[calc(100vw-24px)] max-sm:max-w-[360px] sm:left-4 sm:right-auto sm:translate-x-0 sm:w-[350px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
         >
           <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
             <div className="flex items-center gap-2">
@@ -731,7 +731,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         <div
           ref={gifPickerRef}
           id="gif-picker-popover"
-          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] w-[calc(100vw-16px)] sm:w-[350px] max-w-[360px]"
+          className="absolute bottom-full mb-2 max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:w-[calc(100vw-24px)] max-sm:max-w-[360px] sm:left-4 sm:right-auto sm:translate-x-0 sm:w-[350px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
         >
           <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
             <div className="flex items-center gap-2">

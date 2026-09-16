@@ -117,6 +117,7 @@ const ChatPane = ({ onBack }) => {
   const [activePickerId, setActivePickerId] = useState(null);
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [infoModalMessage, setInfoModalMessage] = useState(null);
@@ -138,6 +139,8 @@ const ChatPane = ({ onBack }) => {
   useBackHandler(!!infoModalMessage, () => setInfoModalMessage(null), "chat-modal-message-info");
   useBackHandler(isSearchOpen, () => setIsSearchOpen(false), "chat-search-bar");
   useBackHandler(showChatOptions, () => setShowChatOptions(false), "chat-dropdown-options");
+  useBackHandler(!!openMenuMessageId, () => { setOpenMenuMessageId(null); setMenuAnchor(null); }, "chat-message-options");
+  useBackHandler(!!fullReactionPickerMsgId, () => setFullReactionPickerMsgId(null), "chat-reaction-picker");
 
   const scrollerElementRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -272,7 +275,9 @@ const ChatPane = ({ onBack }) => {
       setSearchMatchIndex(0);
       setShowChatOptions(false);
       setOpenMenuMessageId(null);
+      setMenuAnchor(null);
       setActivePickerId(null);
+      setFullReactionPickerMsgId(null);
       setIsDraggingOver(false);
       dragCounterRef.current = 0;
     }
@@ -281,6 +286,7 @@ const ChatPane = ({ onBack }) => {
   useEffect(() => {
     const handleGlobalClick = () => {
       setOpenMenuMessageId(null);
+      setMenuAnchor(null);
       setActivePickerId(null);
       setFullReactionPickerMsgId(null);
     };
@@ -289,6 +295,43 @@ const ChatPane = ({ onBack }) => {
       return () => document.removeEventListener("click", handleGlobalClick);
     }
   }, [openMenuMessageId, activePickerId, fullReactionPickerMsgId]);
+
+  const getMenuPositionStyle = useCallback(() => {
+    if (!menuAnchor) return {};
+    const menuWidth = 220;
+    const menuHeight = 340;
+    const padding = 12;
+    const headerHeight = 72; // Chat header height
+    const winWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+    const winHeight = typeof window !== "undefined" ? window.innerHeight : 700;
+
+    // Horizontal alignment
+    let left = menuAnchor.isMine ? (menuAnchor.right - menuWidth) : menuAnchor.left;
+    left = Math.max(padding, Math.min(left, winWidth - menuWidth - padding));
+
+    // Vertical alignment: check space above header vs space below
+    const spaceBelow = winHeight - menuAnchor.bottom;
+    const spaceAbove = menuAnchor.top - headerHeight;
+
+    let top;
+    // Prefer opening downwards if there is ample space below OR if opening upwards would hit the header
+    if (spaceAbove < menuHeight + 10 || spaceBelow >= menuHeight + 16) {
+      top = menuAnchor.bottom + 6;
+    } else {
+      // Open upwards since there is enough space above and space below is tight
+      top = menuAnchor.top - menuHeight - 6;
+    }
+
+    // Final safety clamp: never go above the chat header and never overflow off bottom
+    top = Math.max(headerHeight + 8, Math.min(top, winHeight - menuHeight - 16));
+
+    return {
+      position: "fixed",
+      left: `${left}px`,
+      top: `${top}px`,
+      zIndex: 9999,
+    };
+  }, [menuAnchor]);
 
   const handleStartCall = (type) => {
     if (!selectedChat) return;
@@ -929,7 +972,13 @@ const ChatPane = ({ onBack }) => {
         ) : (
           <div
             ref={scrollerElementRef}
-            onScroll={handleScroll}
+            onScroll={(e) => {
+              handleScroll(e);
+              if (openMenuMessageId) {
+                setOpenMenuMessageId(null);
+                setMenuAnchor(null);
+              }
+            }}
             className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-contain flex flex-col relative select-text"
             style={{ overflowAnchor: "auto" }}
           >
@@ -1172,13 +1221,26 @@ const ChatPane = ({ onBack }) => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setOpenMenuMessageId(openMenuMessageId === message._id ? null : message._id);
-                                setActivePickerId(null);
+                                if (openMenuMessageId === message._id) {
+                                  setOpenMenuMessageId(null);
+                                  setMenuAnchor(null);
+                                } else {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setOpenMenuMessageId(message._id);
+                                  setMenuAnchor({
+                                    top: rect.top,
+                                    bottom: rect.bottom,
+                                    left: rect.left,
+                                    right: rect.right,
+                                    isMine,
+                                  });
+                                  setActivePickerId(null);
+                                }
                               }}
                               className={`p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] shadow-sm transition-all duration-150 cursor-pointer ${
                                 openMenuMessageId === message._id || hoveredMessageId === message._id
                                   ? "opacity-100 scale-100 pointer-events-auto text-theme-main bg-[var(--glass-hover)]"
-                                  : "opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
+                                  : "max-sm:opacity-70 max-sm:scale-95 max-sm:pointer-events-auto opacity-0 scale-75 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)]"
                               }`}
                               title="Message options"
                             >
@@ -1186,174 +1248,155 @@ const ChatPane = ({ onBack }) => {
                             </button>
 
                             {openMenuMessageId === message._id && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className={`absolute ${openUpwards ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${
-                                  isMine ? "right-0" : "left-0 sm:left-0 max-sm:right-0 max-sm:left-auto"
-                                } z-50 min-w-[210px] p-1.5 rounded-2xl bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-32px)]`}
-                              >
-                                {/* Quick Reactions row */}
-                                <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-white/5 rounded-xl border border-white/5">
-                                  {QUICK_REACTIONS.map((emoji) => (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-[9998] bg-transparent"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuMessageId(null);
+                                    setMenuAnchor(null);
+                                  }}
+                                />
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={getMenuPositionStyle()}
+                                  className="w-[220px] p-1.5 rounded-2xl bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-24px)]"
+                                >
+                                  {/* Quick Reactions row */}
+                                  <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-white/5 rounded-xl border border-white/5">
+                                    {QUICK_REACTIONS.map((emoji) => (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => {
+                                          reactToMessage(message._id, emoji);
+                                          setOpenMenuMessageId(null);
+                                          setMenuAnchor(null);
+                                        }}
+                                        className="hover:scale-125 transition-transform p-1 rounded-lg hover:bg-white/10 quick-reaction-btn flex items-center justify-center text-sm"
+                                        title={`React ${emoji}`}
+                                      >
+                                        <EmojiSpan text={emoji} />
+                                      </button>
+                                    ))}
                                     <button
-                                      key={emoji}
                                       type="button"
                                       onClick={() => {
-                                        reactToMessage(message._id, emoji);
+                                        setFullReactionPickerMsgId(message._id);
                                         setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
                                       }}
-                                      className="hover:scale-125 transition-transform p-1 rounded-lg hover:bg-white/10 quick-reaction-btn flex items-center justify-center"
-                                      title={`React ${emoji}`}
+                                      className="p-1 rounded-lg text-theme-muted hover:text-theme-main hover:bg-white/10 transition-all flex items-center justify-center"
+                                      title="More reactions"
                                     >
-                                      <EmojiSpan text={emoji} />
+                                      <Plus size={13} />
                                     </button>
-                                  ))}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setFullReactionPickerMsgId(fullReactionPickerMsgId === message._id ? null : message._id);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="p-1 rounded-lg text-theme-muted hover:text-theme-main hover:bg-white/10 transition-all flex items-center justify-center"
-                                    title="More reactions"
-                                  >
-                                    <Plus size={13} />
-                                  </button>
-                                </div>
+                                  </div>
 
-                                <div className="h-px bg-[var(--glass-border)] my-1" />
+                                  <div className="h-px bg-[var(--glass-border)] my-1" />
 
-                                {/* Menu Options */}
-                                <div className="flex flex-col gap-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setReplyingTo(message);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                                  >
-                                    <Reply size={14} className="text-theme-muted" />
-                                    <span>Reply</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      toggleStarMessage(message._id);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                                  >
-                                    <Star size={14} className={isStarred ? "text-amber-400 fill-amber-400" : "text-theme-muted"} />
-                                    <span>{isStarred ? "Unstar Message" : "Star Message"}</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setForwardingMessage(message);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                                  >
-                                    <Forward size={14} className="text-theme-muted" />
-                                    <span>Forward</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      togglePinMessage(message._id);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                                  >
-                                    <Pin size={14} className={message.isPinned ? "text-accent-primary fill-accent-primary" : "text-theme-muted"} />
-                                    <span>{message.isPinned ? "Unpin Message" : "Pin Message"}</span>
-                                  </button>
-
-                                  {isMine && (
+                                  {/* Menu Options */}
+                                  <div className="flex flex-col gap-0.5">
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setEditingMessage(message);
+                                        setReplyingTo(message);
                                         setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
                                       }}
                                       className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                                     >
-                                      <Edit3 size={14} className="text-theme-muted" />
-                                      <span>Edit Message</span>
+                                      <Reply size={14} className="text-theme-muted" />
+                                      <span>Reply</span>
                                     </button>
-                                  )}
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setInfoModalMessage(message);
-                                      setOpenMenuMessageId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                                  >
-                                    <Info size={14} className="text-theme-muted" />
-                                    <span>Message Info</span>
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        toggleStarMessage(message._id);
+                                        setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                    >
+                                      <Star size={14} className={isStarred ? "text-amber-400 fill-amber-400" : "text-theme-muted"} />
+                                      <span>{isStarred ? "Unstar Message" : "Star Message"}</span>
+                                    </button>
 
-                                  {isMine && (
-                                    <>
-                                      <div className="h-px bg-[var(--glass-border)] my-1" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setForwardingMessage(message);
+                                        setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                    >
+                                      <Forward size={14} className="text-theme-muted" />
+                                      <span>Forward</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        togglePinMessage(message._id);
+                                        setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                    >
+                                      <Pin size={14} className={message.isPinned ? "text-accent-primary fill-accent-primary" : "text-theme-muted"} />
+                                      <span>{message.isPinned ? "Unpin Message" : "Pin Message"}</span>
+                                    </button>
+
+                                    {isMine && (
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          handleDelete(message._id);
+                                          setEditingMessage(message);
                                           setOpenMenuMessageId(null);
+                                          setMenuAnchor(null);
                                         }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors text-left"
+                                        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                                       >
-                                        <Trash2 size={14} className="text-red-400" />
-                                        <span>Delete Message</span>
+                                        <Edit3 size={14} className="text-theme-muted" />
+                                        <span>Edit Message</span>
                                       </button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
+                                    )}
 
-                            {fullReactionPickerMsgId === message._id && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className={`absolute bottom-full mb-2 ${
-                                  isMine ? "right-0" : "left-0 sm:left-0 max-sm:right-0 max-sm:left-auto"
-                                } z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] w-[calc(100vw-32px)] sm:w-[320px] max-w-[320px]`}
-                              >
-                                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
-                                  <span className="text-xs font-semibold text-theme-main">React with Any Emoji</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setFullReactionPickerMsgId(null)}
-                                    className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
-                                  >
-                                    <X size={13} />
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setInfoModalMessage(message);
+                                        setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                    >
+                                      <Info size={14} className="text-theme-muted" />
+                                      <span>Message Info</span>
+                                    </button>
+
+                                    {isMine && (
+                                      <>
+                                        <div className="h-px bg-[var(--glass-border)] my-1" />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleDelete(message._id);
+                                            setOpenMenuMessageId(null);
+                                            setMenuAnchor(null);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors text-left"
+                                        >
+                                          <Trash2 size={14} className="text-red-400" />
+                                          <span>Delete Message</span>
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="emoji-picker-container w-full overflow-hidden">
-                                  <EmojiPicker
-                                    theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
-                                    onEmojiClick={(emojiData) => {
-                                      reactToMessage(message._id, emojiData.emoji);
-                                      setFullReactionPickerMsgId(null);
-                                      setActivePickerId(null);
-                                    }}
-                                    autoFocusSearch={false}
-                                    searchPlaceHolder="Search all emojis..."
-                                    width="100%"
-                                    height={typeof window !== "undefined" && window.innerWidth < 640 ? 280 : 320}
-                                    lazyLoadEmojis={true}
-                                    previewConfig={{ showPreview: false }}
-                                    skinTonesDisabled={false}
-                                  />
-                                </div>
-                              </div>
+                              </>
                             )}
                           </div>
                         )}
@@ -1511,6 +1554,47 @@ const ChatPane = ({ onBack }) => {
       {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
       {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
       {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
+
+      {/* Full Reaction Emoji Picker Modal */}
+      {fullReactionPickerMsgId && (
+        <div
+          onClick={() => setFullReactionPickerMsgId(null)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[340px] rounded-3xl shadow-2xl animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] text-theme-main"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
+              <span className="text-xs font-semibold text-theme-main">React with Any Emoji</span>
+              <button
+                type="button"
+                onClick={() => setFullReactionPickerMsgId(null)}
+                className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="emoji-picker-container w-full overflow-hidden">
+              <EmojiPicker
+                theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
+                onEmojiClick={(emojiData) => {
+                  reactToMessage(fullReactionPickerMsgId, emojiData.emoji);
+                  setFullReactionPickerMsgId(null);
+                  setActivePickerId(null);
+                }}
+                autoFocusSearch={false}
+                searchPlaceHolder="Search all emojis..."
+                width="100%"
+                height={320}
+                lazyLoadEmojis={true}
+                previewConfig={{ showPreview: false }}
+                skinTonesDisabled={false}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
