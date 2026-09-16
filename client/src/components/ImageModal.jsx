@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { downloadFile } from "../lib/download";
 
 const ImageModal = ({ imageUrl, onClose }) => {
   const [scale, setScale] = useState(1);
@@ -57,23 +58,9 @@ const ImageModal = ({ imageUrl, onClose }) => {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = `photo-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadFile(imageUrl, `photo-${Date.now()}.png`);
     } catch (err) {
-      console.warn("Direct blob download failed, falling back to window open", err);
-      const link = document.createElement("a");
-      link.href = imageUrl;
-      link.target = "_blank";
-      link.download = `photo-${Date.now()}.png`;
-      link.click();
+      console.warn("Download failed:", err);
     } finally {
       setIsDownloading(false);
     }

@@ -970,4 +970,58 @@ export const getMessageReceipts = async (req, res) => {
   }
 };
 
+export const proxyDownloadFile = async (req, res) => {
+  try {
+    const { url, filename } = req.query;
 
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ error: "File URL is required" });
+    }
+
+    // Validate URL format
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ error: "Invalid URL" });
+    }
+
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return res.status(400).json({ error: "Only HTTP and HTTPS protocols are supported" });
+    }
+
+    // Clean and sanitize filename
+    const rawFilename = typeof filename === "string" && filename.trim() ? filename.trim() : "download";
+    const cleanFilename = rawFilename.replace(/[\r\n"\\/<>:|?*]/g, "_");
+
+    const remoteResponse = await fetch(url, {
+      headers: {
+        "User-Agent": "PulseMessenger/1.0",
+      },
+    });
+
+    if (!remoteResponse.ok) {
+      return res.status(remoteResponse.status).json({
+        error: `Failed to fetch file from source: ${remoteResponse.statusText}`,
+      });
+    }
+
+    const contentType = remoteResponse.headers.get("content-type") || "application/octet-stream";
+    const contentLength = remoteResponse.headers.get("content-length");
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${cleanFilename}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`
+    );
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
+
+    const arrayBuffer = await remoteResponse.arrayBuffer();
+    return res.status(200).send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    console.error("Error in proxyDownloadFile:", error.message);
+    return res.status(500).json({ error: "Failed to download file" });
+  }
+};

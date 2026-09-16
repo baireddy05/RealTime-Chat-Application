@@ -146,6 +146,7 @@ const ChatPane = ({ onBack }) => {
 
   const scrollerElementRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const isAtBottomRef = useRef(true);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
   const [unreadBelowCount, setUnreadBelowCount] = useState(0);
@@ -193,6 +194,11 @@ const ChatPane = ({ onBack }) => {
         });
       }
     }
+    if (messagesEndRef.current && (behavior === "instant" || behavior === "auto")) {
+      try {
+        messagesEndRef.current.scrollIntoView({ block: "end", inline: "nearest" });
+      } catch {}
+    }
     // Maintain window at top on mobile
     if (typeof window !== "undefined" && window.scrollY !== 0) {
       window.scrollTo(0, 0);
@@ -201,6 +207,30 @@ const ChatPane = ({ onBack }) => {
     setShowScrollBottomBtn(false);
     setUnreadBelowCount(0);
   }, []);
+
+  // Multi-frame scroll locking on initial load / chat switch
+  const performInitialScrollToBottom = useCallback(() => {
+    scrollToBottom("instant");
+    const raf1 = requestAnimationFrame(() => {
+      scrollToBottom("instant");
+      const raf2 = requestAnimationFrame(() => {
+        scrollToBottom("instant");
+      });
+      return () => cancelAnimationFrame(raf2);
+    });
+    const t1 = setTimeout(() => scrollToBottom("instant"), 50);
+    const t2 = setTimeout(() => scrollToBottom("instant"), 150);
+    const t3 = setTimeout(() => scrollToBottom("instant"), 350);
+    const t4 = setTimeout(() => scrollToBottom("instant"), 600);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, [scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const el = scrollerElementRef.current;
@@ -214,15 +244,34 @@ const ChatPane = ({ onBack }) => {
     }
   }, []);
 
-  // Snap instantly on chat load / switch, smooth scroll only on subsequent new messages
+  // Keep scroll pinned to bottom as images and layout elements render during initial load
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      if (isAtBottomRef.current || isInitialChatLoadRef.current) {
+        const el = scrollerElementRef.current;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+        }
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [selectedChat?.id]);
+
+  // Snap instantly on chat load / switch, smooth scroll on new messages
   useLayoutEffect(() => {
     if (isMessagesLoading || !selectedChat?.id) return;
 
     if (isInitialChatLoadRef.current) {
       if (messages.length > 0 || !isMessagesLoading) {
-        scrollToBottom("instant");
+        const cleanup = performInitialScrollToBottom();
         isInitialChatLoadRef.current = false;
         prevMessagesCountRef.current = messages.length;
+        return cleanup;
       }
       return;
     }
@@ -238,7 +287,7 @@ const ChatPane = ({ onBack }) => {
       }
     }
     prevMessagesCountRef.current = messages.length;
-  }, [messages, isMessagesLoading, selectedChat?.id, authUser?._id, scrollToBottom]);
+  }, [messages, isMessagesLoading, selectedChat?.id, authUser?._id, scrollToBottom, performInitialScrollToBottom]);
 
   // Auto scroll when incoming typing bubble appears
   useEffect(() => {
@@ -984,7 +1033,7 @@ const ChatPane = ({ onBack }) => {
             className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-contain flex flex-col relative select-text"
             style={{ overflowAnchor: "auto" }}
           >
-            <div className="mt-auto flex flex-col w-full">
+            <div ref={messagesContainerRef} className="mt-auto flex flex-col w-full">
               <ChatHeader />
               <div className="flex flex-col min-h-0 w-full pb-3">
               {(searchQuery.trim() ? searchMatches : displayedMessages).map((message, index, currentList) => {

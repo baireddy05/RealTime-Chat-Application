@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import { Link, useNavigate } from "react-router-dom";
-import { useBackHandler } from "../lib/backNavigation";
 import {
   Loader,
   Lock,
@@ -26,9 +25,6 @@ const LoginPage = () => {
   const { login, isLoggingIn } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
-
-  // Mobile back navigation: Login → Welcome Screen
-  useBackHandler(true, () => navigate("/welcome"), "login-page-back");
 
   // Interactive mouse physics for the Pulse visual panel on desktop
   const [mouseState, setMouseState] = useState({

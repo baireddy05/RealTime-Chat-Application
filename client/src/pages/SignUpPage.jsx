@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import { Link, useNavigate } from "react-router-dom";
-import { useBackHandler } from "../lib/backNavigation";
 import {
   Loader,
   Lock,
@@ -27,9 +26,6 @@ const SignUpPage = () => {
   const { signup, isSigningUp } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
-
-  // Mobile back navigation: SignUp → Welcome Screen
-  useBackHandler(true, () => navigate("/welcome"), "signup-page-back");
 
   // Interactive mouse physics for desktop
   const [mouseState, setMouseState] = useState({

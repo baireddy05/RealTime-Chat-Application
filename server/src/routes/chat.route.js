@@ -21,6 +21,7 @@ import {
   toggleRoomAdmin,
   getThreadReplies,
   getMessageReceipts,
+  proxyDownloadFile,
 } from "../controllers/chat.controller.js";
 
 const router = express.Router();
@@ -33,6 +34,7 @@ router.delete("/rooms/:roomId/members/:userId", protectRoute, kickRoomMember);
 router.post("/rooms/:roomId/admins", protectRoute, toggleRoomAdmin);
 
 router.get("/preview-link", protectRoute, previewLink);
+router.get("/download/file", protectRoute, proxyDownloadFile);
 router.get("/scheduled/:id", protectRoute, getScheduledMessages);
 router.delete("/scheduled/:messageId", protectRoute, cancelScheduledMessage);
 
