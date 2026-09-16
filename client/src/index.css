@@ -659,6 +659,11 @@ img.emoji {
 }
 
 /* ── Emoji Picker Glass Styling ── */
+.emoji-picker-container {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 .emoji-picker-container .EmojiPickerReact {
   --epr-bg-color: transparent !important;
   --epr-category-label-bg-color: var(--glass-heavy) !important;
@@ -673,11 +678,15 @@ img.emoji {
   border: none !important;
   font-family: inherit !important;
   background: transparent !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-shadow: none !important;
 }
 
 .emoji-picker-container .EmojiPickerReact .epr-header {
   border-bottom: 1px solid var(--glass-border) !important;
-  padding: 8px 12px !important;
+  padding: 8px 10px !important;
 }
 
 .emoji-picker-container .EmojiPickerReact input.epr-search {
@@ -685,12 +694,13 @@ img.emoji {
   border-radius: 9999px !important;
   color: rgb(var(--text-main-rgb)) !important;
   backdrop-filter: blur(10px) !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
   padding: 6px 12px !important;
 }
 
 .emoji-picker-container .EmojiPickerReact .epr-category-nav {
-  padding: 4px 8px !important;
+  padding: 4px 6px !important;
+  gap: 2px !important;
 }
 
 .emoji-picker-container .EmojiPickerReact .epr-body::-webkit-scrollbar {

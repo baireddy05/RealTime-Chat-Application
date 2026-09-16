@@ -1322,8 +1322,9 @@ const ChatPane = ({ onBack }) => {
                             {fullReactionPickerMsgId === message._id && (
                               <div
                                 onClick={(e) => e.stopPropagation()}
-                                className={`absolute bottom-full mb-2 ${isMine ? "right-0" : "left-0"} z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] max-w-[calc(100vw-24px)]`}
-                                style={{ width: "320px" }}
+                                className={`absolute bottom-full mb-2 ${
+                                  isMine ? "right-0" : "left-0 sm:left-0 max-sm:right-0 max-sm:left-auto"
+                                } z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)] w-[calc(100vw-32px)] sm:w-[320px] max-w-[320px]`}
                               >
                                 <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
                                   <span className="text-xs font-semibold text-theme-main">React with Any Emoji</span>
@@ -1335,7 +1336,7 @@ const ChatPane = ({ onBack }) => {
                                     <X size={13} />
                                   </button>
                                 </div>
-                                <div className="emoji-picker-container">
+                                <div className="emoji-picker-container w-full overflow-hidden">
                                   <EmojiPicker
                                     theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
                                     onEmojiClick={(emojiData) => {
@@ -1346,7 +1347,7 @@ const ChatPane = ({ onBack }) => {
                                     autoFocusSearch={false}
                                     searchPlaceHolder="Search all emojis..."
                                     width="100%"
-                                    height={320}
+                                    height={typeof window !== "undefined" && window.innerWidth < 640 ? 280 : 320}
                                     lazyLoadEmojis={true}
                                     previewConfig={{ showPreview: false }}
                                     skinTonesDisabled={false}
