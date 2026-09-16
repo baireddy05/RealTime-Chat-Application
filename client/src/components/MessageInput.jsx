@@ -47,8 +47,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [documentFile, setDocumentFile] = useState(null); // { file, name, size, type, dataUrl }
   const [previewModalImage, setPreviewModalImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [mediaTab, setMediaTab] = useState("emojis"); // "emojis" | "gifs" | "stickers"
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showScheduleMenu, setShowScheduleMenu] = useState(false);
@@ -60,8 +60,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const pulseTimeoutRef = useRef(null);
 
   // Mobile Back Navigation handlers for input popups and previews
-  useBackHandler(showEmojiPicker, () => setShowEmojiPicker(false), "input-emoji-picker");
-  useBackHandler(showGifPicker, () => setShowGifPicker(false), "input-gif-picker");
+  useBackHandler(showMediaPicker, () => setShowMediaPicker(false), "input-media-picker");
   useBackHandler(showAttachMenu, () => setShowAttachMenu(false), "input-attach-menu");
   useBackHandler(showTimerMenu, () => setShowTimerMenu(false), "input-timer-menu");
   useBackHandler(showScheduleMenu, () => setShowScheduleMenu(false), "input-schedule-menu");
@@ -103,10 +102,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
   const attachMenuRef = useRef(null);
   const attachBtnRef = useRef(null);
-  const emojiPickerRef = useRef(null);
-  const emojiBtnRef = useRef(null);
-  const gifPickerRef = useRef(null);
-  const gifBtnRef = useRef(null);
+  const mediaPickerRef = useRef(null);
+  const mediaBtnRef = useRef(null);
   const timerMenuRef = useRef(null);
   const timerBtnRef = useRef(null);
   const scheduleMenuRef = useRef(null);
@@ -142,8 +139,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   useEffect(() => {
     queueMicrotask(() => {
       setShowAttachMenu(false);
-      setShowEmojiPicker(false);
-      setShowGifPicker(false);
+      setShowMediaPicker(false);
       setImagePreview(null);
       setDocumentFile(null);
     });
@@ -163,23 +159,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       }
 
       if (
-        showEmojiPicker &&
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(e.target) &&
-        emojiBtnRef.current &&
-        !emojiBtnRef.current.contains(e.target)
+        showMediaPicker &&
+        mediaPickerRef.current &&
+        !mediaPickerRef.current.contains(e.target) &&
+        mediaBtnRef.current &&
+        !mediaBtnRef.current.contains(e.target)
       ) {
-        setShowEmojiPicker(false);
-      }
-
-      if (
-        showGifPicker &&
-        gifPickerRef.current &&
-        !gifPickerRef.current.contains(e.target) &&
-        gifBtnRef.current &&
-        !gifBtnRef.current.contains(e.target)
-      ) {
-        setShowGifPicker(false);
+        setShowMediaPicker(false);
       }
 
       if (
@@ -203,7 +189,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       }
     };
 
-    if (showAttachMenu || showEmojiPicker || showGifPicker || showTimerMenu || showScheduleMenu) {
+    if (showAttachMenu || showMediaPicker || showTimerMenu || showScheduleMenu) {
       document.addEventListener("mousedown", handleClickOutside, true);
       document.addEventListener("touchstart", handleClickOutside, true);
     }
@@ -212,7 +198,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("touchstart", handleClickOutside, true);
     };
-  }, [showAttachMenu, showEmojiPicker, showGifPicker, showTimerMenu, showScheduleMenu]);
+  }, [showAttachMenu, showMediaPicker, showTimerMenu, showScheduleMenu]);
 
   useEffect(() => {
     return () => {
@@ -509,7 +495,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
     removeImage();
     removeDocument();
-    setShowEmojiPicker(false);
+    setShowMediaPicker(false);
     setReplyingTo(null);
     setScheduledFor(null);
 
@@ -656,105 +642,130 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </div>
       )}
 
-      {/* Full Emoji Picker Popover */}
-      {showEmojiPicker && (
+      {/* Unified Emojis, GIFs & Stickers Popover */}
+      {showMediaPicker && (
         <div
-          ref={emojiPickerRef}
-          id="emoji-picker-popover"
-          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto sm:w-[350px] sm:max-w-[360px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
+          ref={mediaPickerRef}
+          id="media-picker-popover"
+          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto sm:w-[360px] sm:max-w-[370px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
         >
-          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
-            <div className="flex items-center gap-2">
-              <Smile size={16} className="text-accent-primary" />
-              <span className="text-xs font-semibold text-theme-main tracking-tight">All Emojis</span>
-            </div>
-            <div className="flex items-center gap-1">
+          {/* Unified Header with 3 Segmented Tabs & Controls */}
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
+            <div className="flex items-center gap-1 p-0.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 flex-1">
               <button
                 type="button"
-                onClick={() => {
-                  setText((prev) => {
-                    const chars = Array.from(prev);
-                    chars.pop();
-                    return chars.join('');
-                  });
-                  if (inputRef.current) emitPulseShockwave(inputRef.current);
-                }}
-                className="text-theme-muted hover:text-red-400 p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
-                title="Backspace"
+                onClick={() => setMediaTab("emojis")}
+                className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  mediaTab === "emojis"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm"
+                    : "text-theme-muted hover:text-theme-main"
+                }`}
               >
-                <Delete size={14} />
+                <Smile size={14} />
+                <span>Emoji</span>
               </button>
               <button
                 type="button"
-                onClick={() => setShowEmojiPicker(false)}
+                onClick={() => setMediaTab("gifs")}
+                className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  mediaTab === "gifs"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm"
+                    : "text-theme-muted hover:text-theme-main"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]">gif_box</span>
+                <span>GIFs</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaTab("stickers")}
+                className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  mediaTab === "stickers"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm"
+                    : "text-theme-muted hover:text-theme-main"
+                }`}
+              >
+                <Sparkles size={13} />
+                <span>Stickers</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              {mediaTab === "emojis" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setText((prev) => {
+                      const chars = Array.from(prev);
+                      chars.pop();
+                      return chars.join('');
+                    });
+                    if (inputRef.current) emitPulseShockwave(inputRef.current);
+                  }}
+                  className="text-theme-muted hover:text-red-400 p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
+                  title="Backspace"
+                >
+                  <Delete size={14} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowMediaPicker(false)}
                 className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
-                title="Close emoji picker"
+                title="Close picker"
               >
                 <X size={14} />
               </button>
             </div>
           </div>
 
-          {/* Quick reactions strip */}
-          <div className="px-2.5 py-1.5 border-b border-[var(--glass-border)] flex items-center gap-1 overflow-x-auto no-scrollbar bg-[var(--glass-surface)]">
-            <span className="text-[10px] uppercase font-medium text-theme-muted px-1">Quick:</span>
-            {COMMON_EMOJIS.slice(0, 10).map((emoji, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleEmojiSelect(emoji)}
-                className="hover:scale-125 active:scale-95 transition-transform p-1 rounded-lg hover:bg-[var(--glass-hover)] text-base flex-shrink-0 flex items-center justify-center emoji-text"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+          {/* Tab 1: Emojis */}
+          {mediaTab === "emojis" && (
+            <div className="flex flex-col">
+              {/* Quick reactions strip */}
+              <div className="px-2.5 py-1.5 border-b border-[var(--glass-border)] flex items-center gap-1 overflow-x-auto no-scrollbar bg-[var(--glass-surface)]">
+                <span className="text-[10px] uppercase font-medium text-theme-muted px-1">Quick:</span>
+                {COMMON_EMOJIS.slice(0, 10).map((emoji, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleEmojiSelect(emoji)}
+                    className="hover:scale-125 active:scale-95 transition-transform p-1 rounded-lg hover:bg-[var(--glass-hover)] text-base flex-shrink-0 flex items-center justify-center emoji-text"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
 
-          <div className="emoji-picker-container w-full overflow-hidden">
-            <EmojiPicker
-              theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
-              onEmojiClick={(emojiData) => handleEmojiSelect(emojiData.emoji)}
-              autoFocusSearch={false}
-              searchPlaceHolder="Search all emojis..."
-              width="100%"
-              height={typeof window !== "undefined" && window.innerWidth < 640 ? 300 : 380}
-              lazyLoadEmojis={true}
-              previewConfig={{ showPreview: false }}
-              skinTonesDisabled={false}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* GIF & Sticker Picker Popover */}
-      {showGifPicker && (
-        <div
-          ref={gifPickerRef}
-          id="gif-picker-popover"
-          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto sm:w-[350px] sm:max-w-[360px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
-        >
-          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base text-accent-primary">gif_box</span>
-              <span className="text-xs font-semibold text-theme-main tracking-tight">GIFs & Stickers</span>
+              <div className="emoji-picker-container w-full overflow-hidden">
+                <EmojiPicker
+                  theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
+                  onEmojiClick={(emojiData) => handleEmojiSelect(emojiData.emoji)}
+                  autoFocusSearch={false}
+                  searchPlaceHolder="Search all emojis..."
+                  width="100%"
+                  height={typeof window !== "undefined" && window.innerWidth < 640 ? 300 : 380}
+                  lazyLoadEmojis={true}
+                  previewConfig={{ showPreview: false }}
+                  skinTonesDisabled={false}
+                />
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowGifPicker(false)}
-              className="text-theme-muted hover:text-theme-main p-1 rounded-full hover:bg-[var(--glass-hover)] transition-colors"
-              title="Close picker"
-            >
-              <X size={14} />
-            </button>
-          </div>
-          <GifPicker 
-            onGifSelect={async (gifUrl) => {
-              setShowGifPicker(false);
-              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-              await sendMessage({ text: "", image: gifUrl });
-              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-            }} 
-          />
+          )}
+
+          {/* Tab 2 & 3: GIFs & Stickers */}
+          {(mediaTab === "gifs" || mediaTab === "stickers") && (
+            <GifPicker
+              initialTab={mediaTab}
+              hideTopTabs={true}
+              onGifSelect={async (gifUrl) => {
+                setShowMediaPicker(false);
+                window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+                await sendMessage({ text: "", image: gifUrl });
+                window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -821,7 +832,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           <button
             type="button"
             onClick={() => {
-              setShowGifPicker(true);
+              setMediaTab("gifs");
+              setShowMediaPicker(true);
               setShowAttachMenu(false);
             }}
             className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
@@ -1037,8 +1049,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               type="button"
               onClick={() => {
                 setShowAttachMenu((prev) => !prev);
-                setShowEmojiPicker(false);
-                setShowGifPicker(false);
+                setShowMediaPicker(false);
               }}
               className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 shrink-0"
               title="Attach file or media"
@@ -1046,34 +1057,23 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <span className="material-symbols-outlined text-xl">add_circle</span>
             </button>
 
-            {/* Emoji Picker Trigger */}
+            {/* Unified Emoji, GIF & Sticker Trigger Button */}
             <button
-              ref={emojiBtnRef}
+              ref={mediaBtnRef}
+              id="media-picker-button"
               type="button"
               onClick={() => {
-                setShowEmojiPicker((prev) => !prev);
+                setShowMediaPicker((prev) => !prev);
                 setShowAttachMenu(false);
-                setShowGifPicker(false);
               }}
-              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors shrink-0"
-              title="Insert Emoji"
+              className={`p-1.5 sm:p-2 rounded-full transition-colors shrink-0 ${
+                showMediaPicker
+                  ? "text-accent-primary bg-accent-primary/15"
+                  : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
+              }`}
+              title="Emojis, GIFs & Stickers"
             >
               <span className="material-symbols-outlined text-xl">mood</span>
-            </button>
-
-            {/* GIF Picker Trigger (visible on tablet/desktop, accessible via Emoji tabs/Attach on mobile) */}
-            <button
-              ref={gifBtnRef}
-              type="button"
-              onClick={() => {
-                setShowGifPicker((prev) => !prev);
-                setShowAttachMenu(false);
-                setShowEmojiPicker(false);
-              }}
-              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors hidden sm:flex shrink-0"
-              title="Insert GIF"
-            >
-              <span className="material-symbols-outlined text-xl">gif_box</span>
             </button>
 
             <input

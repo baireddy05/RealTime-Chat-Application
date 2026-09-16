@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useThemeStore } from "../store/useThemeStore";
 import {
   Sun,
@@ -7,16 +7,13 @@ import {
   Shield,
   Activity,
   ArrowRight,
-  UserPlus,
   Sparkles,
-  Zap,
 } from "lucide-react";
 
 const WelcomePage = () => {
   const { theme, toggleTheme } = useThemeStore();
-  const navigate = useNavigate();
 
-  // Interactive mouse physics for desktop
+  // Interactive mouse physics - only on desktop pointer devices
   const [mouseState, setMouseState] = useState({
     x: 0,
     y: 0,
@@ -25,9 +22,16 @@ const WelcomePage = () => {
     isHovering: false,
   });
   const containerRef = useRef(null);
+  const [isPointerDevice, setIsPointerDevice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      setIsPointerDevice(true);
+    }
+  }, []);
 
   const handleMouseMove = (e) => {
-    if (!containerRef.current) return;
+    if (!isPointerDevice || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -37,6 +41,7 @@ const WelcomePage = () => {
   };
 
   const handleMouseLeave = () => {
+    if (!isPointerDevice) return;
     setMouseState((prev) => ({ ...prev, nx: 0, ny: 0, isHovering: false }));
   };
 
@@ -46,30 +51,32 @@ const WelcomePage = () => {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       className="flex flex-col min-h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-x-hidden overflow-y-auto select-none font-sans relative apple-ambient-bg justify-between p-5 sm:p-8 md:p-10"
-      style={{ perspective: "1200px" }}
+      style={{ perspective: isPointerDevice ? "1200px" : "none" }}
     >
       {/* Dynamic Interactive Spotlight following Mouse Pointer on Desktop */}
-      <div
-        className="absolute inset-0 pointer-events-none transition-opacity duration-500 z-0 hidden md:block"
-        style={{
-          opacity: mouseState.isHovering ? 1 : 0.6,
-          background: mouseState.isHovering
-            ? `radial-gradient(750px circle at ${mouseState.x}px ${mouseState.y}px, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.14), rgba(6, 182, 212, 0.05), transparent 70%)`
-            : "radial-gradient(700px circle at 50% 50%, rgba(99, 102, 241, 0.16), rgba(139, 92, 246, 0.08), transparent 70%)",
-        }}
-      />
+      {isPointerDevice && (
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity duration-500 z-0 hidden md:block"
+          style={{
+            opacity: mouseState.isHovering ? 1 : 0.6,
+            background: mouseState.isHovering
+              ? `radial-gradient(750px circle at ${mouseState.x}px ${mouseState.y}px, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.14), rgba(6, 182, 212, 0.05), transparent 70%)`
+              : "radial-gradient(700px circle at 50% 50%, rgba(99, 102, 241, 0.16), rgba(139, 92, 246, 0.08), transparent 70%)",
+          }}
+        />
+      )}
 
       {/* Ambient Glow Spheres */}
       <div
         className="absolute top-[-10%] left-[-10%] w-[380px] sm:w-[550px] h-[380px] sm:h-[550px] rounded-full blur-spot-1 pointer-events-none z-0 transition-transform duration-700 ease-out opacity-70"
         style={{
-          transform: `translate3d(${mouseState.nx * -30}px, ${mouseState.ny * -30}px, 0)`,
+          transform: isPointerDevice ? `translate3d(${mouseState.nx * -30}px, ${mouseState.ny * -30}px, 0)` : "none",
         }}
       />
       <div
         className="absolute bottom-[-10%] right-[-10%] w-[380px] sm:w-[550px] h-[380px] sm:h-[550px] rounded-full blur-spot-2 pointer-events-none z-0 transition-transform duration-700 ease-out opacity-70"
         style={{
-          transform: `translate3d(${mouseState.nx * 40}px, ${mouseState.ny * 40}px, 0)`,
+          transform: isPointerDevice ? `translate3d(${mouseState.nx * 40}px, ${mouseState.ny * 40}px, 0)` : "none",
         }}
       />
 
@@ -96,8 +103,10 @@ const WelcomePage = () => {
       <div
         className="flex-1 flex flex-col items-center justify-center text-center my-auto py-8 sm:py-12 relative z-10 max-w-2xl mx-auto transition-transform duration-200 ease-out"
         style={{
-          transform: `rotateY(${mouseState.nx * 8}deg) rotateX(${-mouseState.ny * 8}deg) translateZ(20px)`,
-          transformStyle: "preserve-3d",
+          transform: isPointerDevice
+            ? `rotateY(${mouseState.nx * 8}deg) rotateX(${-mouseState.ny * 8}deg) translateZ(20px)`
+            : "none",
+          transformStyle: isPointerDevice ? "preserve-3d" : "flat",
         }}
       >
         {/* Glowing Liquid Glass Logo Badge */}
@@ -140,25 +149,23 @@ const WelcomePage = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md">
-          <button
-            onClick={() => navigate("/login")}
-            type="button"
-            className="w-full sm:w-1/2 py-3.5 px-6 rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] font-bold text-sm shadow-xl active:scale-[0.98] hover:opacity-90 transition-all flex items-center justify-center gap-2 cursor-pointer"
+        {/* Action Buttons - native Links for instant first-tap navigation */}
+        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md relative z-30 touch-manipulation">
+          <Link
+            to="/login"
+            className="w-full sm:w-1/2 py-3.5 px-6 rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] font-bold text-sm shadow-xl active:scale-[0.98] hover:opacity-90 transition-all flex items-center justify-center gap-2 cursor-pointer no-underline text-center"
           >
             <span>Sign In</span>
             <ArrowRight size={16} />
-          </button>
+          </Link>
 
-          <button
-            onClick={() => navigate("/signup")}
-            type="button"
-            className="w-full sm:w-1/2 py-3.5 px-6 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 text-zinc-900 dark:text-white font-bold text-sm backdrop-blur-md active:scale-[0.98] hover:bg-black/10 dark:hover:bg-white/15 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          <Link
+            to="/signup"
+            className="w-full sm:w-1/2 py-3.5 px-6 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 text-zinc-900 dark:text-white font-bold text-sm backdrop-blur-md active:scale-[0.98] hover:bg-black/10 dark:hover:bg-white/15 transition-all flex items-center justify-center gap-2 cursor-pointer no-underline text-center"
           >
             <Sparkles size={15} className="text-amber-400" />
             <span>Create Account</span>
-          </button>
+          </Link>
         </div>
       </div>
 

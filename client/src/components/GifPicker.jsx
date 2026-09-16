@@ -7,11 +7,17 @@ import { Grid } from '@giphy/react-components';
 // Initialize Giphy Fetch with the API key from environment variables
 const gf = new GiphyFetch(import.meta.env.VITE_GIPHY_API_KEY || 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh'); // Fallback key just in case
 
-const GifPicker = ({ onGifSelect }) => {
-  const [activeTab, setActiveTab] = useState('gifs'); // 'gifs' | 'stickers'
+const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) => {
+  const [activeTab, setActiveTab] = useState(initialTab); // 'gifs' | 'stickers'
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   
+  useEffect(() => {
+    if (initialTab && (initialTab === 'gifs' || initialTab === 'stickers')) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   // Track container width for the Giphy Grid
   const containerRef = useRef(null);
   const [width, setWidth] = useState(() => {
@@ -78,40 +84,42 @@ const GifPicker = ({ onGifSelect }) => {
   return (
     <div className="flex flex-col h-[380px] sm:h-[400px] w-full max-w-full select-none text-theme-main overflow-hidden">
       {/* Top Header Tabs: GIFs / Stickers */}
-      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
-        <div className="flex items-center gap-1.5 p-0.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-full">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('gifs');
-              setSelectedCategory('all');
-            }}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'gifs'
-                ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm'
-                : 'text-theme-muted hover:text-theme-main'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[15px]">gif_box</span>
-            <span>GIFs</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('stickers');
-              setSelectedCategory('all');
-            }}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'stickers'
-                ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm'
-                : 'text-theme-muted hover:text-theme-main'
-            }`}
-          >
-            <Sparkles size={14} />
-            <span>Stickers</span>
-          </button>
+      {!hideTopTabs && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
+          <div className="flex items-center gap-1.5 p-0.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-full">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('gifs');
+                setSelectedCategory('all');
+              }}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'gifs'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm'
+                  : 'text-theme-muted hover:text-theme-main'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">gif_box</span>
+              <span>GIFs</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('stickers');
+                setSelectedCategory('all');
+              }}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'stickers'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm'
+                  : 'text-theme-muted hover:text-theme-main'
+              }`}
+            >
+              <Sparkles size={14} />
+              <span>Stickers</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Search Input */}
       <div className="p-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-surface)]">
