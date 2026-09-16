@@ -661,7 +661,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         <div
           ref={emojiPickerRef}
           id="emoji-picker-popover"
-          className="absolute bottom-full mb-2 max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:w-[calc(100vw-24px)] max-sm:max-w-[360px] sm:left-4 sm:right-auto sm:translate-x-0 sm:w-[350px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
+          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto sm:w-[350px] sm:max-w-[360px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
         >
           <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
             <div className="flex items-center gap-2">
@@ -731,7 +731,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         <div
           ref={gifPickerRef}
           id="gif-picker-popover"
-          className="absolute bottom-full mb-2 max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:w-[calc(100vw-24px)] max-sm:max-w-[360px] sm:left-4 sm:right-auto sm:translate-x-0 sm:w-[350px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
+          className="absolute bottom-full mb-2 left-2 right-2 sm:left-4 sm:right-auto sm:w-[350px] sm:max-w-[360px] z-50 rounded-3xl shadow-glass animate-scaleIn overflow-hidden border border-[var(--glass-border)] backdrop-blur-2xl bg-[var(--glass-heavy)]"
         >
           <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
             <div className="flex items-center gap-2">
@@ -862,7 +862,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
       {/* Disappearing Timer Menu Popover */}
       {showTimerMenu && (
-        <div ref={timerMenuRef} className="absolute bottom-full mb-2 right-4 sm:right-24 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-2 shadow-glass w-48 max-w-[calc(100vw-32px)] animate-scaleIn space-y-1 text-theme-main text-xs">
+        <div ref={timerMenuRef} className="absolute bottom-full mb-2 right-2 sm:right-24 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-2 shadow-glass w-48 max-w-[calc(100vw-16px)] animate-scaleIn space-y-1 text-theme-main text-xs">
           <div className="px-2.5 py-1 text-[10px] font-semibold text-theme-muted uppercase tracking-wider flex items-center justify-between">
             <span>Disappearing Timer</span>
             <Flame size={12} className="text-orange-400" />
@@ -896,7 +896,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
       {/* Schedule Message Popover */}
       {showScheduleMenu && (
-        <div ref={scheduleMenuRef} className="absolute bottom-full mb-2 right-4 sm:right-16 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-3 shadow-glass w-64 max-w-[calc(100vw-32px)] animate-scaleIn space-y-2 text-theme-main text-xs">
+        <div ref={scheduleMenuRef} className="absolute bottom-full mb-2 right-2 sm:right-16 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl p-3 shadow-glass w-64 max-w-[calc(100vw-16px)] animate-scaleIn space-y-2 text-theme-main text-xs">
           <div className="px-1 text-[11px] font-semibold text-accent-primary flex items-center justify-between">
             <span>Schedule Send</span>
             <Clock size={12} />

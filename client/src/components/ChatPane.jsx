@@ -28,6 +28,7 @@ import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
 import { useBackHandler } from "../lib/backNavigation";
+import { downloadFile } from "../lib/download";
 
 const isDifferentDay = (d1, d2) => {
   if (!d1 || !d2) return true;
@@ -118,6 +119,7 @@ const ChatPane = ({ onBack }) => {
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [downloadingFileId, setDownloadingFileId] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [infoModalMessage, setInfoModalMessage] = useState(null);
@@ -1142,16 +1144,27 @@ const ChatPane = ({ onBack }) => {
                                       </span>
                                     </div>
                                   </div>
-                                  <a
-                                    href={message.file.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    download={message.file.name}
-                                    className="p-2 rounded-lg transition-all ml-2 shrink-0 bg-current/10 hover:bg-current/20 text-current"
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        setDownloadingFileId(message._id);
+                                        await downloadFile(message.file.url, message.file.name);
+                                      } finally {
+                                        setDownloadingFileId(null);
+                                      }
+                                    }}
+                                    disabled={downloadingFileId === message._id}
+                                    className="p-2 rounded-lg transition-all ml-2 shrink-0 bg-current/10 hover:bg-current/20 text-current cursor-pointer active:scale-95 disabled:opacity-50 flex items-center justify-center"
                                     title="Download Document"
                                   >
-                                    <span className="material-symbols-outlined text-base">download</span>
-                                  </a>
+                                    {downloadingFileId === message._id ? (
+                                      <Loader size={16} className="animate-spin" />
+                                    ) : (
+                                      <span className="material-symbols-outlined text-base">download</span>
+                                    )}
+                                  </button>
                                 </div>
                               )}
                               {message.audio && <div className="mb-0.5"><AudioMessagePlayer audioUrl={message.audio} isMine={isMine} /></div>}

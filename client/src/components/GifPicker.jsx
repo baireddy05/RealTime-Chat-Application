@@ -14,19 +14,43 @@ const GifPicker = ({ onGifSelect }) => {
   
   // Track container width for the Giphy Grid
   const containerRef = useRef(null);
-  const [width, setWidth] = useState(300); // Default width
+  const [width, setWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return Math.max(180, Math.min(window.innerWidth - 32, 350) - 16);
+    }
+    return 300;
+  });
+
+  const updateWidth = useCallback(() => {
+    if (containerRef.current) {
+      const measured = containerRef.current.offsetWidth;
+      if (measured > 50) {
+        setWidth(Math.max(180, measured - 16));
+      } else if (typeof window !== 'undefined') {
+        const fallback = Math.min(window.innerWidth - 32, 350) - 16;
+        setWidth(Math.max(180, fallback));
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        // We subtract a small amount for padding/scrollbars
-        setWidth(containerRef.current.offsetWidth - 20);
-      }
-    };
     updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
+    const handleResize = () => updateWidth();
+    window.addEventListener('resize', handleResize);
+
+    let observer;
+    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateWidth();
+      });
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (observer) observer.disconnect();
+    };
+  }, [updateWidth]);
 
   // Fetch function required by Giphy Grid
   const fetchGifs = useCallback((offset) => {
@@ -49,9 +73,10 @@ const GifPicker = ({ onGifSelect }) => {
 
   // Key to force Grid re-render when search/tab changes
   const gridKey = `${activeTab}-${selectedCategory}-${searchQuery}`;
+  const columnsCount = width < 290 ? 2 : 3;
 
   return (
-    <div className="flex flex-col h-[400px] select-none text-theme-main">
+    <div className="flex flex-col h-[380px] sm:h-[400px] w-full max-w-full select-none text-theme-main overflow-hidden">
       {/* Top Header Tabs: GIFs / Stickers */}
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
         <div className="flex items-center gap-1.5 p-0.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-full">
@@ -139,12 +164,12 @@ const GifPicker = ({ onGifSelect }) => {
       </div>
 
       {/* Grid Display Area */}
-      <div ref={containerRef} className="flex-1 p-2.5 overflow-y-auto custom-scrollbar bg-[var(--glass-heavy)]">
+      <div ref={containerRef} className="flex-1 p-2.5 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[var(--glass-heavy)] w-full min-w-0">
         <Grid
           key={gridKey}
           fetchGifs={fetchGifs}
           width={width}
-          columns={3}
+          columns={columnsCount}
           gutter={6}
           noResultsMessage={
             <div className="flex flex-col items-center justify-center h-48 text-center p-4">

@@ -12,6 +12,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import AudioMessagePlayer from "./AudioMessagePlayer";
 import FormattedMessageText from "./FormattedMessageText";
+import { downloadFile } from "../lib/download";
 
 const ThreadDrawer = ({ onClose }) => {
   const {
@@ -159,18 +160,17 @@ const ThreadDrawer = ({ onClose }) => {
                 )}
 
                 {activeThreadMessage.file && (
-                  <a
-                    href={activeThreadMessage.file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2.5 flex items-center gap-2 p-2 rounded-xl bg-[var(--glass-hover)] border border-[var(--glass-border)] hover:border-accent-primary/40 transition-colors text-xs"
+                  <button
+                    type="button"
+                    onClick={() => downloadFile(activeThreadMessage.file.url, activeThreadMessage.file.name)}
+                    className="mt-2.5 flex items-center gap-2 p-2 rounded-xl bg-[var(--glass-hover)] border border-[var(--glass-border)] hover:border-accent-primary/40 transition-colors text-xs w-full text-left cursor-pointer"
                   >
-                    <FileText size={16} className="text-accent-primary" />
+                    <FileText size={16} className="text-accent-primary shrink-0" />
                     <span className="truncate flex-1 text-theme-main font-medium">
                       {activeThreadMessage.file.name}
                     </span>
-                    <Download size={14} className="text-theme-muted" />
-                  </a>
+                    <Download size={14} className="text-theme-muted shrink-0" />
+                  </button>
                 )}
               </div>
             </div>
@@ -275,22 +275,21 @@ const ThreadDrawer = ({ onClose }) => {
                     )}
 
                     {reply.file && (
-                      <a
-                        href={reply.file.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`mt-2 flex items-center gap-2 p-2 rounded-xl border text-xs transition-colors ${
+                      <button
+                        type="button"
+                        onClick={() => downloadFile(reply.file.url, reply.file.name)}
+                        className={`mt-2 flex items-center gap-2 p-2 rounded-xl border text-xs transition-colors w-full text-left cursor-pointer ${
                           isMe
                             ? "bg-white/15 border-white/20 text-white"
                             : "bg-[var(--glass-hover)] border-[var(--glass-border)] text-theme-main"
                         }`}
                       >
-                        <FileText size={14} />
+                        <FileText size={14} className="shrink-0" />
                         <span className="truncate flex-1 font-medium">
                           {reply.file.name}
                         </span>
-                        <Download size={12} />
-                      </a>
+                        <Download size={12} className="shrink-0" />
+                      </button>
                     )}
                   </div>
                 </div>
