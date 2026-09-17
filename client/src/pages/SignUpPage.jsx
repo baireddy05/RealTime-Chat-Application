@@ -111,8 +111,8 @@ const SignUpPage = () => {
           style={{
             opacity: mouseState.isHovering ? 1 : 0.6,
             background: mouseState.isHovering
-              ? `radial-gradient(650px circle at ${mouseState.x}px ${mouseState.y}px, rgba(99, 102, 241, 0.25), rgba(139, 92, 246, 0.15), rgba(6, 182, 212, 0.05), transparent 70%)`
-              : "radial-gradient(600px circle at 50% 50%, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.10), transparent 70%)",
+              ? `radial-gradient(650px circle at ${mouseState.x}px ${mouseState.y}px, rgba(0, 240, 255, 0.20), rgba(0, 255, 157, 0.12), rgba(0, 240, 255, 0.05), transparent 70%)`
+              : "radial-gradient(600px circle at 50% 50%, rgba(0, 240, 255, 0.14), rgba(0, 255, 157, 0.08), transparent 70%)",
           }}
         />
 
@@ -139,12 +139,12 @@ const SignUpPage = () => {
           }}
         >
           <div className="relative group mb-8">
-            <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
-            <div className="relative w-32 h-32 rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
+            <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400/40 via-emerald-400/30 to-cyan-500/40 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
+            <div className="relative w-32 h-32 rounded-[2.75rem] shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 border border-black/5 dark:border-white/10">
               <img
                 src="/logo.png"
                 alt="Pulse Logo"
-                className="w-20 h-20 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
+                className="w-full h-full object-cover drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
@@ -152,7 +152,7 @@ const SignUpPage = () => {
           <h1 className="text-5xl font-extrabold text-theme-main tracking-tight mb-5 leading-tight">
             Connect seamlessly <br />
             with{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-cyan-400 to-emerald-400">
               Pulse
             </span>
           </h1>
@@ -162,7 +162,7 @@ const SignUpPage = () => {
           </p>
 
           <div className="mt-8 flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 dark:bg-white/[0.04] border border-white/15 dark:border-white/10 backdrop-blur-md">
-            <Activity className="w-4 h-4 text-indigo-400 animate-pulse" />
+            <Activity className="w-4 h-4 text-cyan-500 animate-pulse" />
             <span className="text-xs text-theme-muted font-medium tracking-wide">
               Ultra-Responsive Synchronous Engine
             </span>
@@ -300,3 +300,4 @@ const SignUpPage = () => {
 };
 
 export default SignUpPage;
+

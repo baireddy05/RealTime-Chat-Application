@@ -60,8 +60,8 @@ const WelcomePage = () => {
           style={{
             opacity: mouseState.isHovering ? 1 : 0.6,
             background: mouseState.isHovering
-              ? `radial-gradient(750px circle at ${mouseState.x}px ${mouseState.y}px, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.14), rgba(6, 182, 212, 0.05), transparent 70%)`
-              : "radial-gradient(700px circle at 50% 50%, rgba(99, 102, 241, 0.16), rgba(139, 92, 246, 0.08), transparent 70%)",
+              ? `radial-gradient(750px circle at ${mouseState.x}px ${mouseState.y}px, rgba(0, 240, 255, 0.20), rgba(0, 255, 157, 0.12), rgba(0, 240, 255, 0.05), transparent 70%)`
+              : "radial-gradient(700px circle at 50% 50%, rgba(0, 240, 255, 0.14), rgba(0, 255, 157, 0.08), transparent 70%)",
           }}
         />
       )}
@@ -83,8 +83,8 @@ const WelcomePage = () => {
       {/* ── Top Header Navigation Bar (Theme Toggle) ── */}
       <div className="w-full flex items-center justify-between z-20 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-black/[0.04] dark:bg-white/[0.08] backdrop-blur-xl border border-black/10 dark:border-white/10 flex items-center justify-center shadow-sm">
-            <img src="/logo.png" alt="Pulse" className="w-5 h-5 object-contain" />
+          <div className="w-9 h-9 rounded-[0.9rem] flex items-center justify-center shadow-sm overflow-hidden border border-black/5 dark:border-white/10">
+            <img src="/logo.png" alt="Pulse" className="w-full h-full object-cover" />
           </div>
           <span className="text-lg font-extrabold tracking-tight text-theme-main">Pulse</span>
         </div>
@@ -111,12 +111,12 @@ const WelcomePage = () => {
       >
         {/* Glowing Liquid Glass Logo Badge */}
         <div className="relative group mb-6 sm:mb-8">
-          <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/35 via-purple-500/35 to-cyan-500/35 rounded-[2.5rem] sm:rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-90 animate-pulse" />
-          <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-[2.5rem] sm:rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 border border-black/5 dark:border-white/10">
+          <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400/40 via-emerald-400/30 to-cyan-500/40 rounded-[2.5rem] sm:rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-90 animate-pulse" />
+          <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-[2.2rem] sm:rounded-[2.75rem] shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 border border-black/5 dark:border-white/10">
             <img
               src="/logo.png"
               alt="Pulse Logo"
-              className="w-14 h-14 sm:w-20 sm:h-20 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
+              className="w-full h-full object-cover drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
             />
           </div>
         </div>
@@ -124,7 +124,7 @@ const WelcomePage = () => {
         <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-theme-main tracking-tight mb-4 sm:mb-5 leading-tight">
           Connect seamlessly <br />
           with{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-cyan-400 to-emerald-400">
             Pulse
           </span>
         </h1>
@@ -135,8 +135,8 @@ const WelcomePage = () => {
 
         {/* Feature Pills */}
         <div className="flex flex-wrap items-center justify-center gap-2.5 mb-8 sm:mb-10">
-          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 dark:bg-white/[0.05] border border-white/15 dark:border-white/10 backdrop-blur-md">
-            <Activity className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 dark:bg-white/[0.05] border border-black/5 dark:border-white/10 backdrop-blur-md">
+            <Activity className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
             <span className="text-[11.5px] sm:text-xs text-theme-muted font-medium tracking-wide">
               Ultra-Fast Synchronous Engine
             </span>
