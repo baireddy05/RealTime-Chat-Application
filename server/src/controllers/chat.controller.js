@@ -560,26 +560,37 @@ export const markMessagesAsRead = async (req, res) => {
     const { id } = req.params;
     const { type } = req.query;
     const myId = req.user._id;
+    const sendReadReceipts = req.user.readReceipts !== false;
 
     if (type === "room") {
+      const updateOp = { $addToSet: { readBy: myId } };
+      if (sendReadReceipts) {
+        updateOp.$push = { reads: { userId: myId, at: new Date() } };
+      }
+      
       await Message.updateMany(
         { roomId: id, readBy: { $ne: myId } },
-        { 
-          $addToSet: { readBy: myId },
-          $push: { reads: { userId: myId, at: new Date() } }
-        }
+        updateOp
       );
-      io.to(id.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
+      
+      if (sendReadReceipts) {
+        io.to(id.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
+      }
     } else {
+      const updateOp = { $addToSet: { readBy: myId } };
+      if (sendReadReceipts) {
+        updateOp.$push = { reads: { userId: myId, at: new Date() } };
+      }
+
       await Message.updateMany(
         { senderId: id, receiverId: myId, readBy: { $ne: myId } },
-        { 
-          $addToSet: { readBy: myId },
-          $push: { reads: { userId: myId, at: new Date() } }
-        }
+        updateOp
       );
-      io.to(id.toString()).emit("messagesRead", { chatId: myId, readerId: myId, type: "user" });
-      io.to(myId.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "user" });
+      
+      if (sendReadReceipts) {
+        io.to(id.toString()).emit("messagesRead", { chatId: myId, readerId: myId, type: "user" });
+        io.to(myId.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "user" });
+      }
     }
 
     res.status(200).json({ success: true });

@@ -12,9 +12,11 @@ import {
   Moon,
   Shield,
   Laptop,
+  Lock,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useThemeStore } from "../store/useThemeStore";
+import { useAuthStore } from "../store/useAuthStore";
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const {
@@ -27,6 +29,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     toggleSound,
   } = useChatStore();
   const { theme, setTheme } = useThemeStore();
+  const { authUser, updateProfile } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState("appearance");
   const [notificationsAllowed, setNotificationsAllowed] = useState(
@@ -96,6 +99,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
           >
             <Volume2 size={14} />
             <span>Sound & Alerts</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("privacy")}
+            className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === "privacy"
+                ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
+                : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+            }`}
+          >
+            <Lock size={14} />
+            <span>Privacy</span>
           </button>
         </div>
 
@@ -316,6 +330,37 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   <div className="text-xs font-bold text-zinc-900 dark:text-white">Encrypted Workspace Active</div>
                   <div className="text-[11px] text-zinc-500">All direct chats, calls, and voice notes are protected with client-side encryption.</div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "privacy" && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex items-center justify-between">
+                <div className="space-y-0.5 max-w-[80%]">
+                  <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                    <Lock size={15} />
+                    <span>Read Receipts (Blue Ticks)</span>
+                  </div>
+                  <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
+                    If turned off, you won't send or receive read receipts. Read receipts are always sent for group chats.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => updateProfile({ readReceipts: authUser?.readReceipts === false ? true : false })}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    authUser?.readReceipts !== false ? "bg-zinc-900 dark:bg-white" : "bg-zinc-300 dark:bg-zinc-700"
+                  }`}
+                  title={authUser?.readReceipts !== false ? "Disable read receipts" : "Enable read receipts"}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-[#121118] shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      authUser?.readReceipts !== false ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
           )}

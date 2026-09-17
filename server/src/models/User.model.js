@@ -35,6 +35,10 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    readReceipts: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

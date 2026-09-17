@@ -199,7 +199,7 @@ const MessageBubble = memo(({
   }, {});
 
   const readObj = (message.reads || []).find(r => r.userId === selectedChat.id);
-  const isReadByRecipient = selectedChat.type === "user" && (readObj || (message.readBy || []).includes(selectedChat.id));
+  const isReadByRecipient = selectedChat.type === "user" && authUser.readReceipts !== false && (readObj || (message.readBy || []).includes(selectedChat.id));
   const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat.id);
   const isDeliveredToRecipient = selectedChat.type === "user" && !!deliveryObj;
   
