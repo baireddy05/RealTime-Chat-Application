@@ -17,6 +17,16 @@ const ICE_SERVERS = {
 let timerInterval = null;
 let pendingIceCandidates = [];
 
+const getVideoConstraints = (facingMode = "user") => {
+  const isPortrait = typeof window !== "undefined" && window.innerHeight > window.innerWidth;
+  return {
+    facingMode: { ideal: facingMode },
+    width: { ideal: isPortrait ? 720 : 1280 },
+    height: { ideal: isPortrait ? 1280 : 720 },
+    aspectRatio: { ideal: isPortrait ? 9 / 16 : 16 / 9 },
+  };
+};
+
 export const useCallStore = create((set, get) => ({
   callState: "idle", // 'idle' | 'calling' | 'incoming' | 'connected'
   callType: "video", // 'audio' | 'video'
@@ -28,10 +38,75 @@ export const useCallStore = create((set, get) => ({
   isSpeakerOn: true,
   isScreenSharing: false,
   screenStream: null,
+  currentFacingMode: "user", // 'user' | 'environment'
+  hasMultipleCameras: false,
+  isSwapped: false,
   callDuration: 0,
   incomingSignal: null,
   peerConnection: null,
   activeSocket: null,
+
+  checkMultipleCameras: async () => {
+    try {
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === "videoinput");
+        set({ hasMultipleCameras: videoInputs.length > 1 });
+      }
+    } catch (err) {
+      console.warn("[PulseCall] Error enumerating media devices:", err);
+    }
+  },
+
+  toggleSwapVideo: () => {
+    set((state) => ({ isSwapped: !state.isSwapped }));
+  },
+
+  switchCamera: async () => {
+    const { currentFacingMode, localStream, peerConnection, callType } = get();
+    if (callType !== "video") return;
+    const nextFacing = currentFacingMode === "user" ? "environment" : "user";
+
+    try {
+      let newStream = null;
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: nextFacing } },
+        });
+      } catch {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: nextFacing },
+        });
+      }
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (newVideoTrack) {
+        if (localStream) {
+          const oldVideoTrack = localStream.getVideoTracks()[0];
+          if (oldVideoTrack) {
+            oldVideoTrack.stop();
+            localStream.removeTrack(oldVideoTrack);
+          }
+          localStream.addTrack(newVideoTrack);
+        }
+
+        if (peerConnection) {
+          const senders = peerConnection.getSenders();
+          const videoSender = senders.find((s) => s.track && s.track.kind === "video");
+          if (videoSender) {
+            await videoSender.replaceTrack(newVideoTrack);
+          }
+        }
+
+        set({
+          currentFacingMode: nextFacing,
+          localStream: new MediaStream(localStream ? localStream.getTracks() : [newVideoTrack]),
+        });
+      }
+    } catch (err) {
+      console.warn("[PulseCall] Failed to switch camera facingMode:", err);
+    }
+  },
 
   // Initialize Socket Listeners for incoming calls and signaling
   initSocketListeners: (socket) => {
@@ -144,22 +219,30 @@ export const useCallStore = create((set, get) => ({
 
     pendingIceCandidates = [];
     soundManager.playOutgoingRing();
+    get().checkMultipleCameras();
 
     let stream = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
+        video: callType === "video" ? getVideoConstraints(get().currentFacingMode) : false,
       });
     } catch (err) {
-      console.warn("[PulseCall] Could not obtain video stream, falling back to audio:", err);
+      console.warn("[PulseCall] Could not obtain optimal video stream, trying fallback:", err);
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        callType = "audio";
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: callType === "video" ? { facingMode: "user" } : false,
+        });
       } catch {
-        soundManager.stopRinging();
-        alert("Camera or Microphone permission was denied or unavailable.");
-        return;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          callType = "audio";
+        } catch {
+          soundManager.stopRinging();
+          alert("Camera or Microphone permission was denied or unavailable.");
+          return;
+        }
       }
     }
 
@@ -241,19 +324,27 @@ export const useCallStore = create((set, get) => ({
     if (!activeSocket || !peerUser || !incomingSignal) return;
 
     let stream = null;
+    get().checkMultipleCameras();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
+        video: callType === "video" ? getVideoConstraints(get().currentFacingMode) : false,
       });
     } catch (err) {
-      console.warn("[PulseCall] Could not obtain camera on answer, falling back to audio:", err);
+      console.warn("[PulseCall] Could not obtain optimal camera on answer, falling back:", err);
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: callType === "video" ? { facingMode: "user" } : false,
+        });
       } catch {
-        alert("Camera or Microphone permission was denied or unavailable.");
-        get().rejectCall();
-        return;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch {
+          alert("Camera or Microphone permission was denied or unavailable.");
+          get().rejectCall();
+          return;
+        }
       }
     }
 
@@ -471,6 +562,8 @@ export const useCallStore = create((set, get) => ({
       isMuted: false,
       isVideoOff: false,
       isScreenSharing: false,
+      currentFacingMode: "user",
+      isSwapped: false,
     });
   },
 }));

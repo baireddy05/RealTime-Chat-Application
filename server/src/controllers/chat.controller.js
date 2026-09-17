@@ -254,6 +254,7 @@ export const sendMessage = async (req, res) => {
       image,
       audio,
       file,
+      contact,
       replyTo,
       isForwarded,
       roomId,
@@ -344,6 +345,7 @@ export const sendMessage = async (req, res) => {
         image,
         audio,
         file,
+        contact: contact || null,
         replyTo,
         isForwarded: Boolean(isForwarded),
         expiresAt: computedExpiresAt,
@@ -369,6 +371,7 @@ export const sendMessage = async (req, res) => {
         image,
         audio,
         file,
+        contact: contact || null,
         replyTo,
         isForwarded: Boolean(isForwarded),
         expiresAt: computedExpiresAt,
@@ -991,12 +994,15 @@ export const proxyDownloadFile = async (req, res) => {
     }
 
     // Clean and sanitize filename
-    const rawFilename = typeof filename === "string" && filename.trim() ? filename.trim() : "download";
+    let rawFilename = typeof filename === "string" && filename.trim() ? filename.trim() : "document.pdf";
+    if (!rawFilename.includes(".") && url.toLowerCase().includes(".pdf")) {
+      rawFilename += ".pdf";
+    }
     const cleanFilename = rawFilename.replace(/[\r\n"\\/<>:|?*]/g, "_");
 
     const remoteResponse = await fetch(url, {
       headers: {
-        "User-Agent": "PulseMessenger/1.0",
+        "User-Agent": "PulseMessenger/1.0 (Windows NT 10.0; Win64; x64)",
       },
     });
 
@@ -1006,7 +1012,11 @@ export const proxyDownloadFile = async (req, res) => {
       });
     }
 
-    const contentType = remoteResponse.headers.get("content-type") || "application/octet-stream";
+    let contentType = remoteResponse.headers.get("content-type") || "application/octet-stream";
+    if (cleanFilename.toLowerCase().endsWith(".pdf")) {
+      contentType = "application/pdf";
+    }
+
     const contentLength = remoteResponse.headers.get("content-length");
 
     res.setHeader("Content-Type", contentType);
@@ -1014,6 +1024,8 @@ export const proxyDownloadFile = async (req, res) => {
       "Content-Disposition",
       `attachment; filename="${cleanFilename}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`
     );
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition, Content-Length");
     if (contentLength) {
       res.setHeader("Content-Length", contentLength);
     }

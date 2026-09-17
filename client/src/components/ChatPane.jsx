@@ -27,6 +27,8 @@ import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
 import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
+import ContactCard from "./ContactCard";
+import SwipeableMessage from "./SwipeableMessage";
 import { useBackHandler } from "../lib/backNavigation";
 import { downloadFile } from "../lib/download";
 
@@ -1081,7 +1083,7 @@ const ChatPane = ({ onBack }) => {
                 }
                 const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
                 const openUpwards = index >= 2;
-                const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
+                const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
 
                 return (
                   <Fragment key={message._id}>
@@ -1093,14 +1095,18 @@ const ChatPane = ({ onBack }) => {
                         </span>
                       </div>
                     )}
-                  <div
-                    id={`msg-${message._id}`}
-                    onMouseEnter={() => setHoveredMessageId(message._id)}
-                    onMouseLeave={() => setHoveredMessageId(null)}
-                    className={`flex max-w-full relative group transition-all px-4 sm:px-6 md:px-8 ${
-                      isSameSenderAsPrev ? "mt-1" : "mt-3.5"
-                    } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
-                  >
+                    <SwipeableMessage
+                      onReply={() => setReplyingTo(message)}
+                      disabled={message.isDeleted || message.isOptimistic}
+                    >
+                      <div
+                        id={`msg-${message._id}`}
+                        onMouseEnter={() => setHoveredMessageId(message._id)}
+                        onMouseLeave={() => setHoveredMessageId(null)}
+                        className={`flex max-w-full relative group transition-all px-4 sm:px-6 md:px-8 ${
+                          isSameSenderAsPrev ? "mt-1" : "mt-3.5"
+                        } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
+                      >
                     {!isMine && selectedChat.type === "room" && (
                       <div className="w-7 h-7 flex-shrink-0 self-end mb-0.5 mr-2">
                         {!isSameSenderAsNext ? (
@@ -1167,7 +1173,7 @@ const ChatPane = ({ onBack }) => {
                             <div onClick={() => message.replyTo.messageId && scrollToMessage(message.replyTo.messageId)}
                               className="mb-1.5 p-2 rounded-xl cursor-pointer transition-colors text-[11px] select-none bg-current/5 border-l-2 border-current/40">
                               <span className="font-semibold block text-[10px] opacity-90">{message.replyTo.senderName || "User"}</span>
-                              <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "Attachment")}</p>
+                              <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.contact ? `👤 Contact: ${message.replyTo.contact.fullName || message.replyTo.contact.username || "Contact"}` : "Attachment")}</p>
                             </div>
                           )}
                           {message.isDeleted ? (
@@ -1181,13 +1187,27 @@ const ChatPane = ({ onBack }) => {
                                 </div>
                               )}
                               {message.file && (
-                                <div className="flex items-center justify-between p-2.5 rounded-xl transition-all border my-1 max-w-sm bg-current/5 border-current/10 hover:bg-current/10">
+                                <div
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      setDownloadingFileId(message._id);
+                                      await downloadFile(message.file.url, message.file.name);
+                                    } finally {
+                                      setDownloadingFileId(null);
+                                    }
+                                  }}
+                                  className="flex items-center justify-between p-2.5 rounded-xl transition-all border my-1 max-w-sm bg-current/5 border-current/10 hover:bg-current/10 cursor-pointer active:scale-[0.99] group/doc"
+                                  title="Click to download / view document"
+                                >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/20 text-red-500 dark:text-red-400 shrink-0">
+                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/20 text-red-500 dark:text-red-400 shrink-0 group-hover/doc:scale-105 transition-transform">
                                       <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
                                     </div>
                                     <div className="flex flex-col min-w-0">
-                                      <span className="text-xs font-semibold truncate opacity-95">{message.file.name}</span>
+                                      <span className="text-xs font-semibold truncate opacity-95 group-hover/doc:text-accent-primary transition-colors">
+                                        {message.file.name}
+                                      </span>
                                       <span className="text-[11px] font-mono opacity-70">
                                         {formatFileSize(message.file.size)} • Document
                                       </span>
@@ -1215,6 +1235,9 @@ const ChatPane = ({ onBack }) => {
                                     )}
                                   </button>
                                 </div>
+                              )}
+                              {message.contact && (
+                                <ContactCard contact={message.contact} isMine={isMine} />
                               )}
                               {message.audio && <div className="mb-0.5"><AudioMessagePlayer audioUrl={message.audio} isMine={isMine} /></div>}
                               {message.expiresAt && (
@@ -1429,6 +1452,19 @@ const ChatPane = ({ onBack }) => {
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        openThread(message);
+                                        setOpenMenuMessageId(null);
+                                        setMenuAnchor(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                    >
+                                      <MessageSquare size={14} className="text-theme-muted" />
+                                      <span>Reply in Thread</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
                                         setInfoModalMessage(message);
                                         setOpenMenuMessageId(null);
                                         setMenuAnchor(null);
@@ -1496,8 +1532,9 @@ const ChatPane = ({ onBack }) => {
                           )}
                         </button>
                       )}
-                    </div>
-                  </div>
+                        </div>
+                      </div>
+                    </SwipeableMessage>
                   </Fragment>
                 );
               })}

@@ -24,6 +24,7 @@ import {
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
 import GifPicker from "./GifPicker";
+import ContactModal from "./ContactModal";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -51,6 +52,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mediaTab, setMediaTab] = useState("emojis"); // "emojis" | "gifs" | "stickers"
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showScheduleMenu, setShowScheduleMenu] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(null);
@@ -135,6 +137,21 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       });
     }
   }, [editingMessage, setReplyingTo]);
+
+  // Auto-focus input when replying to a message or on swipe-reply
+  useEffect(() => {
+    if (replyingTo) {
+      inputRef.current?.focus();
+    }
+  }, [replyingTo]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      inputRef.current?.focus();
+    };
+    window.addEventListener("pulse:focus-input", handleFocus);
+    return () => window.removeEventListener("pulse:focus-input", handleFocus);
+  }, []);
 
   // Close popup menus and reset attachments when switching chats
   useEffect(() => {
@@ -757,6 +774,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           {/* Tab 2 & 3: GIFs & Stickers */}
           {(mediaTab === "gifs" || mediaTab === "stickers") && (
             <GifPicker
+              key={mediaTab}
               initialTab={mediaTab}
               hideTopTabs={true}
               onGifSelect={async (gifUrl) => {
@@ -819,7 +837,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           <button
             type="button"
             onClick={() => {
-              setText((prev) => (prev ? `${prev} 👤 Contact: ${authUser?.username}` : `👤 Contact: ${authUser?.username}`));
+              setShowContactModal(true);
               setShowAttachMenu(false);
             }}
             className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
@@ -830,20 +848,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             <span>Share Contact</span>
           </button>
           <div className="h-px bg-[var(--glass-border)] my-1" />
-          <button
-            type="button"
-            onClick={() => {
-              setMediaTab("gifs");
-              setShowMediaPicker(true);
-              setShowAttachMenu(false);
-            }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
-          >
-            <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[16px]">gif_box</span>
-            </div>
-            <span>GIFs & Animations</span>
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -1004,6 +1008,18 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         <ImageModal
           imageUrl={previewModalImage}
           onClose={() => setPreviewModalImage(null)}
+        />
+      )}
+
+      {showContactModal && (
+        <ContactModal
+          isOpen={showContactModal}
+          onClose={() => setShowContactModal(false)}
+          onSendContact={async (contact) => {
+            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            await sendMessage({ contact, text: "" });
+            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+          }}
         />
       )}
 

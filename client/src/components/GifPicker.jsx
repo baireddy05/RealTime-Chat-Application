@@ -1,13 +1,25 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { GIF_CATEGORIES } from '../lib/gifCatalog';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { GIF_CATEGORIES, GIF_ITEMS } from '../lib/gifCatalog';
 import { Search, X, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { GiphyFetch } from '@giphy/js-fetch-api';
 import { Grid } from '@giphy/react-components';
 
-// Initialize Giphy Fetch with the API key from environment variables
-const gf = new GiphyFetch(import.meta.env.VITE_GIPHY_API_KEY || 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh'); // Fallback key just in case
+// Initialize Giphy Fetch with fallback API key
+const gf = new GiphyFetch(import.meta.env.VITE_GIPHY_API_KEY || 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh');
 
-const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) => {
+export const STICKER_CATEGORIES = [
+  { id: "all", label: "🔥 Trending" },
+  { id: "reactions", label: "💬 Reactions" },
+  { id: "love", label: "❤️ Love" },
+  { id: "cute", label: "🐱 Cute" },
+  { id: "happy", label: "✨ Happy" },
+  { id: "party", label: "🎉 Party" },
+  { id: "anime", label: "🌸 Anime" },
+  { id: "memes", label: "🐸 Memes" },
+  { id: "bye", label: "👋 Bye" },
+];
+
+const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => {
   const [activeTab, setActiveTab] = useState(initialTab); // 'gifs' | 'stickers'
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,9 +34,9 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
   const containerRef = useRef(null);
   const [width, setWidth] = useState(() => {
     if (typeof window !== 'undefined') {
-      return Math.max(180, Math.min(window.innerWidth - 32, 350) - 16);
+      return Math.max(180, Math.min(window.innerWidth - 32, 360) - 16);
     }
-    return 300;
+    return 320;
   });
 
   const updateWidth = useCallback(() => {
@@ -33,7 +45,7 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
       if (measured > 50) {
         setWidth(Math.max(180, measured - 16));
       } else if (typeof window !== 'undefined') {
-        const fallback = Math.min(window.innerWidth - 32, 350) - 16;
+        const fallback = Math.min(window.innerWidth - 32, 360) - 16;
         setWidth(Math.max(180, fallback));
       }
     }
@@ -58,32 +70,50 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
     };
   }, [updateWidth]);
 
-  // Fetch function required by Giphy Grid
-  const fetchGifs = useCallback((offset) => {
+  // Fetch function required by Giphy Grid with robust fallback
+  const fetchGifs = useCallback(async (offset) => {
     const isStickers = activeTab === 'stickers';
-    // If a category (other than 'all') is selected, use it as the search term, otherwise use searchQuery
     const term = selectedCategory !== 'all' ? selectedCategory : searchQuery.trim();
 
-    if (term) {
-      // Search
-      return isStickers
-        ? gf.search(term, { type: 'stickers', offset, limit: 20 })
-        : gf.search(term, { offset, limit: 20 });
-    } else {
-      // Trending
-      return isStickers
-        ? gf.trending({ type: 'stickers', offset, limit: 20 })
-        : gf.trending({ offset, limit: 20 });
+    try {
+      if (term) {
+        return await (isStickers
+          ? gf.search(term, { type: 'stickers', offset, limit: 20 })
+          : gf.search(term, { offset, limit: 20 }));
+      } else {
+        return await (isStickers
+          ? gf.trending({ type: 'stickers', offset, limit: 20 })
+          : gf.trending({ offset, limit: 20 }));
+      }
+    } catch (err) {
+      console.warn("[GifPicker] Giphy fetch fallback triggered:", err);
+      const filtered = GIF_ITEMS.filter((item) => {
+        if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
+        if (term && !item.tags.some(t => t.toLowerCase().includes(term.toLowerCase())) && !item.title.toLowerCase().includes(term.toLowerCase())) return false;
+        return true;
+      });
+      return {
+        data: filtered.map(f => ({
+          id: f.id,
+          title: f.title,
+          images: {
+            original: { url: f.url },
+            fixed_width: { url: f.preview || f.url, width: 200, height: 150 },
+          }
+        })),
+        pagination: { total_count: filtered.length, count: filtered.length, offset: 0 }
+      };
     }
   }, [activeTab, selectedCategory, searchQuery]);
 
   // Key to force Grid re-render when search/tab changes
   const gridKey = `${activeTab}-${selectedCategory}-${searchQuery}`;
   const columnsCount = width < 290 ? 2 : 3;
+  const categoriesList = activeTab === 'stickers' ? STICKER_CATEGORIES : GIF_CATEGORIES;
 
   return (
-    <div className="flex flex-col h-[380px] sm:h-[400px] w-full max-w-full select-none text-theme-main overflow-hidden">
-      {/* Top Header Tabs: GIFs / Stickers */}
+    <div className="flex flex-col h-[380px] sm:h-[410px] w-full max-w-full select-none text-theme-main overflow-hidden">
+      {/* Optional Top Header Tabs: GIFs / Stickers */}
       {!hideTopTabs && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-header)]">
           <div className="flex items-center gap-1.5 p-0.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-full">
@@ -92,6 +122,7 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
               onClick={() => {
                 setActiveTab('gifs');
                 setSelectedCategory('all');
+                setSearchQuery('');
               }}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'gifs'
@@ -107,6 +138,7 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
               onClick={() => {
                 setActiveTab('stickers');
                 setSelectedCategory('all');
+                setSearchQuery('');
               }}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'stickers'
@@ -131,10 +163,10 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
             onChange={(e) => {
               setSearchQuery(e.target.value);
               if (e.target.value && selectedCategory !== 'all') {
-                setSelectedCategory('all'); // Reset category chip if typing manually
+                setSelectedCategory('all');
               }
             }}
-            placeholder={`Search ${activeTab === 'gifs' ? 'GIFs...' : 'stickers...'}`}
+            placeholder={`Search ${activeTab === 'gifs' ? 'GIFs...' : 'animated stickers...'}`}
             className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-theme-main placeholder:text-theme-muted focus:outline-none focus:ring-1 focus:ring-accent-primary transition-all"
             autoFocus
           />
@@ -152,13 +184,13 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
 
       {/* Category Pills Strip */}
       <div className="px-2.5 py-1.5 border-b border-[var(--glass-border)] flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-[var(--glass-surface)] shrink-0">
-        {GIF_CATEGORIES.map((cat) => (
+        {categoriesList.map((cat) => (
           <button
             key={cat.id}
             type="button"
             onClick={() => {
               setSelectedCategory(cat.id);
-              if (searchQuery) setSearchQuery(''); // Clear manual search if picking category
+              if (searchQuery) setSearchQuery('');
             }}
             className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all cursor-pointer ${
               selectedCategory === cat.id
@@ -188,11 +220,10 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
           }
           onGifClick={(gif, e) => {
             e.preventDefault();
-            // Get highest quality url, falling back to original
             const gifUrl = gif.images.original.url;
             onGifSelect(gifUrl);
           }}
-          hideAttribution={true} // Cleaner UI
+          hideAttribution={true}
         />
       </div>
     </div>
@@ -200,3 +231,4 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = false }) =>
 };
 
 export default GifPicker;
+

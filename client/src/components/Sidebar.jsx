@@ -28,6 +28,7 @@ const getMessageSnippet = (msg) => {
   if (msg.audio) return "🎤 Voice note";
   if (msg.image) return "📷 Photo";
   if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
+  if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
   
   const text = msg.decryptedText || msg.text || "";
   if (isEncryptedMessage(text)) {

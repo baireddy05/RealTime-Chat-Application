@@ -73,6 +73,19 @@ const messageSchema = new mongoose.Schema(
       text: String,
       image: String,
       file: Object,
+      contact: Object,
+    },
+    contact: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      username: String,
+      fullName: String,
+      email: String,
+      phone: String,
+      profilePic: String,
+      about: String,
     },
     isEdited: {
       type: Boolean,

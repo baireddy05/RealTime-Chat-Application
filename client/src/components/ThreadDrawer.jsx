@@ -12,6 +12,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import AudioMessagePlayer from "./AudioMessagePlayer";
 import FormattedMessageText from "./FormattedMessageText";
+import ContactCard from "./ContactCard";
 import { downloadFile } from "../lib/download";
 
 const ThreadDrawer = ({ onClose }) => {
@@ -159,6 +160,12 @@ const ThreadDrawer = ({ onClose }) => {
                   </div>
                 )}
 
+                {activeThreadMessage.contact && (
+                  <div className="mt-2.5">
+                    <ContactCard contact={activeThreadMessage.contact} isMine={false} />
+                  </div>
+                )}
+
                 {activeThreadMessage.file && (
                   <button
                     type="button"
@@ -255,6 +262,12 @@ const ThreadDrawer = ({ onClose }) => {
                         <FormattedMessageText
                           text={reply.decryptedText || reply.text}
                         />
+                      </div>
+                    )}
+
+                    {reply.contact && (
+                      <div className="mt-1">
+                        <ContactCard contact={reply.contact} isMine={isMe} />
                       </div>
                     )}
 

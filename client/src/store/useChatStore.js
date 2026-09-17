@@ -500,9 +500,10 @@ export const useChatStore = create((set, get) => ({
         replyTo: messageData.replyTo !== undefined ? messageData.replyTo : (replyingTo ? {
           messageId: replyingTo._id,
           senderName: replyingTo.senderId?.username || replyingTo.senderName || "User",
-          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : "Attachment"),
+          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : replyingTo.contact ? `👤 Contact: ${replyingTo.contact.fullName || replyingTo.contact.username || "Contact"}` : "Attachment"),
           image: replyingTo.image || null,
           file: replyingTo.file || null,
+          contact: replyingTo.contact || null,
         } : null),
       };
 
@@ -525,6 +526,7 @@ export const useChatStore = create((set, get) => ({
           image: messageData.image || null,
           file: messageData.file || null,
           audio: messageData.audio || null,
+          contact: messageData.contact || null,
           createdAt: new Date().toISOString(),
           replyTo: payload.replyTo || null,
           isOptimistic: true,
