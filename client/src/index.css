@@ -866,34 +866,7 @@ img.emoji {
   }
 }
 
-/* ── Message 3-Dots Action Button Visibility ──
-   - Laptop / Desktop: Hidden by default (opacity: 0), smoothly appears ONLY on hover (.group:hover)
-   - Mobile / Touch: Completely removed so messages are uncluttered; options appear on long-press
-*/
-.message-more-btn {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
 
-.group:hover .message-more-btn,
-.message-more-btn.menu-open {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-/* Hide 3-dots button on mobile screen widths (< 768px) and touch pointer devices */
-@media (max-width: 767px) {
-  .message-more-btn {
-    display: none !important;
-  }
-}
-
-@media (hover: none) and (pointer: coarse) {
-  .message-more-btn {
-    display: none !important;
-  }
-}
 
 /* Prevent default callout on long press on mobile for message bubbles */
 .message-bubble-touch {

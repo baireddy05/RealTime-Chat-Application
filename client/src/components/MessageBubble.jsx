@@ -1,5 +1,5 @@
 import { memo, Fragment, useRef } from "react";
-import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -286,7 +286,7 @@ const MessageBubble = memo(({
                           }
                     : {}
                 }
-                className={`message-bubble-touch ${isTransparentBubble ? "py-0 px-0" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full min-w-0 ${
+                className={`message-bubble-touch ${isTransparentBubble ? "py-0 px-0" : "py-2 px-3.5"} ${bubbleRadius} relative group/bubble transition-all w-fit max-w-full min-w-0 ${
                   message.isDeleted
                     ? "bg-surface-container/40 text-outline italic"
                     : isMine && !isTransparentBubble
@@ -502,13 +502,11 @@ const MessageBubble = memo(({
                       )}
                     </>
                   )}
-                </div>
-
-                {/* 3-dot dropdown menu trigger & popover */}
-                {!message.isDeleted && (
-                  <div className="relative flex items-center flex-shrink-0">
-                    <button
-                      type="button"
+                  
+                  {/* WhatsApp-style Hover Menu Trigger */}
+                  {!message.isDeleted && (
+                    <div
+                      role="button"
                       onTouchStart={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
@@ -530,16 +528,21 @@ const MessageBubble = memo(({
                           setActivePickerId(null);
                         }
                       }}
-                      className={`message-more-btn hidden md:flex items-center justify-center p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] shadow-sm transition-all duration-150 cursor-pointer ${
+                      className={`hidden md:flex absolute top-1 right-1 items-center justify-center p-0.5 rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-md shadow-sm transition-opacity duration-150 cursor-pointer z-10 ${
                         isMenuOpen
-                          ? "menu-open opacity-100 scale-100 pointer-events-auto text-theme-main bg-[var(--glass-hover)] ring-2 ring-accent-primary/25"
-                          : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:!opacity-100 text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] scale-90 group-hover:scale-100"
+                          ? "opacity-100 pointer-events-auto"
+                          : "opacity-0 pointer-events-none group-hover/bubble:opacity-100 group-hover/bubble:pointer-events-auto text-current"
                       }`}
                       title="Message options"
                     >
-                      <MoreVertical size={13} />
-                    </button>
+                      <ChevronDown size={14} className="opacity-80" />
+                    </div>
+                  )}
+                </div>
 
+                {/* Dropdown popover */}
+                {!message.isDeleted && (
+                  <div className="relative flex items-center flex-shrink-0">
                     {isMenuOpen && (
                       <>
                         <div
