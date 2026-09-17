@@ -111,13 +111,22 @@ export const useAuthStore = create((set, get) => ({
 
     if (visibilityHandler) {
       document.removeEventListener("visibilitychange", visibilityHandler);
+      window.removeEventListener("focus", visibilityHandler);
     }
     visibilityHandler = () => {
       if (newSocket.connected) {
         newSocket.emit("userVisibilityChange", { isHidden: document.hidden });
       }
+      if (!document.hidden) {
+        import("./useChatStore").then(({ useChatStore }) => {
+          useChatStore.getState().resyncCurrentChat?.();
+          useChatStore.getState().getUsers?.();
+          useChatStore.getState().getRooms?.();
+        }).catch(() => {});
+      }
     };
     document.addEventListener("visibilitychange", visibilityHandler);
+    window.addEventListener("focus", visibilityHandler);
   },
 
   disconnectSocket: () => {
@@ -127,6 +136,7 @@ export const useAuthStore = create((set, get) => ({
     }
     if (visibilityHandler) {
       document.removeEventListener("visibilitychange", visibilityHandler);
+      window.removeEventListener("focus", visibilityHandler);
       visibilityHandler = null;
     }
   },

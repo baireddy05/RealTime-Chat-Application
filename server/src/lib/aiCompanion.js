@@ -132,10 +132,7 @@ export const handleAiMention = async ({ text, roomId, receiverId, senderUser, pa
       if (roomId) {
         io.to(roomId.toString()).emit("newMessage", aiMessage);
       } else {
-        const senderSocket = getReceiverSocketId(senderUser._id.toString());
-        if (senderSocket) {
-          io.to(senderSocket).emit("newMessage", aiMessage);
-        }
+        io.to(senderUser._id.toString()).emit("newMessage", aiMessage);
       }
     } catch (err) {
       console.error("Error generating AI response:", err);

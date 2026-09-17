@@ -1,5 +1,5 @@
-import { memo, Fragment } from "react";
-import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2 } from "lucide-react";
+import { memo, Fragment, useRef } from "react";
+import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -93,6 +93,82 @@ const MessageBubble = memo(({
 }) => {
   const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
   const sender = message.senderId;
+
+  // Long press handling for touch devices (mobile) & context menu support
+  const bubbleRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const isLongPressTriggeredRef = useRef(false);
+
+  const openOptionsMenuAtElement = (element) => {
+    if (message.isDeleted) return;
+    const targetEl = element || bubbleRef.current;
+    if (!targetEl) return;
+    const rect = targetEl.getBoundingClientRect();
+    setOpenMenuMessageId(message._id);
+    setMenuAnchor({
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      isMine,
+    });
+    setActivePickerId(null);
+  };
+
+  const handleTouchStart = (e) => {
+    if (message.isDeleted) return;
+    if (e.target.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
+      return;
+    }
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    isLongPressTriggeredRef.current = false;
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      if (typeof window !== "undefined" && window.navigator?.vibrate) {
+        try {
+          window.navigator.vibrate(30);
+        } catch {}
+      }
+      openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
+    }, 420);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!longPressTimerRef.current) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (isLongPressTriggeredRef.current) {
+      setTimeout(() => {
+        isLongPressTriggeredRef.current = false;
+      }, 350);
+    }
+  };
+
+  const handleContextMenu = (e) => {
+    if (message.isDeleted) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
+  };
   const prevMessage = index > 0 ? currentList[index - 1] : null;
   const prevSenderId = prevMessage ? (prevMessage.senderId?._id || prevMessage.senderId) : null;
   const currentSenderId = message.senderId?._id || message.senderId;
@@ -179,6 +255,18 @@ const MessageBubble = memo(({
             <div className={`flex items-center gap-1.5 ${isMine ? "flex-row-reverse" : "flex-row"} max-w-full min-w-0`}>
               {/* Speech Bubble */}
               <div 
+                ref={bubbleRef}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                onContextMenu={handleContextMenu}
+                onClickCapture={(e) => {
+                  if (isLongPressTriggeredRef.current) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
                 style={
                   !message.isDeleted
                     ? isTransparentBubble
@@ -198,7 +286,7 @@ const MessageBubble = memo(({
                           }
                     : {}
                 }
-                className={`${isTransparentBubble ? "py-0 px-0" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full min-w-0 ${
+                className={`message-bubble-touch ${isTransparentBubble ? "py-0 px-0" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full min-w-0 ${
                   message.isDeleted
                     ? "bg-surface-container/40 text-outline italic"
                     : isMine && !isTransparentBubble
@@ -442,10 +530,10 @@ const MessageBubble = memo(({
                           setActivePickerId(null);
                         }
                       }}
-                      className={`p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] shadow-sm transition-all duration-150 cursor-pointer ${
+                      className={`message-more-btn hidden md:flex items-center justify-center p-1.5 rounded-full bg-[var(--glass-heavy)] border border-[var(--glass-border)] shadow-sm transition-all duration-150 cursor-pointer ${
                         isMenuOpen
-                          ? "opacity-100 scale-100 pointer-events-auto text-theme-main bg-[var(--glass-hover)] ring-2 ring-accent-primary/25"
-                          : "opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:!opacity-100 pointer-events-auto text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] scale-95 sm:scale-90 hover:!scale-100"
+                          ? "menu-open opacity-100 scale-100 pointer-events-auto text-theme-main bg-[var(--glass-hover)] ring-2 ring-accent-primary/25"
+                          : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:!opacity-100 text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] scale-90 group-hover:scale-100"
                       }`}
                       title="Message options"
                     >
@@ -526,6 +614,24 @@ const MessageBubble = memo(({
                               <Reply size={14} className="text-theme-muted" />
                               <span>Reply</span>
                             </button>
+
+                            {(message.decryptedText || message.text) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const textToCopy = message.decryptedText || message.text;
+                                  if (navigator.clipboard?.writeText) {
+                                    navigator.clipboard.writeText(textToCopy);
+                                  }
+                                  setOpenMenuMessageId(null);
+                                  setMenuAnchor(null);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                              >
+                                <Copy size={14} className="text-theme-muted" />
+                                <span>Copy Text</span>
+                              </button>
+                            )}
 
                             <button
                               type="button"

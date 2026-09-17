@@ -827,3 +827,77 @@ img.emoji {
   transform: translateX(-50%) translateY(0) scale(1);
 }
 
+/* ── Mobile Safe Area Insets (iOS notch / home indicator) ── */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Mobile-specific touch improvements */
+@media (max-width: 767px) {
+  /* Prevent text selection on interactive elements */
+  button, [role="button"] {
+    -webkit-touch-callout: none;
+  }
+
+  /* Smoother scrolling on mobile */
+  .custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Tighter spacing on mobile for chat bubbles */
+  .mobile-tight-px {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* Call modal mobile safe area */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .call-safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+}
+
+/* ── Message 3-Dots Action Button Visibility ──
+   - Laptop / Desktop: Hidden by default (opacity: 0), smoothly appears ONLY on hover (.group:hover)
+   - Mobile / Touch: Completely removed so messages are uncluttered; options appear on long-press
+*/
+.message-more-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.group:hover .message-more-btn,
+.message-more-btn.menu-open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Hide 3-dots button on mobile screen widths (< 768px) and touch pointer devices */
+@media (max-width: 767px) {
+  .message-more-btn {
+    display: none !important;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .message-more-btn {
+    display: none !important;
+  }
+}
+
+/* Prevent default callout on long press on mobile for message bubbles */
+.message-bubble-touch {
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
+}
+

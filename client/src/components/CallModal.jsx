@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useCallStore } from "../store/useCallStore";
 import { useBackHandler } from "../lib/backNavigation";
 import { 
@@ -176,9 +177,19 @@ const CallModal = () => {
     });
   };
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 h-screen h-[100dvh] apple-ambient-bg flex flex-col items-center justify-between p-3 sm:p-4 md:p-6 animate-fadeIn text-theme-main select-none backdrop-blur-3xl overflow-hidden"
+      className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] w-screen h-screen h-[100dvh] apple-ambient-bg flex flex-col items-center justify-between p-3 sm:p-4 md:p-6 animate-fadeIn text-theme-main select-none backdrop-blur-3xl overflow-hidden"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100vw",
+        height: "100dvh",
+        zIndex: 9999,
+      }}
       onClick={() => {
         // Unlock audio context on mobile touch if blocked
         if (remoteAudioRef.current && remoteAudioRef.current.paused) {
@@ -476,19 +487,19 @@ const CallModal = () => {
       </div>
 
       {/* Bottom Control Dock (Responsive, Mobile Touch Friendly) */}
-      <div className="z-20 flex items-center justify-center gap-2 sm:gap-3.5 bg-[var(--glass-heavy)] backdrop-blur-3xl border border-[var(--glass-border)] px-3.5 sm:px-6 py-2.5 sm:py-3.5 rounded-full shadow-glass animate-slideUp max-w-[95vw] overflow-x-auto no-scrollbar">
+      <div className="z-20 flex items-center justify-center gap-1.5 sm:gap-3.5 bg-[var(--glass-heavy)] backdrop-blur-3xl border border-[var(--glass-border)] px-3 sm:px-6 py-2 sm:py-3.5 rounded-full shadow-glass animate-slideUp max-w-[95vw] overflow-x-auto no-scrollbar call-safe-bottom">
         {/* Mute Button */}
         <button
           type="button"
           onClick={toggleMute}
-          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
+          className={`p-2.5 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
             isMuted
               ? "bg-red-500 text-white scale-105"
               : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
           }`}
           title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
         >
-          {isMuted ? <MicOff size={19} /> : <Mic size={19} />}
+          {isMuted ? <MicOff size={17} /> : <Mic size={17} />}
         </button>
 
         {/* Video Toggle (if video call) */}
@@ -496,14 +507,14 @@ const CallModal = () => {
           <button
             type="button"
             onClick={toggleVideo}
-            className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
+            className={`p-2.5 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
               isVideoOff
                 ? "bg-red-500 text-white scale-105"
                 : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
             }`}
             title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
           >
-            {isVideoOff ? <VideoOff size={19} /> : <Video size={19} />}
+            {isVideoOff ? <VideoOff size={17} /> : <Video size={17} />}
           </button>
         )}
 
@@ -512,10 +523,10 @@ const CallModal = () => {
           <button
             type="button"
             onClick={switchCamera}
-            className="p-3 sm:p-3.5 rounded-full bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)] transition-all cursor-pointer shadow-md shrink-0 active:rotate-180"
+            className="p-2.5 sm:p-3.5 rounded-full bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)] transition-all cursor-pointer shadow-md shrink-0 active:rotate-180"
             title="Flip Camera (Front/Rear)"
           >
-            <SwitchCamera size={19} />
+            <SwitchCamera size={17} />
           </button>
         )}
 
@@ -524,14 +535,14 @@ const CallModal = () => {
           <button
             type="button"
             onClick={toggleScreenShare}
-            className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
+            className={`p-2.5 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 hidden sm:flex ${
               isScreenSharing
                 ? "bg-emerald-500 text-white scale-105 shadow-emerald-500/30 ring-2 ring-emerald-400/40"
                 : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
             }`}
             title={isScreenSharing ? "Stop Sharing Screen" : "Share Your Screen"}
           >
-            {isScreenSharing ? <MonitorOff size={19} /> : <Monitor size={19} />}
+            {isScreenSharing ? <MonitorOff size={17} /> : <Monitor size={17} />}
           </button>
         )}
 
@@ -540,10 +551,10 @@ const CallModal = () => {
           <button
             type="button"
             onClick={() => setShowReactionPicker(!showReactionPicker)}
-            className="p-3 sm:p-3.5 rounded-full bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)] transition-all cursor-pointer shadow-md active:scale-95"
+            className="p-2.5 sm:p-3.5 rounded-full bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)] transition-all cursor-pointer shadow-md active:scale-95"
             title="Send Live Reaction"
           >
-            <Sparkles size={19} className="text-amber-400" />
+            <Sparkles size={17} className="text-amber-400" />
           </button>
           {showReactionPicker && (
             <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-full px-3 py-1.5 flex items-center gap-2 shadow-glass animate-scaleIn z-50">
@@ -565,28 +576,30 @@ const CallModal = () => {
         <button
           type="button"
           onClick={toggleSpeaker}
-          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
+          className={`p-2.5 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
             isSpeakerOn
               ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30"
               : "bg-[var(--glass-surface)] text-theme-muted border border-[var(--glass-border)] hover:text-theme-main"
           }`}
           title={isSpeakerOn ? "Speaker Active (Click to mute audio)" : "Speaker Muted (Click to unmute)"}
         >
-          {isSpeakerOn ? <Volume2 size={19} /> : <VolumeX size={19} />}
+          {isSpeakerOn ? <Volume2 size={17} /> : <VolumeX size={17} />}
         </button>
 
         {/* End Call Button */}
         <button
           type="button"
           onClick={endCall}
-          className="p-3 sm:p-3.5 rounded-full bg-red-500 hover:bg-red-600 active:scale-95 text-white shadow-lg transition-all duration-200 cursor-pointer ml-1 sm:ml-2 shrink-0"
+          className="p-2.5 sm:p-3.5 rounded-full bg-red-500 hover:bg-red-600 active:scale-95 text-white shadow-lg transition-all duration-200 cursor-pointer ml-1 sm:ml-2 shrink-0"
           title="End Call"
         >
-          <PhoneOff size={19} />
+          <PhoneOff size={17} />
         </button>
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default CallModal;

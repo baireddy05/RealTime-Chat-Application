@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useCallStore } from "../store/useCallStore";
 import { useBackHandler } from "../lib/backNavigation";
 import { soundManager } from "../lib/sound";
@@ -23,9 +24,19 @@ const IncomingCallModal = () => {
     rejectCall();
   };
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
+      className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] w-screen h-screen h-[100dvh] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100vw",
+        height: "100dvh",
+        zIndex: 9999,
+      }}
       onClick={handleReject}
     >
       <div 
@@ -98,6 +109,8 @@ const IncomingCallModal = () => {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default IncomingCallModal;

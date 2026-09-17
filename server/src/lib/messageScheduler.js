@@ -22,10 +22,8 @@ export const startMessageScheduler = () => {
         } else {
           const receiverIdStr = (msg.receiverId?._id || msg.receiverId)?.toString();
           const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
-          const receiverSocketId = getReceiverSocketId(receiverIdStr);
-          const senderSocketId = getReceiverSocketId(senderIdStr);
-          if (receiverSocketId) io.to(receiverSocketId).emit("newMessage", msg);
-          if (senderSocketId) io.to(senderSocketId).emit("newMessage", msg);
+          if (receiverIdStr) io.to(receiverIdStr).emit("newMessage", msg);
+          if (senderIdStr) io.to(senderIdStr).emit("newMessage", msg);
         }
       }
 
@@ -38,10 +36,6 @@ export const startMessageScheduler = () => {
       for (const msg of expiredMessages) {
         msg.isDeleted = true;
         msg.text = "This message has expired and self-destructed";
-        msg.image = null;
-        msg.audio = null;
-        msg.file = null;
-        msg.reactions = [];
         await msg.save();
 
         const payload = {
@@ -57,10 +51,8 @@ export const startMessageScheduler = () => {
         } else {
           const receiverIdStr = (msg.receiverId?._id || msg.receiverId)?.toString();
           const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
-          const receiverSocket = getReceiverSocketId(receiverIdStr);
-          const senderSocket = getReceiverSocketId(senderIdStr);
-          if (receiverSocket) io.to(receiverSocket).emit("messageExpired", payload);
-          if (senderSocket) io.to(senderSocket).emit("messageExpired", payload);
+          if (receiverIdStr) io.to(receiverIdStr).emit("messageExpired", payload);
+          if (senderIdStr) io.to(senderIdStr).emit("messageExpired", payload);
         }
       }
     } catch (error) {

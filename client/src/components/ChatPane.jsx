@@ -727,7 +727,7 @@ const ChatPane = ({ onBack }) => {
             >
               {onBack && (
                 <button onClick={(e) => { e.stopPropagation(); onBack(); }}
-                  className="xl:hidden p-2 text-zinc-500 hover:text-zinc-900 rounded-xl hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 flex-shrink-0 transition-colors mr-0.5" title="Back to conversations">
+                  className="md:hidden p-1.5 text-zinc-500 hover:text-zinc-900 rounded-xl hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 flex-shrink-0 transition-colors mr-0.5" title="Back to conversations">
                   <span className="material-symbols-outlined text-lg">arrow_back</span>
                 </button>
               )}
@@ -780,10 +780,10 @@ const ChatPane = ({ onBack }) => {
             </div>
 
             {/* Monochromatic Header Action Dock */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
               <button
                 onClick={() => handleStartCall("audio")}
-                className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
                 title="Start Voice Call"
                 type="button"
               >
@@ -791,7 +791,7 @@ const ChatPane = ({ onBack }) => {
               </button>
               <button
                 onClick={() => handleStartCall("video")}
-                className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
                 title="Start Video Call"
                 type="button"
               >
@@ -799,7 +799,7 @@ const ChatPane = ({ onBack }) => {
               </button>
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                className="hidden sm:flex p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
                 title="Search in thread"
                 type="button"
               >
@@ -812,7 +812,7 @@ const ChatPane = ({ onBack }) => {
                 e.stopPropagation();
                 setShowChatOptions((p) => !p);
               }}
-              className="p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+              className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
               title="Thread details"
               type="button"
             >

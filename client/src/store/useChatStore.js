@@ -344,6 +344,48 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  resyncCurrentChat: async () => {
+    const { selectedChat, isSending } = get();
+    if (!selectedChat || isSending) return;
+    try {
+      const authUser = useAuthStore.getState().authUser;
+      const res = await axiosInstance.get(`/chat/${selectedChat.id}?type=${selectedChat.type}`);
+      const key = getConversationKey(selectedChat, authUser?._id);
+
+      const decryptedMessages = await Promise.all(
+        res.data.map(async (m) => {
+          let msg = m;
+          if (m.isEncrypted || isEncryptedMessage(m.text)) {
+            const dec = await decryptMessage(m.text, key);
+            msg = { ...msg, decryptedText: dec };
+          }
+          if (msg.replyTo?.text && isEncryptedMessage(msg.replyTo.text)) {
+            try {
+              const decReply = await decryptMessage(msg.replyTo.text, key);
+              msg = { ...msg, replyTo: { ...msg.replyTo, decryptedText: decReply } };
+            } catch {}
+          }
+          return msg;
+        })
+      );
+
+      set((state) => {
+        const currentIds = new Set(state.messages.map((m) => m._id));
+        const hasNew = decryptedMessages.some((m) => !currentIds.has(m._id));
+        const nonOptimisticCount = state.messages.filter((m) => !m.isOptimistic).length;
+        if (hasNew || nonOptimisticCount !== decryptedMessages.length) {
+          const optimistic = state.messages.filter((m) => m.isOptimistic);
+          return {
+            messages: [...decryptedMessages, ...optimistic],
+          };
+        }
+        return state;
+      });
+    } catch (err) {
+      console.error("Error in resyncCurrentChat:", err.message);
+    }
+  },
+
   getThreadReplies: async (messageId) => {
     set({ isThreadLoading: true });
     try {
@@ -723,6 +765,18 @@ export const useChatStore = create((set, get) => ({
       socket.emit("joinRoom", selectedChat.id);
     }
 
+    // Auto-resync active chat and metadata on reconnect
+    socket.off("connect");
+    socket.on("connect", () => {
+      get().resyncCurrentChat();
+      get().getUsers();
+      get().getRooms();
+      const current = get().selectedChat;
+      if (current?.type === "room") {
+        socket.emit("joinRoom", current.id);
+      }
+    });
+
     socket.on("newMessage", async (newMessage) => {
       const { selectedChat } = get();
       const myId = useAuthStore.getState().authUser?._id;
@@ -761,8 +815,15 @@ export const useChatStore = create((set, get) => ({
       if (isRoomMsg || isUserMsg) {
         set((state) => {
           const exists = state.messages.some((m) => m._id === processedMessage._id);
+          if (exists) return state;
+
+          let currentMessages = state.messages;
+          if (isMyMessage) {
+            currentMessages = currentMessages.filter((m) => !m.isOptimistic);
+          }
+
           return {
-            messages: exists ? state.messages : [...state.messages, processedMessage],
+            messages: [...currentMessages, processedMessage],
             scheduledMessages: state.scheduledMessages.filter((m) => m._id !== processedMessage._id),
           };
         });
@@ -970,6 +1031,13 @@ export const useChatStore = create((set, get) => ({
       if (!rooms.some((r) => r._id === newRoom._id)) {
         set({ rooms: [newRoom, ...rooms] });
       }
+      const myId = useAuthStore.getState().authUser?._id?.toString();
+      const isMember = (newRoom.members || []).some(
+        (m) => (m._id || m)?.toString() === myId
+      );
+      if (isMember) {
+        socket.emit("joinRoom", newRoom._id);
+      }
     });
 
     // Real-time reactions
@@ -1123,13 +1191,9 @@ export const useChatStore = create((set, get) => ({
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
-    const { selectedChat } = get();
     if (!socket) return;
     
-    if (selectedChat && selectedChat.type === "room") {
-      socket.emit("leaveRoom", selectedChat.id);
-    }
-    
+    socket.off("connect");
     socket.off("newMessage");
     socket.off("threadUpdated");
     socket.off("messageReaction");
@@ -1197,9 +1261,6 @@ export const useChatStore = create((set, get) => ({
     if (chat?.id) unread[chat.id] = 0;
 
     if (socket) {
-      if (current?.type === "room" && current.id !== chat?.id) {
-        socket.emit("leaveRoom", current.id);
-      }
       if (chat?.type === "room" && current?.id !== chat?.id) {
         socket.emit("joinRoom", chat.id);
       }

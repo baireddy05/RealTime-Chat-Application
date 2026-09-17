@@ -300,12 +300,13 @@ const HomePage = () => {
   };
 
   return (
-    <div
-      className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200"
-      style={{
-        "--sidebar-width": `${sidebarWidth}px`,
-      }}
-    >
+    <>
+      <div
+        className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200 safe-top"
+        style={{
+          "--sidebar-width": `${sidebarWidth}px`,
+        }}
+      >
       {/* 1. Dynamic Liquid Glass Pulse Shockwave Background */}
       {backgroundAnimationsEnabled && typingShockwavesEnabled && <TypingPulseBackground />}
 
@@ -669,34 +670,35 @@ const HomePage = () => {
           </div>
         )}
       </main>
-
-      {/* Modals & Overlays */}
-      {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
-      {isSetStatusOpen && <SetStatusModal onClose={() => setIsSetStatusOpen(false)} />}
-      {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
-      {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
-      {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
-      {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
-      {(isAddFriendOpen || isContactsModalOpen) && (
-        <AddFriendModal
-          onClose={() => {
-            setIsAddFriendOpen(false);
-            setIsContactsModalOpen(false);
-          }}
-        />
-      )}
-      {isSettingsOpen && <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />}
-
-      {/* WebRTC Video & Audio Call Overlays */}
-      <CallModal />
-      <IncomingCallModal />
-
-      {/* Global Drag Overlay during split pane resizing */}
-      {isResizing && (
-        <div className="fixed inset-0 z-[100] cursor-col-resize select-none pointer-events-auto bg-transparent" />
-      )}
     </div>
-  );
+
+    {/* Modals & Overlays - Rendered outside the flex row layout */}
+    {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
+    {isSetStatusOpen && <SetStatusModal onClose={() => setIsSetStatusOpen(false)} />}
+    {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
+    {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
+    {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
+    {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
+    {(isAddFriendOpen || isContactsModalOpen) && (
+      <AddFriendModal
+        onClose={() => {
+          setIsAddFriendOpen(false);
+          setIsContactsModalOpen(false);
+        }}
+      />
+    )}
+    {isSettingsOpen && <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />}
+
+    {/* WebRTC Video & Audio Call Overlays */}
+    <CallModal />
+    <IncomingCallModal />
+
+    {/* Global Drag Overlay during split pane resizing */}
+    {isResizing && (
+      <div className="fixed inset-0 z-[100] cursor-col-resize select-none pointer-events-auto bg-transparent" />
+    )}
+  </>
+);
 };
 
 export default HomePage;

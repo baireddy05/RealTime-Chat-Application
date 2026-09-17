@@ -204,10 +204,7 @@ export const sendFriendRequest = async (req, res) => {
     await newRequest.populate("sender", "username email profilePic status bio");
 
     // Real-time socket notification to receiver
-    const receiverSocketId = getReceiverSocketId(targetUserId.toString());
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newFriendRequest", newRequest.toObject ? newRequest.toObject() : newRequest);
-    }
+    io.to(targetUserId.toString()).emit("newFriendRequest", newRequest.toObject ? newRequest.toObject() : newRequest);
 
     res.status(201).json(newRequest);
   } catch (error) {
@@ -242,17 +239,10 @@ export const acceptFriendRequest = async (req, res) => {
     const updatedReceiver = await User.findById(currentUserId).select("username email profilePic status bio");
 
     // Real-time socket notification to sender
-    const senderSocketId = getReceiverSocketId(friendRequest.sender.toString());
-
-    // Only notify the original sender — the acceptor (receiver) already
-    // updates their own state from the HTTP response, so emitting to them
-    // would cause a duplicate friend entry.
-    if (senderSocketId) {
-      io.to(senderSocketId).emit("friendRequestAccepted", {
-        newFriend: updatedReceiver,
-        requestId,
-      });
-    }
+    io.to(friendRequest.sender.toString()).emit("friendRequestAccepted", {
+      newFriend: updatedReceiver,
+      requestId,
+    });
 
     res.status(200).json({ message: "Friend request accepted", friend: updatedSender });
   } catch (error) {
@@ -305,10 +295,7 @@ export const removeFriend = async (req, res) => {
       ],
     });
 
-    const targetSocketId = getReceiverSocketId(userId);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("friendRemoved", { userId: currentUserId });
-    }
+    io.to(userId.toString()).emit("friendRemoved", { userId: currentUserId });
 
     res.status(200).json({ message: "Friend removed successfully" });
   } catch (error) {

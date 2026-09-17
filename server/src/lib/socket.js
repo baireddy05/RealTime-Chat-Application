@@ -21,14 +21,23 @@ const io = new Server(server, {
   },
 });
 
-// Store user socket mappings for private messaging and online status
-const userSocketMap = {}; // { userId: socketId }
+// Store user socket mappings for multi-device support, private messaging, and online status
+const userSocketMap = {}; // { userId: Set<socketId> }
 const hiddenUsers = new Set(); // { userId }
 
 export const getReceiverSocketId = (receiverId) => {
   if (!receiverId) return undefined;
   const id = receiverId._id ? receiverId._id.toString() : receiverId.toString();
-  return userSocketMap[id];
+  const sockets = userSocketMap[id];
+  if (!sockets || sockets.size === 0) return undefined;
+  return Array.from(sockets)[sockets.size - 1]; // most recently active socket
+};
+
+export const getUserSocketIds = (receiverId) => {
+  if (!receiverId) return [];
+  const id = receiverId._id ? receiverId._id.toString() : receiverId.toString();
+  const sockets = userSocketMap[id];
+  return sockets ? Array.from(sockets) : [];
 };
 
 // Middleware to authenticate socket connections via cookie OR auth payload
@@ -63,7 +72,13 @@ io.on("connection", (socket) => {
   const userId = socket.userId?.toString();
 
   if (userId) {
-    userSocketMap[userId] = socket.id;
+    if (!userSocketMap[userId]) {
+      userSocketMap[userId] = new Set();
+    }
+    userSocketMap[userId].add(socket.id);
+    // Every socket joins the user's personal room so io.to(userId) reaches all their devices/tabs
+    socket.join(userId);
+
     // Broadcast online status to all users
     const getVisibleUsers = () => Object.keys(userSocketMap).filter(id => !hiddenUsers.has(id));
     io.emit("getOnlineUsers", getVisibleUsers());
@@ -109,10 +124,7 @@ io.on("connection", (socket) => {
     if (targetType === "room") {
       socket.to(targetId).emit("userTyping", { userId, username, targetId, targetType });
     } else {
-      const receiverSocketId = getReceiverSocketId(targetId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("userTyping", { userId, username, targetId: userId, targetType: "user" });
-      }
+      io.to(targetId.toString()).emit("userTyping", { userId, username, targetId: userId, targetType: "user" });
     }
   });
 
@@ -120,18 +132,15 @@ io.on("connection", (socket) => {
     if (targetType === "room") {
       socket.to(targetId).emit("userStoppedTyping", { userId, username, targetId, targetType });
     } else {
-      const receiverSocketId = getReceiverSocketId(targetId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("userStoppedTyping", { userId, username, targetId: userId, targetType: "user" });
-      }
+      io.to(targetId.toString()).emit("userStoppedTyping", { userId, username, targetId: userId, targetType: "user" });
     }
   });
 
   // WebRTC Audio/Video Calling Signaling
   socket.on("callUser", ({ userToCall, signalData, callType, callerInfo }) => {
-    const receiverSocketId = getReceiverSocketId(userToCall);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("incomingCall", {
+    const targetSockets = userSocketMap[userToCall];
+    if (targetSockets && targetSockets.size > 0) {
+      io.to(userToCall.toString()).emit("incomingCall", {
         signal: signalData,
         from: userId,
         callType: callType || "video",
@@ -143,45 +152,27 @@ io.on("connection", (socket) => {
   });
 
   socket.on("answerCall", ({ to, signal }) => {
-    const callerSocketId = getReceiverSocketId(to);
-    if (callerSocketId) {
-      io.to(callerSocketId).emit("callAccepted", { signal });
-    }
+    io.to(to.toString()).emit("callAccepted", { signal });
   });
 
   socket.on("rejectCall", ({ to }) => {
-    const callerSocketId = getReceiverSocketId(to);
-    if (callerSocketId) {
-      io.to(callerSocketId).emit("callRejected");
-    }
+    io.to(to.toString()).emit("callRejected");
   });
 
   socket.on("endCall", ({ to }) => {
-    const peerSocketId = getReceiverSocketId(to);
-    if (peerSocketId) {
-      io.to(peerSocketId).emit("callEnded");
-    }
+    io.to(to.toString()).emit("callEnded");
   });
 
   socket.on("iceCandidate", ({ to, candidate }) => {
-    const peerSocketId = getReceiverSocketId(to);
-    if (peerSocketId) {
-      io.to(peerSocketId).emit("iceCandidate", { candidate });
-    }
+    io.to(to.toString()).emit("iceCandidate", { candidate });
   });
 
   socket.on("peerToggleVideo", ({ to, isVideoOff }) => {
-    const peerSocketId = getReceiverSocketId(to);
-    if (peerSocketId) {
-      io.to(peerSocketId).emit("peerToggleVideo", { isVideoOff });
-    }
+    io.to(to.toString()).emit("peerToggleVideo", { isVideoOff });
   });
 
   socket.on("peerToggleMute", ({ to, isMuted }) => {
-    const peerSocketId = getReceiverSocketId(to);
-    if (peerSocketId) {
-      io.to(peerSocketId).emit("peerToggleMute", { isMuted });
-    }
+    io.to(to.toString()).emit("peerToggleMute", { isMuted });
   });
 
   // Message Delivery Receipt
@@ -194,15 +185,12 @@ io.on("connection", (socket) => {
           { $push: { deliveries: { userId, at: new Date() } } }
         ).exec();
       });
-      const senderSocketId = getReceiverSocketId(senderId);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("messageDelivered", { 
-          messageId, 
-          delivererId: userId,
-          chatId: userId,
-          type: "user" 
-        });
-      }
+      io.to(senderId.toString()).emit("messageDelivered", { 
+        messageId, 
+        delivererId: userId,
+        chatId: userId,
+        type: "user" 
+      });
     } catch (err) {
       console.error("Error in messageDelivered event:", err);
     }
@@ -221,9 +209,12 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("A user disconnected:", socket.id);
-    if (userId && userSocketMap[userId] === socket.id) {
-      delete userSocketMap[userId];
-      hiddenUsers.delete(userId);
+    if (userId && userSocketMap[userId]) {
+      userSocketMap[userId].delete(socket.id);
+      if (userSocketMap[userId].size === 0) {
+        delete userSocketMap[userId];
+        hiddenUsers.delete(userId);
+      }
       const getVisibleUsers = () => Object.keys(userSocketMap).filter(id => !hiddenUsers.has(id));
       io.emit("getOnlineUsers", getVisibleUsers());
     }

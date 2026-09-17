@@ -30,10 +30,7 @@ export const uploadStatus = async (req, res) => {
     const currentUser = await User.findById(userId).select("friends");
     if (currentUser && currentUser.friends) {
       currentUser.friends.forEach((friendId) => {
-        const friendSocketId = getReceiverSocketId(friendId.toString());
-        if (friendSocketId) {
-          io.to(friendSocketId).emit("newStatus", newStatus);
-        }
+        io.to(friendId.toString()).emit("newStatus", newStatus);
       });
     }
 
@@ -47,22 +44,16 @@ export const uploadStatus = async (req, res) => {
 export const getStatuses = async (req, res) => {
   try {
     const userId = req.user._id;
-
     const currentUser = await User.findById(userId).select("friends");
-    const friendIds = currentUser.friends || [];
+    const allowedUserIds = [userId, ...(currentUser?.friends || [])];
 
-    // Also fetch own active statuses
-    const targetIds = [...friendIds, userId];
-
-    const activeStatuses = await Status.find({
-      userId: { $in: targetIds },
-      expiresAt: { $gt: new Date() },
+    const statuses = await Status.find({
+      userId: { $in: allowedUserIds },
     })
       .populate("userId", "username profilePic")
-      .sort({ createdAt: 1 })
-      .lean();
+      .sort({ createdAt: -1 });
 
-    res.status(200).json(activeStatuses);
+    res.status(200).json(statuses);
   } catch (error) {
     console.error("Error in getStatuses controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -75,7 +66,6 @@ export const deleteStatus = async (req, res) => {
     const userId = req.user._id;
 
     const status = await Status.findById(statusId);
-    
     if (!status) {
       return res.status(404).json({ error: "Status not found" });
     }
@@ -90,10 +80,7 @@ export const deleteStatus = async (req, res) => {
     const currentUser = await User.findById(userId).select("friends");
     if (currentUser && currentUser.friends) {
       currentUser.friends.forEach((friendId) => {
-        const friendSocketId = getReceiverSocketId(friendId.toString());
-        if (friendSocketId) {
-          io.to(friendSocketId).emit("deletedStatus", { statusId, userId });
-        }
+        io.to(friendId.toString()).emit("deletedStatus", { statusId, userId });
       });
     }
 

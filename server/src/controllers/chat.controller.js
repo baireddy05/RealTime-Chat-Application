@@ -173,6 +173,11 @@ export const createRoom = async (req, res) => {
     // Broadcast new room to all connected sockets
     io.emit("newRoom", newRoom);
 
+    // Auto-join all members currently connected to the new room
+    members.forEach((memberId) => {
+      io.in(memberId.toString()).socketsJoin(newRoom._id.toString());
+    });
+
     res.status(201).json(newRoom);
   } catch (error) {
     console.error("Error in createRoom controller:", error.message);
@@ -234,10 +239,7 @@ export const getMessages = async (req, res) => {
         { senderId: id, receiverId: myId, "deliveries.userId": { $ne: myId } },
         { $push: { deliveries: { userId: myId, at: new Date() } } }
       );
-      const senderSocketId = getReceiverSocketId(id);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("messageDelivered", { chatId: myId, delivererId: myId, type: "user" });
-      }
+      io.to(id.toString()).emit("messageDelivered", { chatId: myId, delivererId: myId, type: "user" });
 
       return res.status(200).json(messages);
     }
@@ -387,12 +389,10 @@ export const sendMessage = async (req, res) => {
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
 
-      // Send to receiver immediately only if NOT scheduled
+      // Send to receiver and sender immediately only if NOT scheduled
       if (!isScheduled) {
-        const receiverSocketId = getReceiverSocketId(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit("newMessage", newMessage);
-        }
+        io.to(receiverId.toString()).emit("newMessage", newMessage);
+        io.to(senderId.toString()).emit("newMessage", newMessage);
       }
     }
 
@@ -414,12 +414,10 @@ export const sendMessage = async (req, res) => {
           newReply: newMessage,
         };
         if (roomId) {
-          io.to(roomId).emit("threadUpdated", threadPayload);
+          io.to(roomId.toString()).emit("threadUpdated", threadPayload);
         } else {
-          const rSocket = getReceiverSocketId(receiverId);
-          const sSocket = getReceiverSocketId(senderId.toString());
-          if (rSocket) io.to(rSocket).emit("threadUpdated", threadPayload);
-          if (sSocket) io.to(sSocket).emit("threadUpdated", threadPayload);
+          io.to(receiverId.toString()).emit("threadUpdated", threadPayload);
+          io.to(senderId.toString()).emit("threadUpdated", threadPayload);
         }
       }
     }
@@ -462,10 +460,8 @@ export const deleteMessage = async (req, res) => {
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messageDeleted", payload);
     } else {
-      const receiverSocket = getReceiverSocketId(message.receiverId.toString());
-      const senderSocket = getReceiverSocketId(message.senderId.toString());
-      if (receiverSocket) io.to(receiverSocket).emit("messageDeleted", payload);
-      if (senderSocket) io.to(senderSocket).emit("messageDeleted", payload);
+      io.to(message.receiverId.toString()).emit("messageDeleted", payload);
+      io.to(message.senderId.toString()).emit("messageDeleted", payload);
     }
 
     res.status(200).json({ success: true, messageId: message._id });
@@ -498,10 +494,8 @@ export const togglePinMessage = async (req, res) => {
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messagePinned", payload);
     } else {
-      const receiverSocket = getReceiverSocketId(message.receiverId.toString());
-      const senderSocket = getReceiverSocketId(message.senderId.toString());
-      if (receiverSocket) io.to(receiverSocket).emit("messagePinned", payload);
-      if (senderSocket) io.to(senderSocket).emit("messagePinned", payload);
+      io.to(message.receiverId.toString()).emit("messagePinned", payload);
+      io.to(message.senderId.toString()).emit("messagePinned", payload);
     }
 
     res.status(200).json({ messageId: message._id, isPinned: message.isPinned });
@@ -550,10 +544,8 @@ export const reactToMessage = async (req, res) => {
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messageReaction", payload);
     } else {
-      const receiverSocket = getReceiverSocketId(message.receiverId.toString());
-      const senderSocket = getReceiverSocketId(message.senderId.toString());
-      if (receiverSocket) io.to(receiverSocket).emit("messageReaction", payload);
-      if (senderSocket) io.to(senderSocket).emit("messageReaction", payload);
+      io.to(message.receiverId.toString()).emit("messageReaction", payload);
+      io.to(message.senderId.toString()).emit("messageReaction", payload);
     }
 
     res.status(200).json({ messageId: message._id, reactions: message.reactions });
@@ -577,7 +569,7 @@ export const markMessagesAsRead = async (req, res) => {
           $push: { reads: { userId: myId, at: new Date() } }
         }
       );
-      io.to(id).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
+      io.to(id.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
     } else {
       await Message.updateMany(
         { senderId: id, receiverId: myId, readBy: { $ne: myId } },
@@ -586,10 +578,8 @@ export const markMessagesAsRead = async (req, res) => {
           $push: { reads: { userId: myId, at: new Date() } }
         }
       );
-      const senderSocketId = getReceiverSocketId(id);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("messagesRead", { chatId: myId, readerId: myId, type: "user" });
-      }
+      io.to(id.toString()).emit("messagesRead", { chatId: myId, readerId: myId, type: "user" });
+      io.to(myId.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "user" });
     }
 
     res.status(200).json({ success: true });
@@ -640,10 +630,8 @@ export const editMessage = async (req, res) => {
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messageEdited", payload);
     } else {
-      const receiverSocket = getReceiverSocketId(message.receiverId.toString());
-      const senderSocket = getReceiverSocketId(message.senderId.toString());
-      if (receiverSocket) io.to(receiverSocket).emit("messageEdited", payload);
-      if (senderSocket) io.to(senderSocket).emit("messageEdited", payload);
+      io.to(message.receiverId.toString()).emit("messageEdited", payload);
+      io.to(message.senderId.toString()).emit("messageEdited", payload);
     }
 
     res.status(200).json(message);
