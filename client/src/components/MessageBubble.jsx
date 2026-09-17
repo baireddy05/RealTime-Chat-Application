@@ -392,7 +392,7 @@ const MessageBubble = memo(({
                         return url ? <LinkPreview url={url} /> : null;
                       })()}
 
-                      {!message.text && (
+                      {!message.text && !isStickerOnly && !isJustEmoji && (
                         <div className="flex items-center justify-end gap-1 mt-1 select-none opacity-70">
                           {message.isEdited && <span className="text-[9px] italic opacity-75">(edited)</span>}
                           <span className="text-[10px] font-medium">
@@ -657,3 +657,4 @@ const MessageBubble = memo(({
 });
 
 export default MessageBubble;
+
