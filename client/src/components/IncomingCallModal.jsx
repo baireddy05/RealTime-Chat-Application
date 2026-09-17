@@ -1,17 +1,32 @@
 import { useCallStore } from "../store/useCallStore";
-import { Phone, PhoneOff, Video, ShieldCheck } from "lucide-react";
+import { useBackHandler } from "../lib/backNavigation";
+import { soundManager } from "../lib/sound";
+import { Phone, PhoneOff, Video } from "lucide-react";
 
 const IncomingCallModal = () => {
   const { callState, callType, peerUser, answerCall, rejectCall } = useCallStore();
+
+  // Intercept physical back button on mobile to decline incoming call
+  useBackHandler(callState === "incoming", rejectCall, "incoming_call_modal");
 
   if (callState !== "incoming" || !peerUser) {
     return null;
   }
 
+  const handleAccept = () => {
+    // Resume audio context if browser suspended it before call start
+    soundManager.initContext();
+    answerCall();
+  };
+
+  const handleReject = () => {
+    rejectCall();
+  };
+
   return (
     <div 
       className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
-      onClick={rejectCall}
+      onClick={handleReject}
     >
       <div 
         className="w-full max-w-sm glass-panel border border-[var(--glass-border)] rounded-3xl p-6 shadow-glass flex flex-col items-center text-center animate-scaleIn relative overflow-hidden bg-[var(--glass-heavy)] backdrop-blur-3xl text-theme-main"
@@ -58,7 +73,7 @@ const IncomingCallModal = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               type="button"
-              onClick={rejectCall}
+              onClick={handleReject}
               className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 active:scale-95 text-white flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer"
               title="Decline"
             >
@@ -71,7 +86,7 @@ const IncomingCallModal = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               type="button"
-              onClick={answerCall}
+              onClick={handleAccept}
               className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white flex items-center justify-center shadow-lg transition-all duration-200 cursor-pointer animate-pulse"
               title="Accept"
             >

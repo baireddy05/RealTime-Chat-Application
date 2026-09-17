@@ -387,6 +387,7 @@ const ChatPane = ({ onBack }) => {
       alert("Unable to find recipient user details.");
       return;
     }
+    soundManager.initContext();
     startCall({
       targetUser: {
         _id: peerId,

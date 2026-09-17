@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useCallStore } from "../store/useCallStore";
+import { useBackHandler } from "../lib/backNavigation";
 import { 
   PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, VolumeX, 
   Sparkles, Monitor, MonitorOff, SwitchCamera, Smartphone, 
@@ -21,6 +22,8 @@ const CallModal = () => {
     remoteStream,
     isMuted,
     isVideoOff,
+    isPeerMuted,
+    isPeerVideoOff,
     isSpeakerOn,
     isScreenSharing,
     screenStream,
@@ -49,6 +52,11 @@ const CallModal = () => {
     typeof window !== "undefined" ? window.innerHeight > window.innerWidth : false
   );
 
+  // Android / Mobile back gesture interception
+  useBackHandler(callState === "calling" || callState === "connected", endCall, "active_call_modal");
+
+  const canScreenShare = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia);
+
   const triggerReaction = useCallback((emoji = "🔥") => {
     const id = Date.now() + Math.random();
     const left = Math.floor(Math.random() * 60) + 20;
@@ -60,7 +68,10 @@ const CallModal = () => {
   }, []);
 
   const isConnected = callState === "connected";
-  const hasRemoteVideo = isConnected && callType === "video" && remoteStream && remoteStream.getVideoTracks().length > 0;
+  const hasRemoteVideo = isConnected && 
+    callType === "video" && 
+    !isPeerVideoOff && 
+    Boolean(remoteStream && remoteStream.getVideoTracks().some((t) => t.readyState === "live"));
 
   // Track window and stream orientation
   const checkOrientation = useCallback(() => {
@@ -85,7 +96,30 @@ const CallModal = () => {
     };
   }, [checkOrientation]);
 
-  // Bind local stream or screen share stream
+  // Callback refs to instantly attach streams whenever elements mount or swap
+  const bindLocalVideo = useCallback((node) => {
+    localVideoRef.current = node;
+    if (node) {
+      const streamToBind = isScreenSharing && screenStream ? screenStream : localStream;
+      if (node.srcObject !== streamToBind) {
+        node.srcObject = streamToBind;
+      }
+      node.play?.().catch(() => {});
+      checkOrientation();
+    }
+  }, [localStream, screenStream, isScreenSharing, checkOrientation]);
+
+  const bindRemoteVideo = useCallback((node) => {
+    remoteVideoRef.current = node;
+    if (node && remoteStream) {
+      if (node.srcObject !== remoteStream) {
+        node.srcObject = remoteStream;
+      }
+      node.play?.().catch(() => {});
+    }
+  }, [remoteStream]);
+
+  // Synchronize local stream changes
   useEffect(() => {
     if (localVideoRef.current) {
       const streamToBind = isScreenSharing && screenStream ? screenStream : localStream;
@@ -95,9 +129,9 @@ const CallModal = () => {
       localVideoRef.current.play?.().catch(() => {});
       checkOrientation();
     }
-  }, [localStream, screenStream, isScreenSharing, callState, checkOrientation]);
+  }, [localStream, screenStream, isScreenSharing, isSwapped, checkOrientation]);
 
-  // Bind remote stream (both audio and video elements)
+  // Synchronize remote video
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       if (remoteVideoRef.current.srcObject !== remoteStream) {
@@ -105,13 +139,20 @@ const CallModal = () => {
       }
       remoteVideoRef.current.play?.().catch(() => {});
     }
+  }, [remoteStream, isSwapped, hasRemoteVideo]);
+
+  // Dedicated remote audio playback and speaker volume control
+  useEffect(() => {
     if (remoteAudioRef.current && remoteStream) {
       if (remoteAudioRef.current.srcObject !== remoteStream) {
         remoteAudioRef.current.srcObject = remoteStream;
       }
-      remoteAudioRef.current.play?.().catch(() => {});
+      remoteAudioRef.current.muted = !isSpeakerOn;
+      remoteAudioRef.current.play?.().catch((err) => {
+        console.warn("[PulseCall] Remote audio autoplay deferred:", err);
+      });
     }
-  }, [remoteStream, callState, isConnected, hasRemoteVideo]);
+  }, [remoteStream, isSpeakerOn, callState, isConnected]);
 
   if (callState !== "calling" && callState !== "connected") {
     return null;
@@ -136,39 +177,52 @@ const CallModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 apple-ambient-bg flex flex-col items-center justify-between p-3 sm:p-4 md:p-8 animate-fadeIn text-theme-main select-none backdrop-blur-3xl overflow-hidden">
+    <div 
+      className="fixed inset-0 z-50 h-screen h-[100dvh] apple-ambient-bg flex flex-col items-center justify-between p-3 sm:p-4 md:p-6 animate-fadeIn text-theme-main select-none backdrop-blur-3xl overflow-hidden"
+      onClick={() => {
+        // Unlock audio context on mobile touch if blocked
+        if (remoteAudioRef.current && remoteAudioRef.current.paused) {
+          remoteAudioRef.current.play().catch(() => {});
+        }
+      }}
+    >
       {/* Dynamic Ambient Blur Glows */}
       <div className="fixed -top-32 -left-32 w-[480px] h-[480px] rounded-full blur-spot-1 pointer-events-none z-0 opacity-40 animate-pulse-slow" />
       <div className="fixed -bottom-32 -right-32 w-[520px] h-[520px] rounded-full blur-spot-2 pointer-events-none z-0 opacity-40 animate-pulse-slow" />
 
-      {/* Hidden audio element for WebRTC audio playback */}
+      {/* Dedicated audio element for crystal-clear remote WebRTC audio playback */}
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
       {/* Top Header Bar */}
-      <div className="w-full max-w-4xl flex items-center justify-between z-10 glass-panel px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[var(--glass-border)] shadow-glass backdrop-blur-2xl">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-accent-primary/15 text-accent-primary">
+      <div className="w-full max-w-4xl flex items-center justify-between z-10 glass-panel px-3.5 sm:px-5 py-2 sm:py-3 rounded-2xl border border-[var(--glass-border)] shadow-glass backdrop-blur-2xl">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 rounded-xl bg-accent-primary/15 text-accent-primary shrink-0">
             {callType === "video" ? <Video size={18} /> : <Sparkles size={18} />}
           </div>
-          <div>
-            <h3 className="font-semibold text-sm tracking-tight capitalize text-theme-main flex items-center gap-1.5">
-              <span>{peerUser?.name || peerUser?.username || "Pulse User"}</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary font-medium">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm tracking-tight capitalize text-theme-main flex items-center gap-1.5 truncate">
+              <span className="truncate">{peerUser?.name || peerUser?.username || "Pulse User"}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary font-medium shrink-0">
                 {callType === "video" ? "HD Video" : "Voice"}
               </span>
             </h3>
-            <p className="text-[11px] text-theme-muted">
-              {isConnected ? "Connected" : "Calling..."}
-            </p>
+            <div className="flex items-center gap-2 text-[11px] text-theme-muted">
+              <span>{isConnected ? "Connected" : "Calling..."}</span>
+              {isPeerMuted && (
+                <span className="inline-flex items-center gap-0.5 text-red-400 font-medium">
+                  <MicOff size={11} /> Muted
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Status / Duration */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-variant font-mono text-[10.5px] text-secondary font-semibold border border-[var(--glass-border)]">
-            1080p 60fps
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-variant font-mono text-[10px] text-secondary font-semibold border border-[var(--glass-border)]">
+            HD 60fps
           </span>
-          <div className="px-3.5 py-1 rounded-full bg-[var(--glass-surface)] border border-[var(--glass-border)] shadow-sm">
+          <div className="px-3 py-1 rounded-full bg-[var(--glass-surface)] border border-[var(--glass-border)] shadow-sm">
             <span className="text-xs font-mono font-medium tracking-wide">
               {isConnected ? (
                 <span className="text-status-online flex items-center gap-1.5">
@@ -184,22 +238,23 @@ const CallModal = () => {
       </div>
 
       {/* Main View Area */}
-      <div className="w-full max-w-4xl flex-1 my-2 sm:my-4 relative rounded-3xl overflow-hidden glass-panel border border-[var(--glass-border)] shadow-glass flex items-center justify-center bg-black/20 backdrop-blur-xl z-10">
+      <div className="w-full max-w-4xl flex-1 my-2 sm:my-3 relative rounded-3xl overflow-hidden glass-panel border border-[var(--glass-border)] shadow-glass flex items-center justify-center bg-black/20 backdrop-blur-xl z-10">
         {callType === "video" ? (
           <>
             {/* Primary Main Video (Remote or Swapped Local) */}
             {!isSwapped ? (
               hasRemoteVideo ? (
                 <video
-                  ref={remoteVideoRef}
+                  ref={bindRemoteVideo}
                   autoPlay
                   playsInline
+                  muted
                   className="w-full h-full object-cover rounded-3xl"
                 />
               ) : (
                 <div className="flex flex-col items-center gap-5 text-center p-6 animate-fadeIn">
                   <div className="relative">
-                    <div className="w-28 sm:w-32 h-28 sm:h-32 rounded-full border-2 border-[var(--glass-border)] shadow-2xl overflow-hidden bg-slate-800 flex items-center justify-center">
+                    <div className="w-24 sm:w-32 h-24 sm:h-32 rounded-full border-2 border-[var(--glass-border)] shadow-2xl overflow-hidden bg-slate-800 flex items-center justify-center">
                       {peerUser?.profilePic ? (
                         <img
                           src={peerUser.profilePic}
@@ -219,11 +274,15 @@ const CallModal = () => {
                     <div className="absolute -inset-2 rounded-full border border-accent-primary/40 animate-ping pointer-events-none" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold capitalize tracking-tight text-theme-main">
+                    <h2 className="text-lg sm:text-xl font-semibold capitalize tracking-tight text-theme-main">
                       {peerUser?.name || peerUser?.username}
                     </h2>
                     <p className="text-xs text-theme-muted mt-1">
-                      {isConnected ? "Camera is turned off" : "Waiting for recipient to accept..."}
+                      {isPeerVideoOff 
+                        ? "Camera is turned off" 
+                        : isConnected 
+                        ? "Waiting for video..." 
+                        : "Waiting for recipient to accept..."}
                     </p>
                   </div>
                 </div>
@@ -231,7 +290,7 @@ const CallModal = () => {
             ) : (
               /* Swapped: Local stream on main canvas */
               <video
-                ref={localVideoRef}
+                ref={bindLocalVideo}
                 autoPlay
                 playsInline
                 muted
@@ -244,9 +303,9 @@ const CallModal = () => {
 
             {/* Screen Share Active Badge */}
             {isScreenSharing && (
-              <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium backdrop-blur-md animate-pulse shadow-md">
-                <Monitor size={14} />
-                <span>You are sharing your screen (1080p)</span>
+              <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium backdrop-blur-md animate-pulse shadow-md">
+                <Monitor size={13} />
+                <span>Screen Share Active</span>
               </div>
             )}
 
@@ -263,21 +322,21 @@ const CallModal = () => {
               ))}
             </div>
 
-            {/* Picture-in-Picture (PiP) Video Preview (Portrait Optimized) */}
+            {/* Picture-in-Picture (PiP) Video Preview */}
             <div
               onClick={toggleSwapVideo}
               title="Click to swap main view and mini view"
               className={`absolute bottom-3 sm:bottom-4 right-3 sm:right-4 z-20 cursor-pointer overflow-hidden rounded-2xl border-2 border-[var(--glass-border)] shadow-2xl bg-slate-950 backdrop-blur-xl transition-all duration-300 hover:scale-105 group ${
                 isEffectivePortrait
                   ? "w-24 xs:w-28 sm:w-32 md:w-36 aspect-[3/4]"
-                  : "w-36 sm:w-44 md:w-48 aspect-video"
+                  : "w-32 xs:w-36 sm:w-44 md:w-48 aspect-video"
               }`}
             >
               {!isSwapped ? (
                 /* Normal PiP: Local Camera Preview */
                 <>
                   <video
-                    ref={localVideoRef}
+                    ref={bindLocalVideo}
                     autoPlay
                     playsInline
                     muted
@@ -298,9 +357,10 @@ const CallModal = () => {
                 <>
                   {hasRemoteVideo ? (
                     <video
-                      ref={remoteVideoRef}
+                      ref={bindRemoteVideo}
                       autoPlay
                       playsInline
+                      muted
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -314,7 +374,7 @@ const CallModal = () => {
 
               {/* PiP Overlay Controls */}
               <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-md p-0.5 rounded-lg">
-                {/* Switch Camera Button (Mobile/Multi-Cam) */}
+                {/* Switch Camera Button */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -327,12 +387,12 @@ const CallModal = () => {
                   <SwitchCamera size={13} />
                 </button>
 
-                {/* Aspect Ratio Toggle (Portrait / Landscape) */}
+                {/* Aspect Ratio Toggle */}
                 <button
                   type="button"
                   onClick={cycleAspectMode}
                   className="p-1 rounded text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
-                  title={`Aspect Ratio: ${aspectMode.toUpperCase()} (Click to toggle)`}
+                  title={`Aspect Ratio: ${aspectMode.toUpperCase()}`}
                 >
                   {isEffectivePortrait ? <RectangleHorizontal size={13} /> : <Smartphone size={13} />}
                 </button>
@@ -371,7 +431,7 @@ const CallModal = () => {
                   <div className="absolute w-56 h-56 rounded-full bg-accent-primary/5 animate-pulse [animation-duration:2s]" />
                 </>
               )}
-              <div className="w-32 h-32 rounded-full border-4 border-[var(--glass-border)] shadow-2xl overflow-hidden bg-slate-800 z-10 relative">
+              <div className="w-28 sm:w-32 h-28 sm:h-32 rounded-full border-4 border-[var(--glass-border)] shadow-2xl overflow-hidden bg-slate-800 z-10 relative">
                 {peerUser?.profilePic ? (
                   <img
                     src={peerUser.profilePic}
@@ -391,30 +451,37 @@ const CallModal = () => {
             </div>
 
             <div className="text-center z-10">
-              <h2 className="text-2xl font-bold capitalize tracking-tight text-theme-main">
+              <h2 className="text-xl sm:text-2xl font-bold capitalize tracking-tight text-theme-main">
                 {peerUser?.name || peerUser?.username}
               </h2>
-              <p className="text-xs text-theme-muted mt-1.5 font-medium">
-                {isConnected ? (
-                  <span className="text-emerald-400 font-mono tracking-wider">
-                    {formatCallTime(callDuration)}
+              <div className="flex items-center justify-center gap-2 mt-1.5">
+                <p className="text-xs text-theme-muted font-medium">
+                  {isConnected ? (
+                    <span className="text-emerald-400 font-mono tracking-wider">
+                      {formatCallTime(callDuration)}
+                    </span>
+                  ) : (
+                    "Calling..."
+                  )}
+                </p>
+                {isPeerMuted && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-red-400 font-medium px-2 py-0.5 rounded-full bg-red-500/10">
+                    <MicOff size={11} /> Peer Muted
                   </span>
-                ) : (
-                  "Calling..."
                 )}
-              </p>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Bottom Control Dock */}
-      <div className="z-20 flex items-center gap-2.5 sm:gap-4 bg-[var(--glass-heavy)] backdrop-blur-3xl border border-[var(--glass-border)] px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-full shadow-glass animate-slideUp max-w-[95vw] overflow-x-auto">
+      {/* Bottom Control Dock (Responsive, Mobile Touch Friendly) */}
+      <div className="z-20 flex items-center justify-center gap-2 sm:gap-3.5 bg-[var(--glass-heavy)] backdrop-blur-3xl border border-[var(--glass-border)] px-3.5 sm:px-6 py-2.5 sm:py-3.5 rounded-full shadow-glass animate-slideUp max-w-[95vw] overflow-x-auto no-scrollbar">
         {/* Mute Button */}
         <button
           type="button"
           onClick={toggleMute}
-          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
+          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
             isMuted
               ? "bg-red-500 text-white scale-105"
               : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
@@ -429,7 +496,7 @@ const CallModal = () => {
           <button
             type="button"
             onClick={toggleVideo}
-            className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
+            className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
               isVideoOff
                 ? "bg-red-500 text-white scale-105"
                 : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
@@ -452,19 +519,21 @@ const CallModal = () => {
           </button>
         )}
 
-        {/* Screen Share Toggle */}
-        <button
-          type="button"
-          onClick={toggleScreenShare}
-          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
-            isScreenSharing
-              ? "bg-emerald-500 text-white scale-105 shadow-emerald-500/30 ring-2 ring-emerald-400/40"
-              : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
-          }`}
-          title={isScreenSharing ? "Stop Sharing Screen" : "Share Your Screen"}
-        >
-          {isScreenSharing ? <MonitorOff size={19} /> : <Monitor size={19} />}
-        </button>
+        {/* Screen Share Toggle (Only on supported laptop/desktop browsers) */}
+        {canScreenShare && (
+          <button
+            type="button"
+            onClick={toggleScreenShare}
+            className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
+              isScreenSharing
+                ? "bg-emerald-500 text-white scale-105 shadow-emerald-500/30 ring-2 ring-emerald-400/40"
+                : "bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] text-theme-main border border-[var(--glass-border)]"
+            }`}
+            title={isScreenSharing ? "Stop Sharing Screen" : "Share Your Screen"}
+          >
+            {isScreenSharing ? <MonitorOff size={19} /> : <Monitor size={19} />}
+          </button>
+        )}
 
         {/* Reaction Launcher */}
         <div className="relative shrink-0">
@@ -496,12 +565,12 @@ const CallModal = () => {
         <button
           type="button"
           onClick={toggleSpeaker}
-          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 ${
+          className={`p-3 sm:p-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md shrink-0 active:scale-95 ${
             isSpeakerOn
               ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30"
               : "bg-[var(--glass-surface)] text-theme-muted border border-[var(--glass-border)] hover:text-theme-main"
           }`}
-          title={isSpeakerOn ? "Speaker Active" : "Speaker Muted"}
+          title={isSpeakerOn ? "Speaker Active (Click to mute audio)" : "Speaker Muted (Click to unmute)"}
         >
           {isSpeakerOn ? <Volume2 size={19} /> : <VolumeX size={19} />}
         </button>
@@ -521,4 +590,3 @@ const CallModal = () => {
 };
 
 export default CallModal;
-

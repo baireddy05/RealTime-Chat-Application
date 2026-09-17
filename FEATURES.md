@@ -52,8 +52,12 @@ This document serves as the central source of truth for all features currently i
 - **Twemoji Support:** Standardized emoji rendering across all devices using Twemoji API.
 
 ## 5. Audio / Video Calling
-- **Real-Time Calling:** Initiate and receive audio/video calls.
-- **Call Controls:** Mute, toggle video, and end call functions.
+- **Real-Time WebRTC Calling:** Low-latency 1-to-1 audio and HD video calls across mobile and laptop devices.
+- **Hardware-Calibrated Audio:** Real-time acoustic echo cancellation, background noise suppression, and automatic gain control to eliminate howling and feedback loops.
+- **Interactive Call Controls:** Toggle microphone, camera on/off, front/rear camera flip on mobile, live floating emoji reactions, speaker volume toggle, and desktop screen sharing.
+- **Picture-in-Picture (PiP) Video:** Seamless PiP floating preview with instant main/mini view swapping and aspect ratio cycling.
+- **Real-Time Peer State Badges:** Live WebSocket synchronization showing when the remote peer mutes their mic or turns off their camera.
+- **Mobile Hardware Back Interception:** Android physical back button and iOS swipe gesture support to cleanly decline incoming calls or hang up.
 
 ## 6. Organization, UI, & Customization
 - **User Profiles:** Customizable profiles with avatars and bio.

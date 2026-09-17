@@ -12,20 +12,23 @@ const ICE_SERVERS = {
     { urls: "stun:stun4.l.google.com:19302" },
     { urls: "stun:global.stun.twilio.com:3478" },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 let timerInterval = null;
 let pendingIceCandidates = [];
 
-const getVideoConstraints = (facingMode = "user") => {
-  const isPortrait = typeof window !== "undefined" && window.innerHeight > window.innerWidth;
-  return {
-    facingMode: { ideal: facingMode },
-    width: { ideal: isPortrait ? 720 : 1280 },
-    height: { ideal: isPortrait ? 1280 : 720 },
-    aspectRatio: { ideal: isPortrait ? 9 / 16 : 16 / 9 },
-  };
-};
+const getAudioConstraints = () => ({
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+});
+
+const getVideoConstraints = (facingMode = "user") => ({
+  facingMode: facingMode ? { ideal: facingMode } : "user",
+  width: { ideal: 1280, max: 1920 },
+  height: { ideal: 720, max: 1080 },
+});
 
 export const useCallStore = create((set, get) => ({
   callState: "idle", // 'idle' | 'calling' | 'incoming' | 'connected'
@@ -35,6 +38,8 @@ export const useCallStore = create((set, get) => ({
   remoteStream: null,
   isMuted: false,
   isVideoOff: false,
+  isPeerMuted: false,
+  isPeerVideoOff: false,
   isSpeakerOn: true,
   isScreenSharing: false,
   screenStream: null,
@@ -68,6 +73,7 @@ export const useCallStore = create((set, get) => ({
     const nextFacing = currentFacingMode === "user" ? "environment" : "user";
 
     try {
+      if (!navigator?.mediaDevices?.getUserMedia) return;
       let newStream = null;
       try {
         newStream = await navigator.mediaDevices.getUserMedia({
@@ -79,7 +85,7 @@ export const useCallStore = create((set, get) => ({
         });
       }
 
-      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newVideoTrack = newStream?.getVideoTracks()?.[0];
       if (newVideoTrack) {
         if (localStream) {
           const oldVideoTrack = localStream.getVideoTracks()[0];
@@ -119,6 +125,8 @@ export const useCallStore = create((set, get) => ({
     socket.off("callEnded");
     socket.off("callUnavailable");
     socket.off("iceCandidate");
+    socket.off("peerToggleVideo");
+    socket.off("peerToggleMute");
 
     socket.on("incomingCall", ({ signal, from, callType, callerInfo }) => {
       // If already in a call, reject the incoming call automatically
@@ -145,6 +153,8 @@ export const useCallStore = create((set, get) => ({
           profilePic: callerInfo?.profilePic,
         },
         incomingSignal: signal,
+        isPeerMuted: false,
+        isPeerVideoOff: false,
       });
     });
 
@@ -210,12 +220,25 @@ export const useCallStore = create((set, get) => ({
         pendingIceCandidates.push(candidate);
       }
     });
+
+    socket.on("peerToggleVideo", ({ isVideoOff }) => {
+      set({ isPeerVideoOff: !!isVideoOff });
+    });
+
+    socket.on("peerToggleMute", ({ isMuted }) => {
+      set({ isPeerMuted: !!isMuted });
+    });
   },
 
   // Start outgoing call
   startCall: async ({ targetUser, callType = "video" }) => {
     const socket = get().activeSocket;
     if (!socket || !targetUser) return;
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      alert("Camera and microphone access requires a Secure Context (HTTPS or localhost). If testing on mobile across a local network, please connect via HTTPS or use localhost.");
+      return;
+    }
 
     pendingIceCandidates = [];
     soundManager.playOutgoingRing();
@@ -224,11 +247,11 @@ export const useCallStore = create((set, get) => ({
     let stream = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: getAudioConstraints(),
         video: callType === "video" ? getVideoConstraints(get().currentFacingMode) : false,
       });
     } catch (err) {
-      console.warn("[PulseCall] Could not obtain optimal video stream, trying fallback:", err);
+      console.warn("[PulseCall] Could not obtain optimal stream, trying fallback:", err);
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
@@ -265,7 +288,12 @@ export const useCallStore = create((set, get) => ({
           remoteStream.addTrack(event.track);
         }
       }
-      set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
+
+      event.track.onmute = () => set({ remoteStream });
+      event.track.onunmute = () => set({ remoteStream });
+      event.track.onended = () => set({ remoteStream });
+
+      set({ remoteStream });
     };
 
     // Handle ICE candidates
@@ -275,6 +303,12 @@ export const useCallStore = create((set, get) => ({
           to: targetUser._id || targetUser.id,
           candidate: event.candidate,
         });
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+        if (pc.restartIce) pc.restartIce();
       }
     };
 
@@ -292,6 +326,8 @@ export const useCallStore = create((set, get) => ({
       peerConnection: pc,
       isMuted: false,
       isVideoOff: callType !== "video",
+      isPeerMuted: false,
+      isPeerVideoOff: false,
       callDuration: 0,
     });
 
@@ -323,11 +359,17 @@ export const useCallStore = create((set, get) => ({
     const { activeSocket, peerUser, incomingSignal, callType } = get();
     if (!activeSocket || !peerUser || !incomingSignal) return;
 
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      alert("Camera and microphone access requires a Secure Context (HTTPS or localhost). If testing on mobile across a local network, please connect via HTTPS or use localhost.");
+      get().rejectCall();
+      return;
+    }
+
     let stream = null;
     get().checkMultipleCameras();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: getAudioConstraints(),
         video: callType === "video" ? getVideoConstraints(get().currentFacingMode) : false,
       });
     } catch (err) {
@@ -367,7 +409,12 @@ export const useCallStore = create((set, get) => ({
           remoteStream.addTrack(event.track);
         }
       }
-      set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
+
+      event.track.onmute = () => set({ remoteStream });
+      event.track.onunmute = () => set({ remoteStream });
+      event.track.onended = () => set({ remoteStream });
+
+      set({ remoteStream });
     };
 
     pc.onicecandidate = (event) => {
@@ -376,6 +423,12 @@ export const useCallStore = create((set, get) => ({
           to: peerUser._id,
           candidate: event.candidate,
         });
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+        if (pc.restartIce) pc.restartIce();
       }
     };
 
@@ -413,6 +466,8 @@ export const useCallStore = create((set, get) => ({
         callDuration: 0,
         isMuted: false,
         isVideoOff: callType !== "video",
+        isPeerMuted: false,
+        isPeerVideoOff: false,
       });
     } catch (err) {
       console.error("[PulseCall] Error answering WebRTC call:", err);
@@ -443,23 +498,32 @@ export const useCallStore = create((set, get) => ({
 
   // Toggle microphone
   toggleMute: () => {
-    const { localStream, isMuted } = get();
+    const { localStream, isMuted, activeSocket, peerUser } = get();
+    const nextMuted = !isMuted;
     if (localStream) {
       localStream.getAudioTracks().forEach((track) => {
-        track.enabled = isMuted; // Inverting current state
+        track.enabled = !nextMuted;
       });
-      set({ isMuted: !isMuted });
+    }
+    set({ isMuted: nextMuted });
+    if (activeSocket && peerUser?._id) {
+      activeSocket.emit("peerToggleMute", { to: peerUser._id, isMuted: nextMuted });
     }
   },
 
   // Toggle video camera
   toggleVideo: () => {
-    const { localStream, isVideoOff } = get();
+    const { localStream, isVideoOff, activeSocket, peerUser, callType } = get();
+    if (callType !== "video") return;
+    const nextVideoOff = !isVideoOff;
     if (localStream) {
       localStream.getVideoTracks().forEach((track) => {
-        track.enabled = isVideoOff; // Inverting current state
+        track.enabled = !nextVideoOff;
       });
-      set({ isVideoOff: !isVideoOff });
+    }
+    set({ isVideoOff: nextVideoOff });
+    if (activeSocket && peerUser?._id) {
+      activeSocket.emit("peerToggleVideo", { to: peerUser._id, isVideoOff: nextVideoOff });
     }
   },
 
@@ -474,6 +538,11 @@ export const useCallStore = create((set, get) => ({
 
     if (!isScreenSharing) {
       try {
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+          alert("Screen sharing is not supported on this device or browser.");
+          return;
+        }
+
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: true,
@@ -561,6 +630,8 @@ export const useCallStore = create((set, get) => ({
       callDuration: 0,
       isMuted: false,
       isVideoOff: false,
+      isPeerMuted: false,
+      isPeerVideoOff: false,
       isScreenSharing: false,
       currentFacingMode: "user",
       isSwapped: false,

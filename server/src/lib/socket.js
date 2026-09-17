@@ -170,6 +170,20 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("peerToggleVideo", ({ to, isVideoOff }) => {
+    const peerSocketId = getReceiverSocketId(to);
+    if (peerSocketId) {
+      io.to(peerSocketId).emit("peerToggleVideo", { isVideoOff });
+    }
+  });
+
+  socket.on("peerToggleMute", ({ to, isMuted }) => {
+    const peerSocketId = getReceiverSocketId(to);
+    if (peerSocketId) {
+      io.to(peerSocketId).emit("peerToggleMute", { isMuted });
+    }
+  });
+
   // Message Delivery Receipt
   socket.on("messageDelivered", async ({ messageId, senderId }) => {
     try {
