@@ -1,4 +1,5 @@
 import { memo, Fragment, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
@@ -541,10 +542,8 @@ const MessageBubble = memo(({
                 </div>
 
                 {/* Dropdown popover */}
-                {!message.isDeleted && (
-                  <div className="relative flex items-center flex-shrink-0">
-                    {isMenuOpen && (
-                      <>
+                {!message.isDeleted && isMenuOpen && typeof document !== "undefined" && createPortal(
+                  <>
                         <div
                           className="fixed inset-0 z-[9998] bg-transparent"
                           onTouchStart={(e) => {
@@ -721,9 +720,8 @@ const MessageBubble = memo(({
                             )}
                           </div>
                         </div>
-                      </>
-                    )}
-                  </div>
+                      </>,
+                  document.body
                 )}
               </div>
             </div>
