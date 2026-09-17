@@ -53,42 +53,41 @@ img.emoji {
 
 /* ══════════════════════════════════════════════════════════════
    FROSTED GLASS DESIGN SYSTEM
-   1. Dark Mode: Cosmic Obsidian Glass
+   1. Dark Mode: Neon Cyber
    2. Light Mode: Arctic Prism Glass
    ══════════════════════════════════════════════════════════════ */
 
 :root,
 :root[data-theme="dark"] {
-  /* 🌑 ExTrack Monochromatic Theme: Deep Charcoal, Silver Slate & White */
-  --bg-app-rgb: 18 17 23;                  /* #121117 reference dark background */
-  --bg-rail-rgb: 16 15 21;                 /* #100f15 activity bar */
-  --bg-sidebar-rgb: 18 17 23;              /* #121117 conversation sidebar */
-  --bg-chat-rgb: 15 14 20;                 /* #0f0e14 main chat workstation */
-  --bg-surface-rgb: 26 25 33;              /* #1a1921 cards & panels */
-  --bg-surface-bright-rgb: 36 34 46;       /* #24222e card hover */
-  --bg-card-rgb: 26 25 33;                 /* #1a1921 */
-  --bg-card-hover-rgb: 36 34 46;           /* #24222e */
-  --bg-input-rgb: 24 23 30;                /* #18171e message input bar */
+  /* 🌙 Neon Cyber Theme: Midnight Navy & Cyan/Mint */
+  --bg-app-rgb: 5 11 20;                   /* #050b14 deep midnight blue */
+  --bg-rail-rgb: 4 8 15;                   /* #04080f activity bar */
+  --bg-sidebar-rgb: 7 13 24;               /* #070d18 conversation sidebar */
+  --bg-chat-rgb: 5 11 20;                  /* #050b14 main chat workstation */
+  --bg-surface-rgb: 10 18 32;              /* #0a1220 cards & panels */
+  --bg-surface-bright-rgb: 15 25 45;       /* #0f192d card hover */
+  --bg-card-rgb: 10 18 32;                 /* #0a1220 */
+  --bg-card-hover-rgb: 15 25 45;           /* #0f192d */
+  --bg-input-rgb: 8 15 28;                 /* #080f1c message input bar */
 
   --txt-primary-rgb: 255 255 255;          /* #ffffff crisp white */
-  --txt-secondary-rgb: 220 217 228;        /* #dcd9e4 light silver */
-  --txt-muted-rgb: 142 138 151;            /* #8e8a97 reference inactive slate */
-  --txt-dim-rgb: 107 103 117;              /* #6b6775 reference subtext */
+  --txt-secondary-rgb: 200 210 220;        /* light blue silver */
+  --txt-muted-rgb: 120 140 160;            /* inactive slate */
+  --txt-dim-rgb: 80 100 120;               /* subtext */
 
-  --border-glass: rgba(255, 255, 255, 0.07);
-  --border-glass-hover: rgba(255, 255, 255, 0.14);
-  --border-specular: rgba(255, 255, 255, 0.25);
+  --border-glass: rgba(0, 240, 255, 0.07);
+  --border-glass-hover: rgba(0, 240, 255, 0.18);
+  --border-specular: rgba(0, 255, 157, 0.35);
 
-  /* Monochromatic Accents */
-  --accent-primary-rgb: 255 255 255;        /* #ffffff Pure White */
-  --accent-secondary-rgb: 220 217 228;     /* #dcd9e4 Platinum Silver */
-  --accent-emerald-rgb: 142 138 151;       /* #8e8a97 Reference Muted Slate */
+  /* Neon Cyber Accents */
+  --accent-primary-rgb: 0 240 255;         /* Neon Cyan */
+  --accent-secondary-rgb: 0 255 157;       /* Neon Mint */
+  --accent-emerald-rgb: 0 255 157;         /* Neon Mint */
 
-  --bg-gradient: linear-gradient(135deg, #121117 0%, #16151e 50%, #0f0e14 100%);
-  --glass-surface: rgba(26, 25, 33, 0.80);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-top: rgba(255, 255, 255, 0.18);
-  --glass-border-specular: rgba(255, 255, 255, 0.30);
+  --bg-gradient: linear-gradient(135deg, #050b14 0%, #08101e 50%, #03060c 100%);
+  --glass-border: rgba(0, 240, 255, 0.08);
+  --glass-border-top: rgba(0, 255, 157, 0.18);
+  --glass-border-specular: rgba(0, 240, 255, 0.30);
   --glass-divider: rgba(255, 255, 255, 0.07);
   --glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.55);
 
@@ -115,17 +114,17 @@ img.emoji {
   --pill-active-text: #0d0c11;
   --pill-active-shadow: 0 4px 14px rgba(0, 0, 0, 0.40);
 
-  /* Monochromatic Ambient Blur Spots */
-  --spot-1: radial-gradient(circle, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 70%, transparent 100%);
-  --spot-2: radial-gradient(circle, rgba(220, 217, 228, 0.08) 0%, rgba(142, 138, 151, 0.02) 70%, transparent 100%);
+  /* Neon Cyber Ambient Blur Spots */
+  --spot-1: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, rgba(0, 240, 255, 0.02) 70%, transparent 100%);
+  --spot-2: radial-gradient(circle, rgba(0, 255, 157, 0.12) 0%, rgba(0, 255, 157, 0.02) 70%, transparent 100%);
 
-  /* High-Contrast Monochromatic Chat Bubbles */
-  --bubble-outgoing-bg: #ffffff;
-  --bubble-outgoing-gradient: linear-gradient(135deg, #ffffff 0%, #f4f4f7 100%);
-  --bubble-outgoing-text: #0d0c11;
-  --bubble-outgoing-subtext: #52505b;
-  --bubble-outgoing-ticks: #0d0c11;
-  --bubble-outgoing-border: rgba(0, 0, 0, 0.10);
+  /* Neon Cyan Outgoing Chat Bubbles */
+  --bubble-outgoing-bg: #00f0ff;
+  --bubble-outgoing-gradient: linear-gradient(135deg, #00f0ff 0%, #00d2ff 100%);
+  --bubble-outgoing-text: #04080f;
+  --bubble-outgoing-subtext: rgba(4, 8, 15, 0.7);
+  --bubble-outgoing-ticks: #04080f;
+  --bubble-outgoing-border: rgba(0, 240, 255, 0.5);
 
   --bubble-incoming-bg: rgba(255, 255, 255, 0.08);
   --bubble-incoming-surface: rgba(255, 255, 255, 0.08);

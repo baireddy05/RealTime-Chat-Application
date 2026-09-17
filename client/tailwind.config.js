@@ -88,13 +88,15 @@ export default {
         DEFAULT: "0.5rem",
         md: "0.75rem",
         lg: "1rem",
-        xl: "1.5rem",
+        xl: "1.75rem",
+        "2xl": "2.25rem",
+        "3xl": "2.75rem",
         full: "9999px",
       },
       boxShadow: {
-        'glass-level-1': '0 8px 32px 0 rgba(0, 0, 0, 0.36)',
-        'glass-level-2': '0 20px 48px 0 rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
-        'bubble-out': '0 4px 14px rgba(99, 102, 241, 0.3)',
+        'glass-level-1': '0 8px 32px 0 rgba(0, 240, 255, 0.1)',
+        'glass-level-2': '0 20px 48px 0 rgba(0, 240, 255, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
+        'bubble-out': '0 4px 20px rgba(0, 240, 255, 0.4)',
         'bubble-in': '0 2px 8px rgba(15, 23, 42, 0.05)',
         'specular': 'inset 0 1px 1px rgba(255, 255, 255, 0.22)',
       },
@@ -143,3 +145,4 @@ export default {
   },
   plugins: [],
 }
+
