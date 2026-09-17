@@ -1006,46 +1006,84 @@ export const useChatStore = create((set, get) => ({
 
     // Real-time message delivered receipts
     socket.on("messageDelivered", ({ messageId, delivererId, chatId }) => {
-      const { messages, selectedChat } = get();
-      if (!selectedChat || selectedChat.id !== chatId) return;
-      const updated = messages.map((m) => {
-        if (messageId) {
-          if (m._id !== messageId) return m;
+      const { messages, selectedChat, lastMessages } = get();
+      
+      let updatedLastMessages = { ...lastMessages };
+      const lastMsg = updatedLastMessages[chatId];
+      if (lastMsg) {
+        if (!messageId || lastMsg._id === messageId) {
+          const deliveries = lastMsg.deliveries || [];
+          if (!deliveries.some(d => d.userId === delivererId)) {
+            updatedLastMessages[chatId] = {
+              ...lastMsg,
+              deliveries: [...deliveries, { userId: delivererId, at: new Date().toISOString() }]
+            };
+          }
         }
-        const deliveries = m.deliveries || [];
-        if (!deliveries.some(d => d.userId === delivererId)) {
-          return { ...m, deliveries: [...deliveries, { userId: delivererId, at: new Date().toISOString() }] };
-        }
-        return m;
-      });
-      set({ messages: updated });
+      }
+
+      const updates = { lastMessages: updatedLastMessages };
+
+      if (selectedChat && selectedChat.id === chatId) {
+        const updated = messages.map((m) => {
+          if (messageId && m._id !== messageId) return m;
+          const deliveries = m.deliveries || [];
+          if (!deliveries.some(d => d.userId === delivererId)) {
+            return { ...m, deliveries: [...deliveries, { userId: delivererId, at: new Date().toISOString() }] };
+          }
+          return m;
+        });
+        updates.messages = updated;
+      }
+      
+      set(updates);
     });
 
     // Real-time read receipts
     socket.on("messagesRead", ({ chatId, readerId, type: _type }) => {
-      const { messages, selectedChat } = get();
-      if (!selectedChat || selectedChat.id !== chatId) return;
-      const updated = messages.map((m) => {
-        const readBy = m.readBy || [];
-        const reads = m.reads || [];
-        let modified = false;
-        let newReadBy = [...readBy];
-        let newReads = [...reads];
-        
-        if (!newReadBy.includes(readerId)) {
-          newReadBy.push(readerId);
-          modified = true;
+      const { messages, selectedChat, lastMessages } = get();
+      
+      let updatedLastMessages = { ...lastMessages };
+      const lastMsg = updatedLastMessages[chatId];
+      if (lastMsg) {
+        const readBy = lastMsg.readBy || [];
+        const reads = lastMsg.reads || [];
+        if (!readBy.includes(readerId)) {
+          updatedLastMessages[chatId] = {
+            ...lastMsg,
+            readBy: [...readBy, readerId],
+            reads: [...reads, { userId: readerId, at: new Date().toISOString() }]
+          };
         }
-        if (!newReads.some(r => r.userId === readerId)) {
-          newReads.push({ userId: readerId, at: new Date().toISOString() });
-          modified = true;
-        }
-        if (modified) {
-          return { ...m, readBy: newReadBy, reads: newReads };
-        }
-        return m;
-      });
-      set({ messages: updated });
+      }
+
+      const updates = { lastMessages: updatedLastMessages };
+
+      if (selectedChat && selectedChat.id === chatId) {
+        const updated = messages.map((m) => {
+          const readBy = m.readBy || [];
+          const reads = m.reads || [];
+          let modified = false;
+          let newReadBy = [...readBy];
+          let newReads = [...reads];
+          
+          if (!newReadBy.includes(readerId)) {
+            newReadBy.push(readerId);
+            modified = true;
+          }
+          if (!newReads.some(r => r.userId === readerId)) {
+            newReads.push({ userId: readerId, at: new Date().toISOString() });
+            modified = true;
+          }
+          if (modified) {
+            return { ...m, readBy: newReadBy, reads: newReads };
+          }
+          return m;
+        });
+        updates.messages = updated;
+      }
+
+      set(updates);
     });
 
     // Real-time message deletion

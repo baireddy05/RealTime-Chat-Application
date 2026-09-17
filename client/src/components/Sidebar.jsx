@@ -357,8 +357,8 @@ const Sidebar = ({
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
-    const isRead = lastMsg && ((lastMsg.reads || []).some(r => r.userId === friendId) || (lastMsg.readBy || []).includes(friendId));
-    const isDelivered = lastMsg && (lastMsg.deliveries || []).some(d => d.userId === friendId);
+    const isRead = lastMsg && ((lastMsg.reads || []).some(r => (r.userId?._id || r.userId)?.toString() === friendId) || (lastMsg.readBy || []).some(id => (id?._id || id)?.toString() === friendId));
+    const isDelivered = lastMsg && (lastMsg.deliveries || []).some(d => (d.userId?._id || d.userId)?.toString() === friendId);
     const typers = (typingUsers[friendId] || []).filter((u) => u && u !== authUser?.username);
     const isTyping = typers.length > 0;
 
@@ -1056,3 +1056,4 @@ const Sidebar = ({
 };
 
 export default Sidebar;
+
