@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
-import EmojiPicker, { Theme } from "emoji-picker-react";
 import { 
   X, 
   Loader, 
@@ -23,7 +22,8 @@ import {
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
-import GifPicker from "./GifPicker";
+const GifPicker = lazy(() => import("./GifPicker"));
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import ContactModal from "./ContactModal";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
@@ -569,10 +569,14 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       {replyingTo && (
         <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[var(--glass-hover)] border-l-2 border-accent-primary border border-[var(--glass-border)] animate-fadeIn">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-1 rounded-full bg-accent-primary/20 text-accent-primary flex-shrink-0">
-              <Reply size={12} />
-            </div>
-            <div className="min-w-0">
+            {replyingTo.image ? (
+              <img src={replyingTo.image} alt="Reply preview" className="w-8 h-8 rounded object-cover flex-shrink-0 bg-black/10 dark:bg-white/10" />
+            ) : (
+              <div className="p-1 rounded-full bg-accent-primary/20 text-accent-primary flex-shrink-0">
+                <Reply size={12} />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
               <span className="text-[11px] font-medium text-accent-primary truncate block">
                 Replying to {replyingTo.senderId?.username || replyingTo.senderName || "User"}
               </span>
@@ -756,35 +760,39 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               </div>
 
               <div className="emoji-picker-container w-full overflow-hidden">
-                <EmojiPicker
-                  theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
-                  onEmojiClick={(emojiData) => handleEmojiSelect(emojiData.emoji)}
-                  autoFocusSearch={false}
-                  searchPlaceHolder="Search all emojis..."
-                  width="100%"
-                  height={typeof window !== "undefined" && window.innerWidth < 640 ? 300 : 380}
-                  lazyLoadEmojis={true}
-                  previewConfig={{ showPreview: false }}
-                  skinTonesDisabled={false}
-                />
+                <Suspense fallback={<div className="flex flex-col items-center justify-center h-[300px] sm:h-[380px]"><Loader className="size-6 animate-spin text-theme-muted mb-2" /><span className="text-xs text-theme-muted">Loading emojis...</span></div>}>
+                  <EmojiPicker
+                    theme={theme === "dark" ? "dark" : "light"}
+                    onEmojiClick={(emojiData) => handleEmojiSelect(emojiData.emoji)}
+                    autoFocusSearch={false}
+                    searchPlaceHolder="Search all emojis..."
+                    width="100%"
+                    height={typeof window !== "undefined" && window.innerWidth < 640 ? 300 : 380}
+                    lazyLoadEmojis={true}
+                    previewConfig={{ showPreview: false }}
+                    skinTonesDisabled={false}
+                  />
+                </Suspense>
               </div>
             </div>
           )}
 
           {/* Tab 2 & 3: GIFs & Stickers */}
           {(mediaTab === "gifs" || mediaTab === "stickers") && (
-            <GifPicker
-              key={mediaTab}
-              initialTab={mediaTab}
-              hideTopTabs={true}
-              onGifSelect={async (gifUrl) => {
-                const isSticker = mediaTab === "stickers" || (gifUrl && (gifUrl.includes("/stickers/") || gifUrl.includes("sticker")));
-                setShowMediaPicker(false);
-                window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-                await sendMessage({ text: "", image: gifUrl, isSticker });
-                window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-              }}
-            />
+            <Suspense fallback={<div className="flex flex-col items-center justify-center h-[300px] sm:h-[380px]"><Loader className="size-6 animate-spin text-theme-muted mb-2" /><span className="text-xs text-theme-muted">Loading {mediaTab}...</span></div>}>
+              <GifPicker
+                key={mediaTab}
+                initialTab={mediaTab}
+                hideTopTabs={true}
+                onGifSelect={async (gifUrl) => {
+                  const isSticker = mediaTab === "stickers" || (gifUrl && (gifUrl.includes("/stickers/") || gifUrl.includes("sticker")));
+                  setShowMediaPicker(false);
+                  window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+                  await sendMessage({ text: "", image: gifUrl, isSticker });
+                  window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+                }}
+              />
+            </Suspense>
           )}
         </div>
       )}

@@ -1,205 +1,234 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Reply } from "lucide-react";
 
 /**
  * WhatsApp / Telegram-Style Swipe-Right-to-Reply Component
  * 
- * Supports mobile touch gestures and desktop pointer dragging.
- * Features:
- * 1. Direction lock (doesn't interfere with vertical chat scrolling)
- * 2. Visual reply indicator with dynamic scaling & accent illumination
- * 3. Haptic tick upon crossing trigger threshold on mobile devices
- * 4. Automatic input focus upon release
- * 5. Smooth elastic snap-back animation
+ * High-performance, gesture-accurate swipe-to-reply:
+ * - Native non-passive touch handling for 100% reliable mobile swipe prevention
+ * - Direction-locking to preserve fluid vertical chat scrolling
+ * - Unified desktop mouse/pointer drag support with window tracking
+ * - Interactive element exclusion (buttons, 3-dots menu, links, reactions)
+ * - Spring snap-back animation + haptic vibration feedback
  */
 const SwipeableMessage = ({ children, onReply, disabled = false }) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isThresholdMet, setIsThresholdMet] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
 
+  const containerRef = useRef(null);
   const startXRef = useRef(0);
   const startYRef = useRef(0);
   const currentOffsetRef = useRef(0);
   const isHorizontalRef = useRef(null);
   const hasVibratedRef = useRef(false);
-  const isDraggingRef = useRef(false);
+  const isPointerDownRef = useRef(false);
 
-  const THRESHOLD = 46;
-  const MAX_SWIPE = 78;
+  const THRESHOLD = 38;
+  const MAX_SWIPE = 75;
 
-  // Touch Handlers
-  const handleTouchStart = (e) => {
-    if (disabled || e.touches.length > 1) return;
-    const touch = e.touches[0];
-    startXRef.current = touch.clientX;
-    startYRef.current = touch.clientY;
-    currentOffsetRef.current = 0;
-    isHorizontalRef.current = null;
-    hasVibratedRef.current = false;
-    setIsSwiping(false);
-  };
+  // --- Touch Event Handlers (Attached natively with { passive: false }) ---
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  const handleTouchMove = (e) => {
-    if (disabled || e.touches.length > 1) return;
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - startXRef.current;
-    const deltaY = touch.clientY - startYRef.current;
+    const onTouchStart = (e) => {
+      if (disabled || e.touches.length > 1) return;
 
-    // Lock direction on initial drag
-    if (isHorizontalRef.current === null) {
-      if (Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6) {
-        if (deltaX > 6 && deltaX > Math.abs(deltaY) * 1.15) {
-          isHorizontalRef.current = true;
-        } else {
-          isHorizontalRef.current = false;
+      // Do not initiate swipe if touching an interactive element (3-dots, buttons, links, etc.)
+      if (e.target.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
+        return;
+      }
+
+      const touch = e.touches[0];
+      startXRef.current = touch.clientX;
+      startYRef.current = touch.clientY;
+      currentOffsetRef.current = 0;
+      isHorizontalRef.current = null;
+      hasVibratedRef.current = false;
+      setIsSwiping(false);
+    };
+
+    const onTouchMove = (e) => {
+      if (disabled || e.touches.length > 1) return;
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - startXRef.current;
+      const deltaY = touch.clientY - startYRef.current;
+
+      // Lock direction after initial movement
+      if (isHorizontalRef.current === null) {
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        if (absX > 6 || absY > 6) {
+          // If swiping right with clear horizontal dominance
+          if (deltaX > 6 && deltaX > absY * 0.85) {
+            isHorizontalRef.current = true;
+          } else {
+            isHorizontalRef.current = false;
+          }
         }
       }
-    }
 
-    if (isHorizontalRef.current) {
-      // Prevent browser default vertical scroll while intentionally swiping to reply
-      if (e.cancelable) {
-        e.preventDefault();
-      }
-
-      setIsSwiping(true);
-      const clampedX = Math.max(0, deltaX);
-      const damped = clampedX > THRESHOLD 
-        ? THRESHOLD + (clampedX - THRESHOLD) * 0.32 
-        : clampedX;
-      const finalOffset = Math.min(damped, MAX_SWIPE);
-
-      currentOffsetRef.current = finalOffset;
-      setSwipeOffset(finalOffset);
-
-      const met = finalOffset >= THRESHOLD;
-      setIsThresholdMet(met);
-
-      if (met && !hasVibratedRef.current) {
-        hasVibratedRef.current = true;
-        if (typeof window !== "undefined" && window.navigator?.vibrate) {
-          try {
-            window.navigator.vibrate(10);
-          } catch {}
+      if (isHorizontalRef.current === true) {
+        // Crucial: non-passive listener allows preventing browser gesture cancellations
+        if (e.cancelable) {
+          e.preventDefault();
         }
-      } else if (!met && hasVibratedRef.current) {
-        hasVibratedRef.current = false;
+
+        setIsSwiping(true);
+        const clampedX = Math.max(0, deltaX);
+        const damped = clampedX > THRESHOLD 
+          ? THRESHOLD + (clampedX - THRESHOLD) * 0.35 
+          : clampedX;
+        const finalOffset = Math.min(damped, MAX_SWIPE);
+
+        currentOffsetRef.current = finalOffset;
+        setSwipeOffset(finalOffset);
+
+        const met = finalOffset >= THRESHOLD;
+        setIsThresholdMet(met);
+
+        if (met && !hasVibratedRef.current) {
+          hasVibratedRef.current = true;
+          if (typeof window !== "undefined" && window.navigator?.vibrate) {
+            try {
+              window.navigator.vibrate(12);
+            } catch {}
+          }
+        } else if (!met && hasVibratedRef.current) {
+          hasVibratedRef.current = false;
+        }
       }
-    }
-  };
+    };
 
-  const handleTouchEnd = () => {
-    if (isHorizontalRef.current && currentOffsetRef.current >= THRESHOLD) {
-      onReply?.();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("pulse:focus-input"));
+    const onTouchEnd = () => {
+      if (isHorizontalRef.current === true && currentOffsetRef.current >= THRESHOLD) {
+        onReply?.();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("pulse:focus-input"));
+        }
       }
-    }
 
-    // Reset with smooth snap-back
-    setIsSwiping(false);
-    setSwipeOffset(0);
-    setIsThresholdMet(false);
-    isHorizontalRef.current = null;
-    hasVibratedRef.current = false;
-    currentOffsetRef.current = 0;
-  };
+      // Snap back smoothly
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      setIsThresholdMet(false);
+      isHorizontalRef.current = null;
+      hasVibratedRef.current = false;
+      currentOffsetRef.current = 0;
+    };
 
-  // Optional Pointer (Mouse drag) Handlers for Desktop
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [disabled, onReply, THRESHOLD, MAX_SWIPE]);
+
+  // --- Desktop Mouse / Pointer Drag Support ---
   const handlePointerDown = (e) => {
     if (disabled || e.pointerType === "touch" || e.button !== 0) return;
-    // Don't intercept clicks on interactive buttons, links, or menus
-    if (e.target.closest("button, a, input, textarea, img, [role='button']")) return;
+    if (e.target.closest("button, a, input, textarea, select, img, [role='button'], .quick-reaction-btn")) return;
 
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     currentOffsetRef.current = 0;
     isHorizontalRef.current = null;
-    isDraggingRef.current = true;
+    isPointerDownRef.current = true;
     hasVibratedRef.current = false;
-  };
 
-  const handlePointerMove = (e) => {
-    if (!isDraggingRef.current || disabled) return;
-    const deltaX = e.clientX - startXRef.current;
-    const deltaY = e.clientY - startYRef.current;
+    const onWindowPointerMove = (ev) => {
+      if (!isPointerDownRef.current) return;
+      const deltaX = ev.clientX - startXRef.current;
+      const deltaY = ev.clientY - startYRef.current;
 
-    if (isHorizontalRef.current === null) {
-      if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
-        if (deltaX > 8 && deltaX > Math.abs(deltaY) * 1.2) {
-          isHorizontalRef.current = true;
-        } else {
-          isHorizontalRef.current = false;
-          isDraggingRef.current = false;
+      if (isHorizontalRef.current === null) {
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        if (absX > 7 || absY > 7) {
+          if (deltaX > 7 && deltaX > absY * 0.85) {
+            isHorizontalRef.current = true;
+          } else {
+            isHorizontalRef.current = false;
+            isPointerDownRef.current = false;
+          }
         }
       }
-    }
 
-    if (isHorizontalRef.current) {
-      setIsSwiping(true);
-      const clampedX = Math.max(0, deltaX);
-      const damped = clampedX > THRESHOLD 
-        ? THRESHOLD + (clampedX - THRESHOLD) * 0.32 
-        : clampedX;
-      const finalOffset = Math.min(damped, MAX_SWIPE);
+      if (isHorizontalRef.current === true) {
+        setIsSwiping(true);
+        const clampedX = Math.max(0, deltaX);
+        const damped = clampedX > THRESHOLD 
+          ? THRESHOLD + (clampedX - THRESHOLD) * 0.35 
+          : clampedX;
+        const finalOffset = Math.min(damped, MAX_SWIPE);
 
-      currentOffsetRef.current = finalOffset;
-      setSwipeOffset(finalOffset);
+        currentOffsetRef.current = finalOffset;
+        setSwipeOffset(finalOffset);
 
-      const met = finalOffset >= THRESHOLD;
-      setIsThresholdMet(met);
-    }
-  };
-
-  const handlePointerUp = () => {
-    if (isDraggingRef.current && isHorizontalRef.current && currentOffsetRef.current >= THRESHOLD) {
-      onReply?.();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("pulse:focus-input"));
+        const met = finalOffset >= THRESHOLD;
+        setIsThresholdMet(met);
       }
-    }
+    };
 
-    isDraggingRef.current = false;
-    setIsSwiping(false);
-    setSwipeOffset(0);
-    setIsThresholdMet(false);
-    isHorizontalRef.current = null;
-    currentOffsetRef.current = 0;
+    const onWindowPointerUp = () => {
+      if (isPointerDownRef.current && isHorizontalRef.current === true && currentOffsetRef.current >= THRESHOLD) {
+        onReply?.();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("pulse:focus-input"));
+        }
+      }
+
+      isPointerDownRef.current = false;
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      setIsThresholdMet(false);
+      isHorizontalRef.current = null;
+      currentOffsetRef.current = 0;
+
+      window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
+      window.removeEventListener("pointercancel", onWindowPointerUp);
+    };
+
+    window.addEventListener("pointermove", onWindowPointerMove);
+    window.addEventListener("pointerup", onWindowPointerUp);
+    window.addEventListener("pointercancel", onWindowPointerUp);
   };
 
   return (
     <div 
-      className="relative w-full overflow-visible touch-pan-y select-none group/swipe"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      ref={containerRef}
+      className="relative w-full overflow-visible touch-pan-y group/swipe select-none"
       onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
     >
       {/* WhatsApp / Telegram Reply Icon Badge */}
       <div 
-        className="absolute left-1 sm:left-2.5 top-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center justify-center transition-all"
+        className="absolute left-1.5 sm:left-3 top-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center justify-center transition-all"
         style={{
-          opacity: Math.min(1, Math.max(0, (swipeOffset - 8) / 32)),
-          transform: `translateY(-50%) translateX(${Math.min(swipeOffset * 0.55, 24)}px) scale(${
-            isThresholdMet ? 1.15 : Math.max(0.6, swipeOffset / THRESHOLD)
+          opacity: Math.min(1, Math.max(0, (swipeOffset - 6) / 28)),
+          transform: `translateY(-50%) translateX(${Math.min(swipeOffset * 0.6, 26)}px) scale(${
+            isThresholdMet ? 1.15 : Math.max(0.65, swipeOffset / THRESHOLD)
           })`,
         }}
       >
         <div 
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 shadow-md ${
             isThresholdMet
-              ? "bg-accent-primary text-white shadow-lg shadow-accent-primary/40 ring-2 ring-accent-primary/30 scale-105"
-              : "bg-[var(--glass-surface)] border border-[var(--glass-border)] text-theme-muted shadow-sm"
+              ? "bg-accent-primary text-white shadow-accent-primary/40 ring-2 ring-accent-primary/30 scale-105"
+              : "bg-[var(--glass-heavy)] border border-[var(--glass-border)] text-theme-muted"
           }`}
         >
           <Reply 
             size={15} 
             className={`transition-transform duration-150 ${
-              isThresholdMet ? "scale-110" : "scale-90 opacity-70"
+              isThresholdMet ? "scale-110" : "scale-90 opacity-80"
             }`} 
           />
         </div>
@@ -209,7 +238,7 @@ const SwipeableMessage = ({ children, onReply, disabled = false }) => {
       <div
         style={{
           transform: `translateX(${swipeOffset}px)`,
-          transition: isSwiping ? "none" : "transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)",
+          transition: isSwiping ? "none" : "transform 0.24s cubic-bezier(0.18, 0.89, 0.32, 1.15)",
           willChange: isSwiping ? "transform" : "auto",
         }}
         className="w-full flex flex-col"

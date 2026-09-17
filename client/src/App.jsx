@@ -1,11 +1,14 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import HomePage from "./pages/HomePage";
-import SignUpPage from "./pages/SignUpPage";
-import LoginPage from "./pages/LoginPage";
-import WelcomePage from "./pages/WelcomePage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import { Loader } from "lucide-react";
+
+// Lazy load pages to drastically reduce the initial JS bundle size
+const HomePage = lazy(() => import("./pages/HomePage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const WelcomePage = lazy(() => import("./pages/WelcomePage"));
 
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
@@ -23,13 +26,15 @@ function App() {
 
   return (
     <div className="h-full apple-ambient-bg flex flex-col">
-      <Routes>
-        <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/welcome" replace />} />
-        <Route path="/welcome" element={!authUser ? <WelcomePage /> : <Navigate to="/" replace />} />
-        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" replace />} />
-        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" replace />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader className="size-8 animate-spin text-palette-mint" /></div>}>
+        <Routes>
+          <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/welcome" replace />} />
+          <Route path="/welcome" element={!authUser ? <WelcomePage /> : <Navigate to="/" replace />} />
+          <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" replace />} />
+          <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }
