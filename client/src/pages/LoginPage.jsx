@@ -135,11 +135,11 @@ const LoginPage = () => {
         >
           <div className="relative group mb-8">
             <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400/40 via-emerald-400/30 to-cyan-500/40 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
-            <div className="relative w-32 h-32 rounded-[2.75rem] shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 border border-black/5 dark:border-white/10">
+            <div className="relative w-36 h-36 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
               <img
                 src="/logo.png"
                 alt="Pulse Logo"
-                className="w-full h-full object-cover drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
+                className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
@@ -275,4 +275,5 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+
 

@@ -346,10 +346,10 @@ const HomePage = () => {
               setSelectedChat(null);
               setActiveNav("all-chats");
             }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all cursor-pointer border border-black/5 dark:border-white/10"
+              className="group relative flex items-center justify-center w-12 h-12 hover:scale-105 active:scale-95 transition-all cursor-pointer"
               type="button"
             >
-              <img alt="Pulse Logo" className="w-full h-full object-cover drop-shadow-sm transition-transform group-hover:scale-110" src="/logo.png" />
+              <img alt="Pulse Logo" className="w-11 h-11 object-contain drop-shadow-sm transition-transform group-hover:scale-110" src="/logo.png" />
             <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               Pulse Home
             </span>
@@ -584,11 +584,8 @@ const HomePage = () => {
               {/* Central Glowing Hero Logo Emblem */}
               <div className="relative mb-6 flex items-center justify-center">
                 <div className="absolute inset-0 rounded-3xl bg-cyan-500/20 dark:bg-cyan-400/30 blur-2xl opacity-60 animate-pulse" />
-                  <div
-                    ref={logoRef}
-                    className="relative w-24 h-24 rounded-[1.8rem] shadow-xl flex items-center justify-center overflow-hidden z-10 hover:scale-105 transition-transform border border-black/5 dark:border-white/10"
-                  >
-                    <img src="/logo.png" alt="Pulse" className="w-full h-full object-cover drop-shadow-[0_4px_16px_rgba(0,240,255,0.3)]" />
+                  <div ref={logoRef} className="relative w-28 h-28 flex items-center justify-center z-10 hover:scale-105 transition-transform">
+                    <img src="/logo.png" alt="Pulse" className="w-full h-full object-contain drop-shadow-[0_4px_16px_rgba(0,240,255,0.3)]" />
                   </div>
               </div>
 
@@ -703,4 +700,5 @@ const HomePage = () => {
 };
 
 export default HomePage;
+
 
