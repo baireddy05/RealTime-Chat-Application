@@ -349,7 +349,7 @@ const HomePage = () => {
             className="group relative flex items-center justify-center w-12 h-12 rounded-2xl hover:bg-black/5 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all cursor-pointer"
             type="button"
           >
-            <img alt="Pulse Logo" className="w-9 h-9 object-contain drop-shadow-sm transition-transform group-hover:scale-110" src="/logo.svg" />
+            <img alt="Pulse Logo" className="w-9 h-9 object-contain drop-shadow-sm transition-transform group-hover:scale-110" src="/logo.png" />
             <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               Pulse Home
             </span>
@@ -588,7 +588,7 @@ const HomePage = () => {
                   ref={logoRef}
                   className="relative w-24 h-24 rounded-[2rem] bg-black/[0.03] dark:bg-white/[0.06] backdrop-blur-2xl shadow-xl flex items-center justify-center z-10 hover:scale-105 transition-transform"
                 >
-                  <img src="/logo.svg" alt="Pulse" className="w-16 h-16 object-contain drop-shadow-md" />
+                  <img src="/logo.png" alt="Pulse" className="w-16 h-16 object-contain drop-shadow-md" />
                 </div>
               </div>
 

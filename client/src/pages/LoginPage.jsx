@@ -137,7 +137,7 @@ const LoginPage = () => {
             <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-cyan-500/30 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
             <div className="relative w-32 h-32 rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105">
               <img
-                src="/logo.svg"
+                src="/logo.png"
                 alt="Pulse Logo"
                 className="w-20 h-20 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
               />
@@ -178,7 +178,7 @@ const LoginPage = () => {
           <div className="w-full max-w-[400px] mx-auto animate-slide-up">
             {/* Mobile Header with Logo */}
             <div className="flex items-center gap-3 mb-6 lg:hidden justify-center">
-              <img src="/logo.svg" alt="Pulse Logo" className="w-12 h-12 object-contain drop-shadow" />
+              <img src="/logo.png" alt="Pulse Logo" className="w-12 h-12 object-contain drop-shadow" />
               <span className="text-2xl font-extrabold tracking-tight text-theme-main">Pulse</span>
             </div>
 

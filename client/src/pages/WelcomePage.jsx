@@ -84,7 +84,7 @@ const WelcomePage = () => {
       <div className="w-full flex items-center justify-between z-20 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-2xl bg-black/[0.04] dark:bg-white/[0.08] backdrop-blur-xl border border-black/10 dark:border-white/10 flex items-center justify-center shadow-sm">
-            <img src="/logo.svg" alt="Pulse" className="w-5 h-5 object-contain" />
+            <img src="/logo.png" alt="Pulse" className="w-5 h-5 object-contain" />
           </div>
           <span className="text-lg font-extrabold tracking-tight text-theme-main">Pulse</span>
         </div>
@@ -114,7 +114,7 @@ const WelcomePage = () => {
           <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/35 via-purple-500/35 to-cyan-500/35 rounded-[2.5rem] sm:rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-90 animate-pulse" />
           <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-[2.5rem] sm:rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.06] shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 border border-black/5 dark:border-white/10">
             <img
-              src="/logo.svg"
+              src="/logo.png"
               alt="Pulse Logo"
               className="w-14 h-14 sm:w-20 sm:h-20 object-contain drop-shadow-[0_8px_20px_rgba(99,102,241,0.5)] transition-transform duration-500 group-hover:scale-110"
             />
