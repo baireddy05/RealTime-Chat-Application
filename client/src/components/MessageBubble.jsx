@@ -233,7 +233,7 @@ const MessageBubble = memo(({
           id={`msg-${message._id}`}
           onMouseEnter={() => setHoveredMessageId(message._id)}
           onMouseLeave={() => setHoveredMessageId(null)}
-          className={`flex max-w-full relative group transition-all px-4 sm:px-6 md:px-8 ${
+          className={`flex max-w-full relative transition-all px-4 sm:px-6 md:px-8 ${
             isSameSenderAsPrev ? "mt-1" : "mt-3.5"
           } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
         >
@@ -252,7 +252,7 @@ const MessageBubble = memo(({
           )}
 
           <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] md:max-w-[70%] min-w-0`}>
-            <div className={`flex items-center gap-1.5 ${isMine ? "flex-row-reverse" : "flex-row"} max-w-full min-w-0`}>
+            <div className={`flex items-center gap-1.5 group ${isMine ? "flex-row-reverse" : "flex-row"} max-w-full min-w-0`}>
               {/* Speech Bubble */}
               <div 
                 ref={bubbleRef}
