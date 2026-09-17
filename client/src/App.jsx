@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import { Loader } from "lucide-react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Lazy load pages to drastically reduce the initial JS bundle size
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -35,6 +36,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <SpeedInsights />
     </div>
   );
 }
