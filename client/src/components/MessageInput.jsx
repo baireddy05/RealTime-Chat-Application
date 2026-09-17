@@ -778,9 +778,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               initialTab={mediaTab}
               hideTopTabs={true}
               onGifSelect={async (gifUrl) => {
+                const isSticker = mediaTab === "stickers" || (gifUrl && (gifUrl.includes("/stickers/") || gifUrl.includes("sticker")));
                 setShowMediaPicker(false);
                 window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-                await sendMessage({ text: "", image: gifUrl });
+                await sendMessage({ text: "", image: gifUrl, isSticker });
                 window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
               }}
             />

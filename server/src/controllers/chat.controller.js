@@ -263,6 +263,7 @@ export const sendMessage = async (req, res) => {
       linkPreview,
       parentMessageId,
       isEncrypted,
+      isSticker,
     } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
@@ -354,6 +355,7 @@ export const sendMessage = async (req, res) => {
         linkPreview: resolvedPreview,
         parentMessageId: parentMessageId || null,
         isEncrypted: Boolean(isEncrypted),
+        isSticker: Boolean(isSticker),
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -380,6 +382,7 @@ export const sendMessage = async (req, res) => {
         linkPreview: resolvedPreview,
         parentMessageId: parentMessageId || null,
         isEncrypted: Boolean(isEncrypted),
+        isSticker: Boolean(isSticker),
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");

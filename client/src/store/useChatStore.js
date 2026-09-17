@@ -527,6 +527,7 @@ export const useChatStore = create((set, get) => ({
           file: messageData.file || null,
           audio: messageData.audio || null,
           contact: messageData.contact || null,
+          isSticker: Boolean(messageData.isSticker),
           createdAt: new Date().toISOString(),
           replyTo: payload.replyTo || null,
           isOptimistic: true,

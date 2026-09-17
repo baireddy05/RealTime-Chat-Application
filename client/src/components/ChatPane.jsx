@@ -1084,6 +1084,9 @@ const ChatPane = ({ onBack }) => {
                 const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
                 const openUpwards = index >= 2;
                 const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
+                const isSticker = message.isSticker || Boolean(message.image && (message.image.includes("/stickers/") || message.image.includes("giphy-preview.gif") || message.image.includes("sticker")));
+                const isStickerOnly = !message.isDeleted && isSticker && (!message.text || !message.text.trim()) && !message.file && !message.audio && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned;
+                const isTransparentBubble = isJustEmoji || isStickerOnly;
 
                 return (
                   <Fragment key={message._id}>
@@ -1127,7 +1130,7 @@ const ChatPane = ({ onBack }) => {
                         <div 
                           style={
                             !message.isDeleted
-                              ? isJustEmoji
+                              ? isTransparentBubble
                                 ? { background: 'transparent', color: isMine ? 'var(--bubble-outgoing-text)' : 'var(--bubble-incoming-text)', boxShadow: 'none', border: 'none' }
                                 : isMine
                                   ? {
@@ -1144,10 +1147,10 @@ const ChatPane = ({ onBack }) => {
                                     }
                               : {}
                           }
-                          className={`${isJustEmoji ? "py-1 px-1" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full min-w-0 ${
+                          className={`${isTransparentBubble ? "py-0 px-0" : "py-2 px-3.5"} ${bubbleRadius} relative transition-all w-fit max-w-full min-w-0 ${
                             message.isDeleted
                               ? "bg-surface-container/40 text-outline italic"
-                              : isMine && !isJustEmoji
+                              : isMine && !isTransparentBubble
                               ? "border border-black/10 dark:border-white/40 shadow-sm"
                               : ""
                           } ${
@@ -1181,10 +1184,42 @@ const ChatPane = ({ onBack }) => {
                           ) : (
                             <>
                               {message.image && (
-                                <div className="overflow-hidden rounded-xl mb-1.5">
-                                  <img src={message.image} alt="Attachment" onClick={() => setActiveImage(message.image)}
-                                    className="max-w-[280px] max-h-[280px] object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity" />
-                                </div>
+                                isStickerOnly ? (
+                                  <div className="relative group/sticker my-0.5 flex flex-col items-end">
+                                    <img
+                                      src={message.image}
+                                      alt="Sticker"
+                                      loading="lazy"
+                                      onClick={() => setActiveImage(message.image)}
+                                      className="w-32 h-32 xs:w-36 xs:h-36 sm:w-44 sm:h-44 object-contain bg-transparent select-none cursor-pointer hover:scale-105 transition-transform duration-200 drop-shadow-md"
+                                    />
+                                    <div className="flex items-center gap-1 text-[9.5px] px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 shadow-sm mt-1 select-none">
+                                      <span>
+                                        {new Date(message.createdAt).toLocaleTimeString([], {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </span>
+                                      {isMine && !message.isDeleted && (
+                                        message.isOptimistic ? (
+                                          <Clock size={11} className="opacity-70 animate-pulse text-white" title="Sending..." />
+                                        ) : (
+                                          renderReceiptIcon(message)
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="overflow-hidden rounded-2xl mb-1.5 max-w-full sm:max-w-[360px] md:max-w-[420px]">
+                                    <img
+                                      src={message.image}
+                                      alt="Attachment"
+                                      loading="lazy"
+                                      onClick={() => setActiveImage(message.image)}
+                                      className="w-auto h-auto max-w-full max-h-[380px] sm:max-h-[460px] object-contain rounded-2xl cursor-pointer hover:opacity-95 transition-all active:scale-[0.99] shadow-sm block bg-black/5 dark:bg-white/5"
+                                    />
+                                  </div>
+                                )
                               )}
                               {message.file && (
                                 <div

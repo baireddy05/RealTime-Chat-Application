@@ -24,6 +24,10 @@ const messageSchema = new mongoose.Schema(
     audio: {
       type: String,
     },
+    isSticker: {
+      type: Boolean,
+      default: false,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

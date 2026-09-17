@@ -142,13 +142,23 @@ const ThreadDrawer = ({ onClose }) => {
                 )}
 
                 {activeThreadMessage.image && (
-                  <div className="mt-2.5 rounded-xl overflow-hidden max-h-56 border border-[var(--glass-border)]">
-                    <img
-                      src={activeThreadMessage.image}
-                      alt="Attachment"
-                      className="w-full h-auto object-cover max-h-56"
-                    />
-                  </div>
+                  (activeThreadMessage.isSticker || (activeThreadMessage.image.includes("/stickers/") || activeThreadMessage.image.includes("sticker"))) ? (
+                    <div className="my-1.5 flex items-center justify-center">
+                      <img
+                        src={activeThreadMessage.image}
+                        alt="Sticker"
+                        className="w-28 h-28 sm:w-36 sm:h-36 object-contain bg-transparent select-none drop-shadow-md"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-2.5 rounded-2xl overflow-hidden border border-[var(--glass-border)] max-w-full">
+                      <img
+                        src={activeThreadMessage.image}
+                        alt="Attachment"
+                        className="w-auto h-auto max-w-full max-h-72 object-contain rounded-2xl block bg-black/5 dark:bg-white/5"
+                      />
+                    </div>
+                  )
                 )}
 
                 {activeThreadMessage.audio && (
@@ -215,6 +225,8 @@ const ThreadDrawer = ({ onClose }) => {
               const avatar =
                 reply.senderId?.profilePic ||
                 "https://api.dicebear.com/7.x/bottts/svg?seed=" + encodeURIComponent(replySender);
+              const isReplySticker = reply.isSticker || Boolean(reply.image && (reply.image.includes("/stickers/") || reply.image.includes("sticker")));
+              const isReplyStickerOnly = isReplySticker && (!reply.text || !reply.text.trim()) && !reply.file && !reply.audio && !reply.contact;
 
               return (
                 <div
@@ -228,34 +240,39 @@ const ThreadDrawer = ({ onClose }) => {
                   />
 
                   <div
-                    className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
-                      isMe
+                    style={isReplyStickerOnly ? { background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 } : {}}
+                    className={`max-w-[82%] rounded-2xl ${isReplyStickerOnly ? "p-0" : "p-3"} text-xs leading-relaxed shadow-sm ${
+                      isReplyStickerOnly
+                        ? "bg-transparent shadow-none"
+                        : isMe
                         ? "bg-accent-primary text-white rounded-tr-sm"
                         : "bg-[var(--glass-surface)] border border-[var(--glass-border)] text-theme-main rounded-tl-sm"
                     }`}
                   >
-                    <div
-                      className={`flex items-center gap-1.5 mb-1 ${
-                        isMe ? "justify-end text-white/80" : "text-theme-muted"
-                      }`}
-                    >
-                      <span
-                        className={`font-semibold text-[11px] ${
-                          isMe
-                            ? "text-white"
-                            : "text-accent-primary"
+                    {!isReplyStickerOnly && (
+                      <div
+                        className={`flex items-center gap-1.5 mb-1 ${
+                          isMe ? "justify-end text-white/80" : "text-theme-muted"
                         }`}
                       >
-                        {isMe ? "You" : replySender}
-                      </span>
+                        <span
+                          className={`font-semibold text-[11px] ${
+                            isMe
+                              ? "text-white"
+                              : "text-accent-primary"
+                          }`}
+                        >
+                          {isMe ? "You" : replySender}
+                        </span>
 
-                      <span className="text-[10px] opacity-75">
-                        {new Date(reply.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
+                        <span className="text-[10px] opacity-75">
+                          {new Date(reply.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    )}
 
                     {reply.text && (
                       <div className="break-words">
@@ -272,13 +289,26 @@ const ThreadDrawer = ({ onClose }) => {
                     )}
 
                     {reply.image && (
-                      <div className="mt-2 rounded-xl overflow-hidden max-h-48 border border-[var(--glass-border)]">
-                        <img
-                          src={reply.image}
-                          alt="Attachment"
-                          className="w-full h-auto object-cover max-h-48"
-                        />
-                      </div>
+                      isReplyStickerOnly ? (
+                        <div className="my-1 flex flex-col items-end">
+                          <img
+                            src={reply.image}
+                            alt="Sticker"
+                            className="w-24 h-24 sm:w-32 sm:h-32 object-contain bg-transparent select-none drop-shadow-md"
+                          />
+                          <span className="text-[9.5px] px-1.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 shadow-sm mt-0.5">
+                            {new Date(reply.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-2 rounded-2xl overflow-hidden border border-[var(--glass-border)] max-w-full">
+                          <img
+                            src={reply.image}
+                            alt="Attachment"
+                            className="w-auto h-auto max-w-full max-h-64 object-contain rounded-2xl block bg-black/5 dark:bg-white/5"
+                          />
+                        </div>
+                      )
                     )}
 
                     {reply.audio && (
