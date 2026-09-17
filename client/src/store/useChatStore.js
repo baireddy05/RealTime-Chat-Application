@@ -801,12 +801,24 @@ export const useChatStore = create((set, get) => ({
       }
 
       // Always update last message in store so sidebar re-sorts & shows preview
-      set((state) => ({
-        lastMessages: {
-          ...state.lastMessages,
-          [chatId]: processedMessage,
-        },
-      }));
+      set((state) => {
+        let newUsers = state.users || [];
+        const otherUserObj = isMyMessage ? newMessage.receiverId : newMessage.senderId;
+        
+        if (otherUserObj && typeof otherUserObj === 'object' && otherUserObj._id) {
+          if (!newUsers.some((u) => u._id === otherUserObj._id)) {
+            newUsers = [...newUsers, { ...otherUserObj, id: otherUserObj._id }];
+          }
+        }
+
+        return {
+          lastMessages: {
+            ...state.lastMessages,
+            [chatId]: processedMessage,
+          },
+          users: newUsers,
+        };
+      });
 
       const isRoomMsg = selectedChat?.type === "room" && processedMessage.roomId?.toString() === selectedChat.id?.toString();
       const isUserMsg = selectedChat?.type === "user" && 

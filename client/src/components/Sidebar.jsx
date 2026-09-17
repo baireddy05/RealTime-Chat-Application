@@ -57,6 +57,7 @@ const Sidebar = ({
 }) => {
   const {
     rooms,
+    users,
     getRooms,
     selectedChat,
     setSelectedChat,
@@ -185,10 +186,25 @@ const Sidebar = ({
   }, [rooms, searchQuery]);
 
   const filteredFriends = useMemo(() => {
+    const allKnownUsers = new Map();
+    
+    // Add all friends
+    (friends || []).forEach(f => {
+      if (f && f._id) allKnownUsers.set(f._id, f);
+    });
+
+    // Add any user from `users` that we have a chat history with
+    (users || []).forEach(u => {
+      if (u && u._id && lastMessages[u._id] && !allKnownUsers.has(u._id)) {
+        allKnownUsers.set(u._id, u);
+      }
+    });
+
+    const chatList = Array.from(allKnownUsers.values());
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return friends || [];
-    return (friends || []).filter((f) => f.username.toLowerCase().includes(q));
-  }, [friends, searchQuery]);
+    if (!q) return chatList;
+    return chatList.filter((f) => f.username.toLowerCase().includes(q));
+  }, [friends, users, lastMessages, searchQuery]);
 
   // Sort helper by recent message
   const getChatTimestamp = (item) => {
