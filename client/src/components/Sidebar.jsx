@@ -402,7 +402,6 @@ const Sidebar = ({
     const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     const previewText = getMessageSnippet(lastMsg);
-    const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
     const isRead = lastMsg && ((lastMsg.reads || []).some(r => (r.userId?._id || r.userId)?.toString() === friendId) || (lastMsg.readBy || []).some(id => (id?._id || id)?.toString() === friendId));
