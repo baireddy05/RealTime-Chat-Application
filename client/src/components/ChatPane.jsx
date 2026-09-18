@@ -32,6 +32,24 @@ import SwipeableMessage from "./SwipeableMessage";
 import MessageBubble from "./MessageBubble";
 import { useBackHandler } from "../lib/backNavigation";
 import { downloadFile } from "../lib/download";
+import { isEncryptedMessage, getConversationKey, decryptMessage } from "../lib/crypto";
+
+const getPinnedPreview = (msg, fallbackDecryptedText) => {
+  if (!msg) return "";
+  if (msg.isDeleted || msg.text === "This message was deleted" || msg.decryptedText === "This message was deleted") {
+    return "🚫 This message was deleted";
+  }
+  if (msg.poll) return `📊 Poll: ${msg.poll.question || "Poll"}`;
+  if (msg.audio) return "🎤 Voice Note";
+  const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
+  if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
+  if (msg.image) return msg.decryptedText || fallbackDecryptedText || (!isEncryptedMessage(msg.text) && msg.text ? msg.text : "📷 Photo");
+  if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
+  if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || "Contact"}`;
+  
+  const text = msg.decryptedText || fallbackDecryptedText || (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text) || "";
+  return text;
+};
 
 const isDifferentDay = (d1, d2) => {
   if (!d1 || !d2) return true;
@@ -110,6 +128,7 @@ const ChatPane = ({ onBack }) => {
     isScheduledOpen, setIsScheduledOpen,
     scheduledMessages, getScheduledMessages,
     openThread, closeThread, isThreadOpen,
+    archivedChats, toggleArchiveChat,
   } = useChatStore();
   const { authUser, onlineUsers } = useAuthStore();
   const { startCall } = useCallStore();
@@ -538,8 +557,9 @@ const ChatPane = ({ onBack }) => {
       const editedTag = msg.isEdited ? " (edited)" : "";
 
       lines.push(`[${time}] ${senderName}${editedTag}:`);
-      if (msg.text) {
-        lines.push(`  ${msg.decryptedText || msg.text}`);
+      if (msg.decryptedText || msg.text) {
+        const textContent = msg.decryptedText || (isEncryptedMessage(msg.text) ? "[Encrypted message]" : msg.text);
+        lines.push(`  ${textContent}`);
       }
       if (msg.image) {
         lines.push(`  [Attachment: Image (${msg.image})]`);
@@ -575,6 +595,34 @@ const ChatPane = ({ onBack }) => {
 
   const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
   const currentPinned = pinnedMessages.length > 0 ? pinnedMessages[pinnedIndex % pinnedMessages.length] : null;
+  const [pinnedDecryptedText, setPinnedDecryptedText] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!currentPinned) {
+      setPinnedDecryptedText(null);
+      return;
+    }
+    if (currentPinned.decryptedText) {
+      setPinnedDecryptedText(currentPinned.decryptedText);
+      return;
+    }
+    if (currentPinned.text && isEncryptedMessage(currentPinned.text)) {
+      const key = getConversationKey(selectedChat, authUser?._id);
+      decryptMessage(currentPinned.text, key)
+        .then((dec) => {
+          if (active) setPinnedDecryptedText(dec);
+        })
+        .catch(() => {
+          if (active) setPinnedDecryptedText("🔒 Encrypted Message");
+        });
+    } else {
+      setPinnedDecryptedText(currentPinned.text || "");
+    }
+    return () => {
+      active = false;
+    };
+  }, [currentPinned, selectedChat, authUser?._id]);
 
   const scrollToMessage = (msgId) => {
     const el = document.getElementById(`msg-${msgId}`);
@@ -912,6 +960,20 @@ const ChatPane = ({ onBack }) => {
                     <Palette size={14} className="text-accent-primary" /> Chat Theme
                   </button>
 
+                  <button
+                    onClick={async () => {
+                      const success = await toggleArchiveChat(selectedChat._id || selectedChat.id);
+                      if (success) {
+                        setShowChatOptions(false);
+                        onBack();
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary leading-none">archive</span> 
+                    {archivedChats.includes((selectedChat._id || selectedChat.id)?.toString()) ? "Unarchive Chat" : "Archive Chat"}
+                  </button>
+
                   {/* Scheduled Messages Option */}
                   <button
                     onClick={() => {
@@ -1013,7 +1075,7 @@ const ChatPane = ({ onBack }) => {
                 PINNED {pinnedMessages.length > 1 && `${pinnedIndex + 1}/${pinnedMessages.length}`}
               </span>
               <p className="font-body-md text-xs text-on-surface-variant truncate">
-                {currentPinned.text || (currentPinned.image ? "📷 Photo" : "Attachment")}
+                {getPinnedPreview(currentPinned, pinnedDecryptedText)}
               </p>
             </div>
           </div>

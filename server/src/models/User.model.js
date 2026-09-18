@@ -44,6 +44,7 @@ const userSchema = new mongoose.Schema(
       of: new mongoose.Schema({
         wallpaper: String,
         theme: String,
+        archived: Boolean,
       }, { _id: false }),
       default: {},
     },

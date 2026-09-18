@@ -1152,3 +1152,37 @@ export const proxyDownloadFile = async (req, res) => {
     return res.status(500).json({ error: "Failed to download file" });
   }
 };
+
+export const toggleArchiveChat = async (req, res) => {
+  try {
+    const { id: chatId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (!user.chatPreferences) {
+      user.chatPreferences = new Map();
+    }
+    
+    const currentPrefs = user.chatPreferences.get(chatId) || {};
+    const isArchived = currentPrefs.archived || false;
+    
+    user.chatPreferences.set(chatId, {
+      ...currentPrefs,
+      archived: !isArchived
+    });
+    
+    await user.save();
+    
+    res.status(200).json({ 
+      success: true, 
+      chatId,
+      archived: !isArchived,
+      preferences: user.chatPreferences.get(chatId)
+    });
+  } catch (error) {
+    console.error("Error in toggleArchiveChat: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

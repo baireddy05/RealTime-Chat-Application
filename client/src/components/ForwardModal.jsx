@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Search, Send, Forward, Check } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
+import { isEncryptedMessage } from "../lib/crypto";
 
 const ForwardModal = ({ message, onClose }) => {
   const [search, setSearch] = useState("");
@@ -38,7 +39,8 @@ const ForwardModal = ({ message, onClose }) => {
   };
 
   const previewSnippet =
-    message.text ||
+    message.decryptedText ||
+    (isEncryptedMessage(message.text) ? "🔒 Encrypted Message" : message.text) ||
     (message.image ? "Photo" : message.file ? message.file.name : message.audio ? "Voice memo" : "Message");
 
   return (

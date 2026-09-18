@@ -24,6 +24,7 @@ import {
   proxyDownloadFile,
   votePoll,
   viewWhisper,
+  toggleArchiveChat,
 } from "../controllers/chat.controller.js";
 
 const router = express.Router();
@@ -57,5 +58,7 @@ router.delete("/message/:messageId", protectRoute, deleteMessage);
 router.post("/message/:messageId/pin", protectRoute, togglePinMessage);
 router.post("/message/:messageId/star", protectRoute, toggleStarMessage);
 router.get("/message/:messageId/receipts", protectRoute, getMessageReceipts);
+
+router.post("/archive/:id", protectRoute, toggleArchiveChat);
 
 export default router;

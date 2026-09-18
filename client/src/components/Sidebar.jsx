@@ -65,6 +65,8 @@ const Sidebar = ({
     lastMessages,
     setIsSettingsOpen,
     typingUsers,
+    drafts,
+    archivedChats,
   } = useChatStore();
 
   const { authUser, onlineUsers, socket } = useAuthStore();
@@ -237,8 +239,18 @@ const Sidebar = ({
   const allChats = useMemo(() => {
     const roomItems = filteredRooms.map((r) => ({ ...r, chatType: "room" }));
     const friendItems = filteredFriends.map((f) => ({ ...f, chatType: "user" }));
+
+    // Add Saved Messages (Self Chat)
+    if (authUser && !friendItems.some((f) => f._id?.toString() === authUser._id?.toString())) {
+      friendItems.push({
+        ...authUser,
+        chatType: "user",
+        isSelfChat: true,
+      });
+    }
+
     return [...roomItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
-  }, [filteredRooms, filteredFriends, lastMessages]);
+  }, [filteredRooms, filteredFriends, lastMessages, authUser]);
 
   // Compute Unread lists
   const unreadChats = useMemo(() => {
@@ -247,6 +259,16 @@ const Sidebar = ({
       return u > 0;
     });
   }, [allChats, unreadCounts]);
+
+  const visibleChatsList = useMemo(() => {
+    return allChats.filter(c => {
+      const chatId = (c._id || c.id)?.toString();
+      const isArchived = archivedChats.includes(chatId);
+      if (activeFilter === "archived") return isArchived;
+      if (activeFilter === "all") return !isArchived;
+      return true; // other filters handle themselves or we can filter them too
+    });
+  }, [allChats, archivedChats, activeFilter]);
 
   const totalUnreadCount = unreadChats.length;
   const roomsCount = filteredRooms.length;
@@ -276,6 +298,7 @@ const Sidebar = ({
     const senderUsername = isOutgoing ? "You" : lastMsg?.senderId?.username || "";
     const typers = (typingUsers[roomId] || []).filter((u) => u && u !== authUser?.username);
     const isTyping = typers.length > 0;
+    const draftText = drafts[roomId];
 
     return (
       <div
@@ -325,6 +348,11 @@ const Sidebar = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
                   </span>
                 </div>
+              ) : draftText ? (
+                <div className="flex items-center gap-1 min-w-0 truncate">
+                  <span className="text-red-500 font-bold shrink-0">[Draft]</span>
+                  <span className="truncate text-zinc-900 dark:text-white font-medium">{draftText}</span>
+                </div>
               ) : previewText ? (
                 <>
                   {isOutgoing && (
@@ -366,8 +394,10 @@ const Sidebar = ({
 
   const renderFriendCard = (friend) => {
     const friendId = (friend._id || friend.id)?.toString();
+    const authUserId = authUser?._id?.toString();
+    const isSelfChat = friend.isSelfChat || friendId === authUserId;
     const isSelected = (selectedChat?.id || selectedChat?._id)?.toString() === friendId;
-    const isOnline = onlineUsersSet.has(friendId);
+    const isOnline = isSelfChat ? true : onlineUsersSet.has(friendId);
     const unread = unreadCounts[friendId] !== undefined ? unreadCounts[friendId] : (friend.unreadCount || 0);
     const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
@@ -379,6 +409,7 @@ const Sidebar = ({
     const isDelivered = lastMsg && (lastMsg.deliveries || []).some(d => (d.userId?._id || d.userId)?.toString() === friendId);
     const typers = (typingUsers[friendId] || []).filter((u) => u && u !== authUser?.username);
     const isTyping = typers.length > 0;
+    const draftText = drafts[friendId];
 
     return (
       <div
@@ -386,7 +417,7 @@ const Sidebar = ({
         onClick={() =>
           selectChat({
             id: friendId,
-            name: friend.username,
+            name: isSelfChat ? "Saved Messages" : friend.username,
             type: "user",
             profilePic: friend.profilePic,
           })
@@ -400,10 +431,11 @@ const Sidebar = ({
         <div className="relative shrink-0 w-10 h-10">
           <img
             className="w-full h-full rounded-full object-cover bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
-            alt={friend.username}
+            alt={isSelfChat ? "Saved Messages" : friend.username}
             src={
-              friend.profilePic ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username)}&background=27272a&color=ffffff`
+              isSelfChat
+                ? friend.profilePic || `https://ui-avatars.com/api/?name=Saved&background=3b82f6&color=ffffff`
+                : friend.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username)}&background=27272a&color=ffffff`
             }
           />
           <span
@@ -422,7 +454,11 @@ const Sidebar = ({
                 isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
               }`}
             >
-              {friend.username}
+              {isSelfChat ? (
+                <div className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">bookmark</span>Saved Messages (You)</div>
+              ) : (
+                friend.username
+              )}
             </span>
 
             <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
@@ -434,6 +470,11 @@ const Sidebar = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-2" />
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
                   </span>
+                </div>
+              ) : draftText ? (
+                <div className="flex items-center gap-1 min-w-0 truncate">
+                  <span className="text-red-500 font-bold shrink-0">[Draft]</span>
+                  <span className="truncate text-zinc-900 dark:text-white font-medium">{draftText}</span>
                 </div>
               ) : previewText ? (
                 <>
@@ -750,6 +791,18 @@ const Sidebar = ({
             <span>Direct</span>
             <span className="text-[10px] opacity-75 font-mono">({directCount})</span>
           </button>
+
+          <button
+            onClick={() => setActiveFilter("archived")}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              activeFilter === "archived"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
+            }`}
+            type="button"
+          >
+            <span>Archived</span>
+          </button>
         </div>
       </div>
 
@@ -1025,12 +1078,23 @@ const Sidebar = ({
 
         {/* ALL TAB: Unified Chat Stream (Groups + Direct merged, chronologically sorted by recent activity) */}
         {activeFilter === "all" && (
-          allChats.length === 0 ? (
+          visibleChatsList.length === 0 ? (
             <div className="p-8 text-center text-zinc-500 text-xs">
               No conversations yet. Start a chat or create a group!
             </div>
           ) : (
-            allChats.map(renderChatCard)
+            visibleChatsList.map(renderChatCard)
+          )
+        )}
+
+        {/* ARCHIVED TAB: Unified Chat Stream for Archived Chats */}
+        {activeFilter === "archived" && (
+          visibleChatsList.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs">
+              No archived chats.
+            </div>
+          ) : (
+            visibleChatsList.map(renderChatCard)
           )
         )}
 

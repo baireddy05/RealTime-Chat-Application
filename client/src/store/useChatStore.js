@@ -30,6 +30,20 @@ export const useChatStore = create((set, get) => ({
   // 8 Enhanced Features state
   unreadCounts: {}, // { [chatId]: number }
   lastMessages: {}, // { [chatId]: messageObj }
+  drafts: (() => {
+    try {
+      return JSON.parse(localStorage.getItem("pulse-chat-drafts") || "{}");
+    } catch {
+      return {};
+    }
+  })(), // { [chatId]: string }
+  archivedChats: (() => {
+    try {
+      return JSON.parse(localStorage.getItem("pulse-archived-chats") || "[]");
+    } catch {
+      return [];
+    }
+  })(), // [chatId]
   disappearingTimer: null, // null, 5, 60, 3600, 86400 (seconds)
   scheduledMessages: [],
   networkStatuses: [],
@@ -260,6 +274,43 @@ export const useChatStore = create((set, get) => ({
       console.error(error);
     } finally {
       set({ isUsersLoading: false });
+    }
+  },
+
+  setDraft: (chatId, text) => {
+    set((state) => {
+      const newDrafts = { ...state.drafts };
+      if (!text || text.trim() === "") {
+        delete newDrafts[chatId];
+      } else {
+        newDrafts[chatId] = text;
+      }
+      try {
+        localStorage.setItem("pulse-chat-drafts", JSON.stringify(newDrafts));
+      } catch (e) {
+        console.error("Failed to save draft", e);
+      }
+      return { drafts: newDrafts };
+    });
+  },
+
+  toggleArchiveChat: async (chatId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/archive/${chatId}`);
+      set((state) => {
+        let newArchived = [...state.archivedChats];
+        if (newArchived.includes(chatId)) {
+          newArchived = newArchived.filter((id) => id !== chatId);
+        } else {
+          newArchived.push(chatId);
+        }
+        localStorage.setItem("pulse-archived-chats", JSON.stringify(newArchived));
+        return { archivedChats: newArchived };
+      });
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
     }
   },
 

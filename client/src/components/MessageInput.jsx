@@ -63,6 +63,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isTypingPulse, setIsTypingPulse] = useState(false);
   const [isWhisperMode, setIsWhisperMode] = useState(false);
+  const [isHD, setIsHD] = useState(false);
   const pulseTimeoutRef = useRef(null);
 
   // Mobile Back Navigation handlers for input popups and previews
@@ -128,6 +129,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setEditingMessage,
     disappearingTimer,
     setDisappearingTimer,
+    drafts,
+    setDraft,
   } = useChatStore();
   const { authUser, socket } = useAuthStore();
 
@@ -156,15 +159,30 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     return () => window.removeEventListener("pulse:focus-input", handleFocus);
   }, []);
 
-  // Close popup menus and reset attachments when switching chats
+  // Close popup menus, reset attachments, and load draft when switching chats
   useEffect(() => {
     queueMicrotask(() => {
       setShowAttachMenu(false);
       setShowMediaPicker(false);
       setImagePreview(null);
       setDocumentFile(null);
+      
+      if (selectedChat?.id && !editingMessage) {
+        const savedDraft = drafts[selectedChat.id];
+        setText(savedDraft || "");
+      }
     });
   }, [selectedChat?.id]);
+
+  // Save draft on text change
+  useEffect(() => {
+    if (selectedChat?.id && !editingMessage && !isSending) {
+      const timeout = setTimeout(() => {
+        setDraft(selectedChat.id, text);
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [text, selectedChat?.id, editingMessage, setDraft, isSending]);
 
   // Global outside click handler to close popups
   useEffect(() => {
@@ -323,6 +341,51 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const removeDocument = () => {
     setDocumentFile(null);
     if (documentInputRef.current) documentInputRef.current.value = "";
+  };
+
+  const compressImage = (file, hd) => {
+    return new Promise((resolve) => {
+      if (hd) return resolve(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1280;
+          const MAX_HEIGHT = 1280;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          // if already small enough, just return original
+          if (width === img.width && height === img.height) {
+             return resolve(file);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            const newFile = new File([blob], file.name, { type: "image/jpeg" });
+            resolve(newFile);
+          }, "image/jpeg", 0.7);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const uploadToCloudinary = async (file) => {
@@ -511,6 +574,9 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
     
     setText("");
+    if (selectedChat?.id) {
+      setDraft(selectedChat.id, "");
+    }
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
@@ -528,7 +594,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
     if (currentImage) {
       setIsUploading(true);
-      imageUrl = await uploadToCloudinary(currentImage.file);
+      const finalFile = await compressImage(currentImage.file, isHD);
+      imageUrl = await uploadToCloudinary(finalFile);
       setIsUploading(false);
     }
 
@@ -669,7 +736,21 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <X size={10} />
             </button>
           </div>
-          <span className="text-xs text-theme-muted pr-2">Photo attached</span>
+          <div className="flex flex-col gap-1 pr-2">
+            <span className="text-xs text-theme-muted font-medium">Photo attached</span>
+            <button
+              type="button"
+              onClick={() => setIsHD(!isHD)}
+              className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide transition-all shadow-sm ${
+                isHD 
+                  ? "bg-accent-primary text-white ring-1 ring-accent-primary"
+                  : "bg-black/10 text-zinc-500 dark:bg-white/10 dark:text-zinc-400 hover:bg-black/20 dark:hover:bg-white/20"
+              }`}
+              title={isHD ? "Sending in High Quality" : "Sending compressed"}
+            >
+              HD
+            </button>
+          </div>
         </div>
       )}
 
