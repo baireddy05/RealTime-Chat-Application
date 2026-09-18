@@ -502,7 +502,6 @@ export const useChatStore = create((set, get) => ({
   reactToMessage: async (messageId, emoji) => {
     try {
       const res = await axiosInstance.post(`/chat/${messageId}/react`, { emoji });
-      // Optimistic update
       const { messages } = get();
       const updatedMessages = messages.map((m) =>
         m._id === messageId ? { ...m, reactions: res.data.reactions } : m
@@ -510,6 +509,27 @@ export const useChatStore = create((set, get) => ({
       set({ messages: updatedMessages });
     } catch (error) {
       console.error("Error reacting to message:", error);
+    }
+  },
+
+  votePoll: async (messageId, optionIndex) => {
+    try {
+      const res = await axiosInstance.post(`/chat/${messageId}/vote`, { optionIndex });
+      const { messages } = get();
+      const updatedMessages = messages.map((m) =>
+        m._id === messageId ? { ...m, poll: res.data.poll } : m
+      );
+      set({ messages: updatedMessages });
+    } catch (error) {
+      console.error("Error voting on poll:", error);
+    }
+  },
+
+  viewWhisper: async (messageId) => {
+    try {
+      await axiosInstance.post(`/chat/${messageId}/whisper`);
+    } catch (error) {
+      console.error("Error viewing whisper:", error);
     }
   },
 
@@ -1057,6 +1077,24 @@ export const useChatStore = create((set, get) => ({
       const { messages } = get();
       const updated = messages.map((m) =>
         m._id === messageId ? { ...m, reactions } : m
+      );
+      set({ messages: updated });
+    });
+
+    // Real-time polls
+    socket.on("pollUpdated", ({ messageId, poll }) => {
+      const { messages } = get();
+      const updated = messages.map((m) =>
+        m._id === messageId ? { ...m, poll } : m
+      );
+      set({ messages: updated });
+    });
+
+    // Message Deleted
+    socket.on("messageDeleted", ({ messageId }) => {
+      const { messages } = get();
+      const updated = messages.map((m) =>
+        m._id === messageId ? { ...m, isDeleted: true, text: "This whisper has vanished.", image: null, file: null, audio: null } : m
       );
       set({ messages: updated });
     });

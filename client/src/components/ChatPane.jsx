@@ -132,6 +132,8 @@ const ChatPane = ({ onBack }) => {
   );
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [droppedFile, setDroppedFile] = useState(null);
+  const [selectedMessageIds, setSelectedMessageIds] = useState([]);
+  const isSelectionMode = selectedMessageIds.length > 0;
   const dragCounterRef = useRef(0);
 
   // Mobile Back Navigation handlers for ChatPane overlays
@@ -146,6 +148,8 @@ const ChatPane = ({ onBack }) => {
   useBackHandler(showChatOptions, () => setShowChatOptions(false), "chat-dropdown-options");
   useBackHandler(!!openMenuMessageId, () => { setOpenMenuMessageId(null); setMenuAnchor(null); }, "chat-message-options");
   useBackHandler(!!fullReactionPickerMsgId, () => setFullReactionPickerMsgId(null), "chat-reaction-picker");
+
+  useBackHandler(isSelectionMode, () => setSelectedMessageIds([]), "chat-selection-mode");
 
   const scrollerElementRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -333,6 +337,7 @@ const ChatPane = ({ onBack }) => {
       setActivePickerId(null);
       setFullReactionPickerMsgId(null);
       setIsDraggingOver(false);
+      setSelectedMessageIds([]);
       dragCounterRef.current = 0;
     }
   }, [selectedChat?.id]);
@@ -953,6 +958,49 @@ const ChatPane = ({ onBack }) => {
       )}
       </div>
 
+      {/* Bulk Action Header for Selection Mode */}
+      {isSelectionMode && (
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 xl:px-6 py-3 bg-surface-container-highest backdrop-blur-xl border-b border-outline-variant/20 shadow-md animate-slideDown">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSelectedMessageIds([])}
+              className="p-1.5 rounded-full hover:bg-surface-container-high transition-colors"
+              title="Cancel Selection"
+            >
+              <X size={20} className="text-on-surface" />
+            </button>
+            <span className="font-semibold text-on-surface">
+              {selectedMessageIds.length} Selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Future bulk forward logic
+                setSelectedMessageIds([]);
+              }}
+              className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface transition-colors flex items-center gap-2"
+              title="Forward Selected"
+            >
+              <Forward size={18} />
+              <span className="hidden sm:inline text-sm font-medium">Forward</span>
+            </button>
+            <button
+              onClick={() => {
+                // Delete all selected
+                selectedMessageIds.forEach(id => handleDelete(id));
+                setSelectedMessageIds([]);
+              }}
+              className="p-2 rounded-lg hover:bg-error/20 text-error transition-colors flex items-center gap-2"
+              title="Delete Selected"
+            >
+              <Trash2 size={18} />
+              <span className="hidden sm:inline text-sm font-medium">Delete</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Pinned Message Banner (Stitch Specification) */}
       {currentPinned && (
         <div className="flex items-center justify-between px-4 xl:px-6 py-2 bg-surface-container-high/70 backdrop-blur-md border-b border-outline-variant/15 shadow-sm z-20">
@@ -1058,6 +1106,13 @@ const ChatPane = ({ onBack }) => {
                   downloadFile={downloadFile}
                   scrollToMessage={scrollToMessage}
                   getMenuPositionStyle={getMenuPositionStyle}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedMessageIds.includes(message._id)}
+                  toggleSelection={(id) => {
+                    setSelectedMessageIds(prev => 
+                      prev.includes(id) ? prev.filter(mid => mid !== id) : [...prev, id]
+                    );
+                  }}
                 />
               ))}
               {/* Real-time Incoming Typing Indicator Speech Bubble */}
@@ -1144,7 +1199,14 @@ const ChatPane = ({ onBack }) => {
       )}
 
       <MessageInput droppedFile={droppedFile} onClearDroppedFile={() => setDroppedFile(null)} />
-      {activeImage && <ImageModal imageUrl={activeImage} onClose={() => setActiveImage(null)} />}
+      {activeImage && (
+        <ImageModal
+          imageUrl={activeImage}
+          images={messages.filter(m => m.image && !m.isDeleted).map(m => m.image)}
+          initialIndex={messages.filter(m => m.image && !m.isDeleted).findIndex(m => m.image === activeImage)}
+          onClose={() => setActiveImage(null)}
+        />
+      )}
 
       {/* Delete confirmation */}
       {messageToDelete && (

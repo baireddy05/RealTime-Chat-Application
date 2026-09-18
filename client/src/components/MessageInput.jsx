@@ -25,6 +25,7 @@ import ImageModal from "./ImageModal";
 const GifPicker = lazy(() => import("./GifPicker"));
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import ContactModal from "./ContactModal";
+import CreatePollModal from "./CreatePollModal";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -55,11 +56,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showScheduleMenu, setShowScheduleMenu] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(null);
   const [customScheduleDate, setCustomScheduleDate] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isTypingPulse, setIsTypingPulse] = useState(false);
+  const [isWhisperMode, setIsWhisperMode] = useState(false);
   const pulseTimeoutRef = useRef(null);
 
   // Mobile Back Navigation handlers for input popups and previews
@@ -552,9 +555,15 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         senderName: currentReply.senderId?.username || currentReply.senderName || "User",
         text: currentReply.decryptedText || currentReply.text || (currentReply.image ? "📷 Photo" : currentReply.file ? `📎 ${currentReply.file.name}` : "Attachment"),
         image: currentReply.image || null,
+        image: currentReply.image || null,
         file: currentReply.file || null,
       } : undefined,
+      isWhisper: isWhisperMode,
     });
+    
+    // Reset whisper mode
+    if (isWhisperMode) setIsWhisperMode(false);
+
     // Fire after React state updates the DOM
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
@@ -883,6 +892,32 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <span>Schedule Message</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsWhisperMode(!isWhisperMode);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${isWhisperMode ? 'bg-red-500/20 text-red-500' : 'bg-pink-500/20 text-pink-500'}`}>
+              <span className="material-symbols-outlined text-[15px]">{isWhisperMode ? "visibility_off" : "visibility"}</span>
+            </div>
+            <span>{isWhisperMode ? "Whisper Mode (ON)" : "Send as Whisper"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowPollModal(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+              <span className="material-symbols-outlined text-sm">poll</span>
+            </div>
+            <span>Poll</span>
+          </button>
         </div>
       )}
 
@@ -1032,6 +1067,18 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         />
       )}
 
+      {showPollModal && (
+        <CreatePollModal
+          isOpen={showPollModal}
+          onClose={() => setShowPollModal(false)}
+          onSubmit={async (pollData) => {
+            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            await sendMessage({ text: "", poll: pollData });
+            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+          }}
+        />
+      )}
+
       {/* Voice Recording Bar UI */}
       {isRecording ? (
         <div className="flex items-center justify-between bg-[var(--glass-surface)] border border-red-500/30 rounded-full px-4 py-2 shadow-glass animate-fadeIn">
@@ -1144,6 +1191,11 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                   }
                 }}
               />
+              {isWhisperMode && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center pointer-events-none" title="Whisper Mode ON">
+                  <span className="material-symbols-outlined text-[14px]">visibility_off</span>
+                </div>
+              )}
               {text.length > 0 && (
                 <span
                   aria-hidden="true"

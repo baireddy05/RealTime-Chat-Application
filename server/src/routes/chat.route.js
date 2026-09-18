@@ -22,6 +22,8 @@ import {
   getThreadReplies,
   getMessageReceipts,
   proxyDownloadFile,
+  votePoll,
+  viewWhisper,
 } from "../controllers/chat.controller.js";
 
 const router = express.Router();
@@ -46,6 +48,8 @@ router.post("/send", protectRoute, sendMessage);
 router.post("/send/:id", protectRoute, sendMessage);
 
 router.post("/:messageId/react", protectRoute, reactToMessage);
+router.post("/:messageId/vote", protectRoute, votePoll);
+router.post("/:messageId/whisper", protectRoute, viewWhisper);
 router.post("/:id/read", protectRoute, markMessagesAsRead);
 
 router.put("/message/:messageId", protectRoute, editMessage);

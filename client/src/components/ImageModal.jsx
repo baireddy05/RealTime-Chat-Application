@@ -14,11 +14,18 @@ import {
   Send,
   Loader2,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { downloadFile } from "../lib/download";
 
-const ImageModal = ({ imageUrl, onClose }) => {
+const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
+  const isGallery = images.length > 0;
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  
+  const currentImageUrl = isGallery ? images[currentIndex] : imageUrl;
+
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [isForwardOpen, setIsForwardOpen] = useState(false);
@@ -40,6 +47,16 @@ const ImageModal = ({ imageUrl, onClose }) => {
           onClose();
         }
       }
+      if (isGallery && !isForwardOpen) {
+        if (e.key === "ArrowLeft") {
+          setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+          handleReset();
+        }
+        if (e.key === "ArrowRight") {
+          setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+          handleReset();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -58,7 +75,7 @@ const ImageModal = ({ imageUrl, onClose }) => {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      await downloadFile(imageUrl, `photo-${Date.now()}.png`);
+      await downloadFile(currentImageUrl, `photo-${Date.now()}.png`);
     } catch (err) {
       console.warn("Download failed:", err);
     } finally {
@@ -71,7 +88,7 @@ const ImageModal = ({ imageUrl, onClose }) => {
     setIsForwarding(true);
     try {
       const res = await forwardMessage({
-        image: imageUrl,
+        image: currentImageUrl,
         text: caption.trim(),
         targetChat: selectedTarget,
       });
@@ -198,23 +215,48 @@ const ImageModal = ({ imageUrl, onClose }) => {
 
       {/* Main Image Stage */}
       <div
-        className="w-full h-full flex items-center justify-center p-4 md:p-8 overflow-hidden cursor-grab active:cursor-grabbing"
+        className="relative w-full h-[85vh] flex items-center justify-center p-4 overflow-hidden select-none"
         onClick={(e) => {
           if (e.target === e.currentTarget && !isForwardOpen) {
             onClose();
           }
         }}
       >
+        {isGallery && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+              handleReset();
+            }}
+            className="absolute left-4 z-10 w-12 h-12 flex items-center justify-center rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:scale-110 active:scale-95 transition-all shadow-lg backdrop-blur-md"
+          >
+            <ChevronLeft size={32} />
+          </button>
+        )}
+
         <img
-          src={imageUrl}
-          alt="Preview Modal"
+          src={currentImageUrl}
+          alt="Full size view"
+          className="max-w-full max-h-full object-contain drop-shadow-2xl transition-transform duration-200 ease-out will-change-transform"
           style={{
             transform: `scale(${scale}) rotate(${rotation}deg)`,
-            transition: "transform 0.25s cubic-bezier(0.2, 0, 0, 1)",
+            cursor: scale > 1 ? "grab" : "default",
           }}
-          className="max-h-[75vh] md:max-h-[82vh] max-w-[95vw] md:max-w-[85vw] object-contain rounded-2xl shadow-2xl select-none"
-          draggable={false}
         />
+
+        {isGallery && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+              handleReset();
+            }}
+            className="absolute right-4 z-10 w-12 h-12 flex items-center justify-center rounded-full bg-black/50 text-white/90 hover:bg-black/70 hover:scale-110 active:scale-95 transition-all shadow-lg backdrop-blur-md"
+          >
+            <ChevronRight size={32} />
+          </button>
+        )}
       </div>
 
       {/* Forwarding Modal Dialog */}

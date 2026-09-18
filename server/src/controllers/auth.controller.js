@@ -124,7 +124,7 @@ export const checkAuth = (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { username, profilePic, bio, status, readReceipts } = req.body;
+    const { username, profilePic, bio, status, readReceipts, chatPreferences } = req.body;
     const userId = req.user._id;
 
     if (username) {
@@ -142,6 +142,7 @@ export const updateProfile = async (req, res) => {
         ...(bio !== undefined && { bio }),
         ...(status !== undefined && { status }),
         ...(readReceipts !== undefined && { readReceipts }),
+        ...(chatPreferences !== undefined && { chatPreferences }),
       },
       { new: true }
     ).select("-password").lean();

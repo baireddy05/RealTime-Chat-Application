@@ -266,6 +266,8 @@ export const sendMessage = async (req, res) => {
       parentMessageId,
       isEncrypted,
       isSticker,
+      poll,
+      isWhisper,
     } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
@@ -358,6 +360,8 @@ export const sendMessage = async (req, res) => {
         parentMessageId: parentMessageId || null,
         isEncrypted: Boolean(isEncrypted),
         isSticker: Boolean(isSticker),
+        poll: poll || null,
+        isWhisper: Boolean(isWhisper),
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -385,6 +389,8 @@ export const sendMessage = async (req, res) => {
         parentMessageId: parentMessageId || null,
         isEncrypted: Boolean(isEncrypted),
         isSticker: Boolean(isSticker),
+        poll: poll || null,
+        isWhisper: Boolean(isWhisper),
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -596,6 +602,113 @@ export const markMessagesAsRead = async (req, res) => {
     res.status(200).json({ success: true });
   } catch (error) {
     console.error("Error in markMessagesAsRead:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const votePoll = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { optionIndex } = req.body;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message || !message.poll) {
+      return res.status(404).json({ error: "Poll not found" });
+    }
+
+    const hasVotedAny = message.poll.options.some((opt) => opt.votes.includes(userId));
+
+    if (!message.poll.multipleAnswers) {
+      // Remove previous vote if single answer
+      message.poll.options.forEach((opt) => {
+        opt.votes = opt.votes.filter((id) => id.toString() !== userId.toString());
+      });
+    }
+
+    const option = message.poll.options[optionIndex];
+    if (!option) {
+      return res.status(400).json({ error: "Invalid option index" });
+    }
+
+    // Toggle vote logic
+    const existingVoteIndex = option.votes.findIndex((id) => id.toString() === userId.toString());
+    if (existingVoteIndex !== -1) {
+      option.votes.splice(existingVoteIndex, 1);
+    } else {
+      option.votes.push(userId);
+    }
+
+    await message.save();
+    await message.populate("senderId", "username profilePic");
+
+    const targetId = message.roomId ? message.roomId.toString() : (
+      message.senderId._id.toString() === userId.toString() ? message.receiverId.toString() : message.senderId._id.toString()
+    );
+
+    // Broadcast updated poll
+    io.to(targetId).emit("pollUpdated", {
+      messageId: message._id,
+      poll: message.poll
+    });
+    // Send to oneself if DM
+    if (!message.roomId) {
+      io.to(userId.toString()).emit("pollUpdated", {
+        messageId: message._id,
+        poll: message.poll
+      });
+    }
+
+    res.status(200).json({ messageId: message._id, poll: message.poll });
+  } catch (error) {
+    console.error("Error in votePoll:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const viewWhisper = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message || !message.isWhisper) {
+      return res.status(404).json({ error: "Whisper not found" });
+    }
+
+    if (message.isDeleted) {
+      return res.status(400).json({ error: "Whisper already viewed" });
+    }
+
+    // Mark as viewed/deleted immediately
+    message.isDeleted = true;
+    message.text = "This whisper has vanished.";
+    message.image = null;
+    message.audio = null;
+    message.file = null;
+    
+    await message.save();
+
+    const targetId = message.roomId ? message.roomId.toString() : (
+      message.senderId.toString() === userId.toString() ? message.receiverId.toString() : message.senderId.toString()
+    );
+
+    // Broadcast deletion
+    io.to(targetId).emit("messageDeleted", {
+      messageId: message._id,
+      chatId: targetId
+    });
+    
+    if (!message.roomId) {
+      io.to(userId.toString()).emit("messageDeleted", {
+        messageId: message._id,
+        chatId: message.senderId.toString() === userId.toString() ? message.receiverId.toString() : message.senderId.toString()
+      });
+    }
+
+    res.status(200).json({ success: true, messageId: message._id });
+  } catch (error) {
+    console.error("Error in viewWhisper:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -147,7 +147,21 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    poll: {
+      question: String,
+      options: [
+        {
+          text: String,
+          votes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
+        }
+      ],
+      multipleAnswers: { type: Boolean, default: false }
+    },
     isEncrypted: {
+      type: Boolean,
+      default: false,
+    },
+    isWhisper: {
       type: Boolean,
       default: false,
     },

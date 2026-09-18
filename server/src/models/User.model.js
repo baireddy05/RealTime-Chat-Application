@@ -39,6 +39,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    chatPreferences: {
+      type: Map,
+      of: new mongoose.Schema({
+        wallpaper: String,
+        theme: String,
+      }, { _id: false }),
+      default: {},
+    },
   },
   { timestamps: true }
 );

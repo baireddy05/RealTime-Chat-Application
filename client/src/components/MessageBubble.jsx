@@ -1,4 +1,4 @@
-import { memo, Fragment, useRef } from "react";
+import { memo, Fragment, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
@@ -7,6 +7,7 @@ import AudioMessagePlayer from "./AudioMessagePlayer";
 import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import { isOnlyEmojis, EmojiSpan } from "../lib/emoji";
+import { useChatStore } from "../store/useChatStore";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
@@ -90,7 +91,10 @@ const MessageBubble = memo(({
   downloadingFileId,
   downloadFile,
   scrollToMessage,
-  getMenuPositionStyle
+  getMenuPositionStyle,
+  isSelectionMode,
+  isSelected,
+  toggleSelection
 }) => {
   const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
   const sender = message.senderId;
@@ -100,6 +104,7 @@ const MessageBubble = memo(({
   const longPressTimerRef = useRef(null);
   const touchStartPosRef = useRef({ x: 0, y: 0 });
   const isLongPressTriggeredRef = useRef(false);
+  const [isViewingWhisper, setIsViewingWhisper] = useState(false);
 
   const openOptionsMenuAtElement = (element) => {
     if (message.isDeleted) return;
@@ -137,6 +142,13 @@ const MessageBubble = memo(({
           window.navigator.vibrate(30);
         } catch {}
       }
+      
+      // If we are not in selection mode, enter selection mode on long press
+      if (!isSelectionMode && typeof toggleSelection === 'function') {
+        toggleSelection(message._id);
+        return;
+      }
+      
       openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
     }, 420);
   };
@@ -168,6 +180,12 @@ const MessageBubble = memo(({
     if (message.isDeleted) return;
     e.preventDefault();
     e.stopPropagation();
+    
+    if (!isSelectionMode && typeof toggleSelection === 'function') {
+      toggleSelection(message._id);
+      return;
+    }
+    
     openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
   };
   const prevMessage = index > 0 ? currentList[index - 1] : null;
@@ -215,6 +233,7 @@ const MessageBubble = memo(({
   const isSticker = message.isSticker || Boolean(message.image && (message.image.includes("/stickers/") || message.image.includes("giphy-preview.gif") || message.image.includes("sticker")));
   const isStickerOnly = !message.isDeleted && isSticker && (!message.text || !message.text.trim()) && !message.file && !message.audio && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned;
   const isTransparentBubble = isJustEmoji || isStickerOnly;
+  const isVisuallyDeleted = message.isDeleted && !isViewingWhisper;
 
   return (
     <Fragment key={message._id}>
@@ -238,7 +257,7 @@ const MessageBubble = memo(({
             isSameSenderAsPrev ? "mt-1" : "mt-3.5"
           } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
         >
-          {!isMine && selectedChat.type === "room" && (
+          {!isMine && selectedChat.type === "room" && !isSelectionMode && (
             <div className="w-7 h-7 flex-shrink-0 self-end mb-0.5 mr-2">
               {!isSameSenderAsNext ? (
                 <img
@@ -252,8 +271,21 @@ const MessageBubble = memo(({
             </div>
           )}
 
-          <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[85%] md:max-w-[70%] min-w-0`}>
-            <div className={`flex items-center gap-1.5 group ${isMine ? "flex-row-reverse" : "flex-row"} max-w-full min-w-0`}>
+          {isSelectionMode && (
+            <div 
+              className="flex items-center justify-center mr-3 self-center cursor-pointer"
+              onClick={() => toggleSelection(message._id)}
+            >
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                isSelected ? "bg-accent-primary border-accent-primary" : "border-outline hover:border-accent-primary/50"
+              }`}>
+                {isSelected && <Check size={14} className="text-white" strokeWidth={3} />}
+              </div>
+            </div>
+          )}
+
+          <div className={`flex flex-col ${isMine && !isSelectionMode ? "items-end" : "items-start"} max-w-[85%] md:max-w-[70%] min-w-0 flex-1`}>
+            <div className={`flex items-center gap-1.5 group ${isMine && !isSelectionMode ? "flex-row-reverse" : "flex-row"} max-w-full min-w-0`}>
               {/* Speech Bubble */}
               <div 
                 ref={bubbleRef}
@@ -263,13 +295,19 @@ const MessageBubble = memo(({
                 onTouchCancel={handleTouchEnd}
                 onContextMenu={handleContextMenu}
                 onClickCapture={(e) => {
+                  if (isSelectionMode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleSelection(message._id);
+                    return;
+                  }
                   if (isLongPressTriggeredRef.current) {
                     e.preventDefault();
                     e.stopPropagation();
                   }
                 }}
                 style={
-                  !message.isDeleted
+                  !isVisuallyDeleted
                     ? isTransparentBubble
                       ? { background: 'transparent', color: isMine ? 'var(--bubble-outgoing-text)' : 'var(--bubble-incoming-text)', boxShadow: 'none', border: 'none' }
                       : isMine
@@ -340,10 +378,44 @@ const MessageBubble = memo(({
                       </div>
                     </div>
                   )}
-                  {message.isDeleted ? (
-                    <div className="flex items-center gap-2 text-[12px] py-0.5"><Ban size={12} /> This message was deleted</div>
+                  {isVisuallyDeleted ? (
+                    <div className="flex items-center gap-2 text-[12px] py-0.5">
+                      <Ban size={12} /> {message.text === "This whisper has vanished." ? "This whisper has vanished." : "This message was deleted"}
+                    </div>
+                  ) : message.isWhisper && !isMine && !isViewingWhisper ? (
+                    <div 
+                      className="flex flex-col items-center justify-center p-6 gap-3 min-w-[200px] cursor-pointer active:scale-95 transition-transform select-none"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setIsViewingWhisper(true);
+                        useChatStore.getState().viewWhisper(message._id);
+                      }}
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                        setIsViewingWhisper(false);
+                      }}
+                      onPointerCancel={(e) => {
+                        e.stopPropagation();
+                        setIsViewingWhisper(false);
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                      }}
+                    >
+                      <div className="w-14 h-14 rounded-full bg-accent-primary/20 text-accent-primary flex items-center justify-center animate-pulse">
+                        <span className="material-symbols-outlined text-[32px]">visibility_off</span>
+                      </div>
+                      <span className="text-xs font-semibold text-center opacity-80">
+                        Press and hold to<br/>reveal whisper
+                      </span>
+                    </div>
                   ) : (
                     <>
+                      {message.isWhisper && isMine && (
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold opacity-60 mb-1">
+                          <span className="material-symbols-outlined text-[12px]">visibility_off</span> Whisper
+                        </div>
+                      )}
                       {message.image && (
                         isStickerOnly ? (
                           <div className="relative group/sticker my-0.5 flex flex-col items-end">
@@ -446,6 +518,44 @@ const MessageBubble = memo(({
                         <ContactCard contact={message.contact} isMine={isMine} />
                       )}
                       {message.audio && <div className="mb-0.5"><AudioMessagePlayer audioUrl={message.audio} isMine={isMine} /></div>}
+                      {message.poll && (
+                        <div className={`mt-1 mb-2 p-3 rounded-2xl border ${isMine ? 'bg-black/10 border-white/10 text-white' : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-zinc-900 dark:text-zinc-100'}`}>
+                          <div className="flex items-start gap-2 mb-3">
+                            <span className="material-symbols-outlined text-lg mt-0.5">poll</span>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold leading-tight">{message.poll.question}</span>
+                              <span className="text-[10px] opacity-70 mt-0.5 select-none">{message.poll.multipleAnswers ? "Select one or more" : "Select one"}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {message.poll.options.map((opt, i) => {
+                              const totalVotes = message.poll.options.reduce((acc, o) => acc + o.votes.length, 0);
+                              const percentage = totalVotes === 0 ? 0 : Math.round((opt.votes.length / totalVotes) * 100);
+                              const hasVoted = opt.votes.includes(authUser._id);
+                              return (
+                                <div key={i} className="relative overflow-hidden rounded-xl bg-black/10 dark:bg-white/10 border border-transparent hover:border-black/20 dark:hover:border-white/20 transition-colors cursor-pointer" onClick={() => {
+                                  useChatStore.getState().votePoll(message._id, i);
+                                }}>
+                                  <div className="absolute top-0 left-0 bottom-0 bg-accent-primary/30 transition-all duration-500 ease-out" style={{ width: `${percentage}%` }} />
+                                  <div className="relative z-10 flex items-center justify-between p-2.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-4 h-4 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${hasVoted ? 'border-accent-primary bg-accent-primary text-white' : 'border-current opacity-50'}`}>
+                                        {hasVoted && <span className="material-symbols-outlined text-[10px] font-bold">check</span>}
+                                      </div>
+                                      <span className="text-xs font-semibold">{opt.text}</span>
+                                    </div>
+                                    {totalVotes > 0 && (
+                                      <div className="flex items-center gap-1.5 opacity-80">
+                                        <span className="text-[10px] bg-black/20 dark:bg-white/20 px-1.5 py-0.5 rounded-full">{opt.votes.length}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                       {message.expiresAt && (
                         <div className="mb-1.5 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 shadow-sm animate-pulse">
                           <Flame size={10} />
@@ -498,6 +608,9 @@ const MessageBubble = memo(({
                                 {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
                               </span>
                             )
+                          )}
+                          {message.isEdited && (
+                            <span className="text-[10px] italic opacity-60 ml-1 select-none">(edited)</span>
                           )}
                         </div>
                       )}
