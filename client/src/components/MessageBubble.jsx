@@ -66,7 +66,7 @@ const formatDateDivider = (dateStr) => {
 };
 
 const MessageBubble = memo(({
-  message,
+  message: msgProp,
   index,
   currentList,
   authUser,
@@ -96,6 +96,12 @@ const MessageBubble = memo(({
   isSelected,
   toggleSelection
 }) => {
+  const [isViewingWhisper, setIsViewingWhisper] = useState(false);
+  const [whisperContent, setWhisperContent] = useState(null);
+
+  // Shadow the message prop so we can view the local copy while holding
+  const message = isViewingWhisper && whisperContent ? { ...msgProp, ...whisperContent } : msgProp;
+
   const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
   const sender = message.senderId;
 
@@ -104,7 +110,6 @@ const MessageBubble = memo(({
   const longPressTimerRef = useRef(null);
   const touchStartPosRef = useRef({ x: 0, y: 0 });
   const isLongPressTriggeredRef = useRef(false);
-  const [isViewingWhisper, setIsViewingWhisper] = useState(false);
 
   const openOptionsMenuAtElement = (element) => {
     if (message.isDeleted) return;
@@ -143,12 +148,6 @@ const MessageBubble = memo(({
         } catch {}
       }
       
-      // If we are not in selection mode, enter selection mode on long press
-      if (!isSelectionMode && typeof toggleSelection === 'function') {
-        toggleSelection(message._id);
-        return;
-      }
-      
       openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
     }, 420);
   };
@@ -180,11 +179,6 @@ const MessageBubble = memo(({
     if (message.isDeleted) return;
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!isSelectionMode && typeof toggleSelection === 'function') {
-      toggleSelection(message._id);
-      return;
-    }
     
     openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
   };
@@ -295,15 +289,16 @@ const MessageBubble = memo(({
                 onTouchCancel={handleTouchEnd}
                 onContextMenu={handleContextMenu}
                 onClickCapture={(e) => {
-                  if (isSelectionMode) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleSelection(message._id);
-                    return;
-                  }
                   if (isLongPressTriggeredRef.current) {
                     e.preventDefault();
                     e.stopPropagation();
+                    return;
+                  }
+                  if (isSelectionMode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleSelection(msgProp._id);
+                    return;
                   }
                 }}
                 style={
@@ -387,16 +382,25 @@ const MessageBubble = memo(({
                       className="flex flex-col items-center justify-center p-6 gap-3 min-w-[200px] cursor-pointer active:scale-95 transition-transform select-none"
                       onPointerDown={(e) => {
                         e.stopPropagation();
+                        // Save content so it doesn't vanish instantly from UI when the server deletes it
+                        setWhisperContent({
+                          text: msgProp.decryptedText || msgProp.text,
+                          image: msgProp.image,
+                          audio: msgProp.audio,
+                          file: msgProp.file
+                        });
                         setIsViewingWhisper(true);
-                        useChatStore.getState().viewWhisper(message._id);
+                        useChatStore.getState().viewWhisper(msgProp._id);
                       }}
                       onPointerUp={(e) => {
                         e.stopPropagation();
                         setIsViewingWhisper(false);
+                        setWhisperContent(null);
                       }}
                       onPointerCancel={(e) => {
                         e.stopPropagation();
                         setIsViewingWhisper(false);
+                        setWhisperContent(null);
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -816,6 +820,21 @@ const MessageBubble = memo(({
                               <Forward size={14} className="text-theme-muted" />
                               <span>Forward</span>
                             </button>
+
+                            {typeof toggleSelection === 'function' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toggleSelection(msgProp._id);
+                                  setOpenMenuMessageId(null);
+                                  setMenuAnchor(null);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                              >
+                                <Check size={14} className="text-theme-muted" />
+                                <span>Select Message</span>
+                              </button>
+                            )}
 
                             {isMine && (
                               <button

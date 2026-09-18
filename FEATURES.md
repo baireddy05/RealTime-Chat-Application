@@ -25,6 +25,8 @@ This document serves as the central source of truth for all features currently i
 - **Live Typing Indicators:** Real-time visual feedback when the other person is typing.
 - **Message Formatting:** Rich text formatting.
 - **In-Chat Search:** Search for specific messages inside a conversation.
+- **Interactive Polls:** Create polls with single or multiple answers and see real-time voting results.
+- **Ephemeral Whisper Mode:** Send disappearing messages that vanish permanently after being viewed once by pressing and holding.
 
 ## 3. Advanced Interactions & Threading
 - **Quoted Replies / Threading:** Swipe to reply (`SwipeableMessage.jsx`) or click to quote a specific message.
@@ -34,6 +36,10 @@ This document serves as the central source of truth for all features currently i
 - **Quick Emoji Bar:** Frequently used emojis displayed directly above the message input field.
 - **Pinned Messages:** Pin important messages to the top of the chat.
 - **Typing Shockwave:** Visual ripple animation effects triggered when typing in the input field.
+- **Draft Indicators:** Unsent text is automatically saved as a draft with a visible indicator in the sidebar.
+- **Saved Messages (Self-Chat):** A dedicated channel to send files, notes, and links to yourself.
+- **Archive Chats:** Hide inactive chats from the main inbox into a dedicated "Archived" view.
+- **HD Media Quality Toggle:** Choose whether to send images compressed (for speed) or in High Definition.
 
 ## 4. Media, Files & Rich Content
 - **Drag-and-Drop Files:** Drag files directly into the chat window to upload.
@@ -77,6 +83,7 @@ This document serves as the central source of truth for all features currently i
 - **Desktop/In-App Notifications:** Real-time push notifications for new messages.
 - **Mute / Unmute Chats:** Ability to silence notifications for specific chats or groups.
 - **Mobile Swipe Gestures:** Swipeable navigation and interactions for a native app feel on mobile devices.
+- **Floating "Unread" & Smart Scroll Button:** A floating button that appears when scrolled up, displaying the unread message count and smoothly scrolling back to the latest messages.
 - **PWA Support:** Install the application as a Progressive Web App directly to the user's home screen.
 - **App Settings:** Configure general application preferences.
 - **API Health Monitoring:** Dedicated endpoints for uptime monitoring and cron-job keep-alives.

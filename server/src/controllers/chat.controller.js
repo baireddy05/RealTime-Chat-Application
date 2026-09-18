@@ -617,7 +617,12 @@ export const votePoll = async (req, res) => {
       return res.status(404).json({ error: "Poll not found" });
     }
 
-    const hasVotedAny = message.poll.options.some((opt) => opt.votes.includes(userId));
+    const option = message.poll.options[optionIndex];
+    if (!option) {
+      return res.status(400).json({ error: "Invalid option index" });
+    }
+
+    const hasVotedThisOption = option.votes.some((id) => id.toString() === userId.toString());
 
     if (!message.poll.multipleAnswers) {
       // Remove previous vote if single answer
@@ -626,16 +631,15 @@ export const votePoll = async (req, res) => {
       });
     }
 
-    const option = message.poll.options[optionIndex];
-    if (!option) {
-      return res.status(400).json({ error: "Invalid option index" });
-    }
-
-    // Toggle vote logic
-    const existingVoteIndex = option.votes.findIndex((id) => id.toString() === userId.toString());
-    if (existingVoteIndex !== -1) {
-      option.votes.splice(existingVoteIndex, 1);
+    if (hasVotedThisOption) {
+      // If it's a multiple answer poll, we remove it here.
+      // If it's single answer, it was already removed by the filter above.
+      if (message.poll.multipleAnswers) {
+        const existingVoteIndex = option.votes.findIndex((id) => id.toString() === userId.toString());
+        if (existingVoteIndex !== -1) option.votes.splice(existingVoteIndex, 1);
+      }
     } else {
+      // Add the vote
       option.votes.push(userId);
     }
 
