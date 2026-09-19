@@ -129,6 +129,7 @@ const ChatPane = ({ onBack }) => {
     isScheduledOpen, setIsScheduledOpen,
     scheduledMessages, getScheduledMessages,
     archivedChats, toggleArchiveChat,
+    isThreadOpen, closeThread,
   } = useChatStore();
   const { authUser, onlineUsers } = useAuthStore();
   const { startCall } = useCallStore();
@@ -139,6 +140,7 @@ const ChatPane = ({ onBack }) => {
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [activePickerId, setActivePickerId] = useState(null);
   const [downloadingFileId, setDownloadingFileId] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
