@@ -15,7 +15,6 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
 import { useFriendStore } from "../store/useFriendStore";
-import { useThemeStore } from "../store/useThemeStore";
 import { usePWAInstall } from "../hooks/usePWAInstall";
 import TypingPulseBackground from "../components/TypingPulseBackground";
 import { useBackHandler, backManager } from "../lib/backNavigation";
@@ -41,7 +40,6 @@ const HomePage = () => {
   const { socket, authUser, logout } = useAuthStore();
   const { initSocketListeners } = useCallStore();
   const { friends, incomingRequests, getFriends, getFriendRequests } = useFriendStore();
-  const { theme, toggleTheme } = useThemeStore();
   const { isInstallable, promptInstall } = usePWAInstall();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -522,8 +520,6 @@ const HomePage = () => {
           onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
           onOpenStatus={() => setIsStatusStoriesOpen(true)}
           onOpenStarred={() => setIsStarredOpen(true)}
-          onToggleTheme={toggleTheme}
-          theme={theme}
           authUser={authUser}
           rawStatus={rawStatus}
           statusEmoji={statusEmoji}

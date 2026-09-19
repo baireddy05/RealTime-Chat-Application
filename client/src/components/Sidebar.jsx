@@ -47,8 +47,6 @@ const Sidebar = ({
   onOpenCreateGroup,
   onOpenStatus,
   onOpenStarred,
-  onToggleTheme,
-  theme,
   statusEmoji = "💻",
   statusCategory = "Coding",
   statusDetail = "Available",
@@ -607,7 +605,7 @@ const Sidebar = ({
               </button>
 
               {showOptionsDropdown && (
-                <div className="absolute right-0 top-9 z-50 w-56 rounded-2xl overflow-hidden bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px]">
+                <div className="absolute right-0 top-9 z-50 w-56 max-w-[calc(100vw-1rem)] rounded-2xl overflow-hidden bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px]">
                   {onOpenProfile && (
                     <button
                       onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
@@ -642,17 +640,6 @@ const Sidebar = ({
                     >
                       <span className="material-symbols-outlined text-[16px] text-accent-primary">install_desktop</span>
                       <span>Install Pulse PWA</span>
-                    </button>
-                  )}
-                  {onToggleTheme && (
-                    <button
-                      onClick={() => { onToggleTheme(); setShowOptionsDropdown(false); }}
-                      className="md:hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">
-                        {theme === "dark" ? "light_mode" : "dark_mode"}
-                      </span>
-                      <span>Switch Theme</span>
                     </button>
                   )}
                   <button
