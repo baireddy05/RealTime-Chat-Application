@@ -10,9 +10,9 @@ export const CHAT_THEME_PRESETS = [
     description: "Adaptive liquid glass with sleek monochromatic bubbles",
     accentColor: "#6366f1",
     bubbleOutgoing: "linear-gradient(135deg, #18181b 0%, #27272a 100%)",
-    bubbleOutgoingDark: "linear-gradient(135deg, #ffffff 0%, #e4e4e7 100%)",
+    bubbleOutgoingDark: "linear-gradient(135deg, #00f0ff 0%, #00d2ff 100%)",
     bubbleOutgoingText: "#ffffff",
-    bubbleOutgoingTextDark: "#09090b",
+    bubbleOutgoingTextDark: "#04080f",
     bubbleIncoming: "rgba(255, 255, 255, 0.95)",
     bubbleIncomingDark: "rgba(255, 255, 255, 0.07)",
     bubbleIncomingText: "#18181b",
@@ -164,6 +164,48 @@ export const getThemeById = (themeId) => {
   return CHAT_THEME_PRESETS.find((t) => t.id === normalizedId) || CHAT_THEME_PRESETS[0];
 };
 
+// Read a live UI-theme CSS variable (set by useThemeStore). Used so the
+// "default" chat theme always matches the active whole-app UI theme instead
+// of hardcoding bubble colors that clash with it.
+const readUiVar = (name, fallback) => {
+  try {
+    if (typeof document === "undefined") return fallback;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const resolveDefaultPreset = (preset, isDark) => {
+  // Fallbacks mirror the signature Neon Cyber dark / monochrome light looks
+  const fallbackOutgoing = isDark
+    ? "linear-gradient(135deg, #00f0ff 0%, #00d2ff 100%)"
+    : preset.bubbleOutgoing;
+  return {
+    id: preset.id,
+    name: preset.name,
+    accentColor: preset.accentColor,
+    bubbleOutgoingGradient: readUiVar("--bubble-outgoing-gradient", fallbackOutgoing),
+    bubbleOutgoingText: readUiVar(
+      "--bubble-outgoing-text",
+      isDark ? "#04080f" : preset.bubbleOutgoingText
+    ),
+    bubbleIncomingSurface: readUiVar(
+      "--bubble-incoming-surface",
+      isDark ? "rgba(255, 255, 255, 0.08)" : preset.bubbleIncoming
+    ),
+    bubbleIncomingText: readUiVar(
+      "--bubble-incoming-text",
+      isDark ? "#f4f4f6" : preset.bubbleIncomingText
+    ),
+    wallpaperGradient: preset.wallpaperGradient || "transparent",
+    hasDoodles: preset.hasDoodles ?? true,
+    customWallpaperUrl: null,
+    wallpaperOpacity: 0.25,
+  };
+};
+
 export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
   if (!themeConfigOrId) {
     return resolveThemeStyles("default", isDark);
@@ -172,6 +214,10 @@ export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
   // If it's a string matching a preset ID
   if (typeof themeConfigOrId === "string") {
     const preset = getThemeById(themeConfigOrId);
+    // "default" follows the active whole-app UI theme (all 10 UI themes)
+    if (preset.id === "default") {
+      return resolveDefaultPreset(preset, isDark);
+    }
     return {
       id: preset.id,
       name: preset.name,
@@ -189,6 +235,21 @@ export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
 
   // If it's a custom theme object
   const preset = getThemeById(themeConfigOrId?.presetId || "default");
+  // A "default"-based custom theme without its own bubble color still
+  // follows the active whole-app UI theme.
+  if (preset.id === "default" && !themeConfigOrId?.customBubbleColor) {
+    const base = resolveDefaultPreset(preset, isDark);
+    return {
+      ...base,
+      id: "custom",
+      name: themeConfigOrId?.name || preset.name,
+      accentColor: themeConfigOrId?.accentColor || preset.accentColor,
+      wallpaperGradient: preset.wallpaperGradient || "transparent",
+      hasDoodles: themeConfigOrId?.hasDoodles ?? preset.hasDoodles,
+      customWallpaperUrl: themeConfigOrId?.customWallpaperUrl || null,
+      wallpaperOpacity: themeConfigOrId?.wallpaperOpacity ?? 0.35,
+    };
+  }
   return {
     id: themeConfigOrId?.presetId || "custom",
     name: themeConfigOrId?.name || preset.name,

@@ -11,6 +11,7 @@ import StatusModal from "../components/StatusModal";
 import StarredDrawer from "../components/StarredDrawer";
 import CreateGroupModal from "../components/CreateGroupModal";
 import SettingsModal from "../components/SettingsModal";
+import PulseLogo from "../components/PulseLogo";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
@@ -348,7 +349,7 @@ const HomePage = () => {
               className="group relative flex items-center justify-center w-12 h-12 hover:scale-105 active:scale-95 transition-all cursor-pointer"
               type="button"
             >
-              <img alt="Pulse Logo" className="w-11 h-11 object-contain logo-squircle drop-shadow-sm transition-transform group-hover:scale-110" src="/logo.png" />
+              <PulseLogo className="w-11 h-11 object-contain drop-shadow-sm transition-transform group-hover:scale-110" />
             <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
               Pulse Home
             </span>
@@ -568,7 +569,7 @@ const HomePage = () => {
               <div className="relative mb-6 flex items-center justify-center">
                 <div className="absolute inset-0 rounded-3xl bg-cyan-500/20 dark:bg-cyan-400/30 blur-2xl opacity-60 animate-pulse" />
                   <div ref={logoRef} className="relative w-28 h-28 flex items-center justify-center z-10 hover:scale-105 transition-transform">
-                    <img src="/logo.png" alt="Pulse" className="w-full h-full object-contain logo-squircle drop-shadow-[0_4px_16px_rgba(0,240,255,0.3)]" />
+                    <PulseLogo alt="Pulse" className="w-full h-full object-contain drop-shadow-[0_4px_16px_rgba(0,240,255,0.3)]" />
                   </div>
               </div>
 

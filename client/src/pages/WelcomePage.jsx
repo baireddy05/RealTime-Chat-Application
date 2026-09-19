@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useThemeStore } from "../store/useThemeStore";
+import PulseLogo from "../components/PulseLogo";
 import {
   Sun,
   Moon,
@@ -84,7 +85,7 @@ const WelcomePage = () => {
       <div className="w-full flex items-center justify-between z-20 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center hover:scale-105 transition-transform">
-            <img src="/logo.png" alt="Pulse" className="w-10 h-10 object-contain logo-squircle drop-shadow-sm" />
+            <PulseLogo alt="Pulse" className="w-10 h-10 object-contain drop-shadow-sm" />
           </div>
           <span className="text-lg font-extrabold tracking-tight text-theme-main">Pulse</span>
         </div>
@@ -113,10 +114,9 @@ const WelcomePage = () => {
         <div className="relative group mb-6 sm:mb-8">
           <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400/40 via-emerald-400/30 to-cyan-500/40 rounded-[2.5rem] sm:rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-90 animate-pulse" />
           <div className="relative w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
-            <img
-              src="/logo.png"
+            <PulseLogo
               alt="Pulse Logo"
-              className="w-full h-full object-contain logo-squircle drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
+              className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
             />
           </div>
         </div>

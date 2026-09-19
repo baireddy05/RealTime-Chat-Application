@@ -117,7 +117,7 @@ const ChatHeader = memo(() => (
 ));
 
 const ChatPane = ({ onBack }) => {
-  const { theme } = useThemeStore();
+  const { theme, uiThemeId: activeUiThemeId } = useThemeStore();
   const {
     messages, getMessages, isMessagesLoading, selectedChat, setSelectedChat,
     subscribeToMessages, unsubscribeFromMessages, reactToMessage, deleteMessage,
@@ -691,7 +691,10 @@ const ChatPane = ({ onBack }) => {
 
   const effectiveTheme = getEffectiveChatTheme(selectedChat?.id);
   const isDarkTheme = theme !== "light";
-  const themeStyles = resolveThemeStyles(effectiveTheme, isDarkTheme);
+  // activeUiThemeId keeps this component subscribed so same-scheme UI theme
+  // switches (e.g. midnight -> abyss) repaint bubbles; the "default" chat
+  // theme inherits live UI-theme bubble styles on every render.
+  const themeStyles = resolveThemeStyles(effectiveTheme, isDarkTheme, activeUiThemeId);
 
   return (
     <div 

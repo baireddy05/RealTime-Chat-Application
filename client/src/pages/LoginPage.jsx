@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
+import PulseLogo from "../components/PulseLogo";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Loader,
@@ -136,10 +137,9 @@ const LoginPage = () => {
           <div className="relative group mb-8">
             <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400/40 via-emerald-400/30 to-cyan-500/40 rounded-[3rem] blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-80" />
             <div className="relative w-36 h-36 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
-              <img
-                src="/logo.png"
+              <PulseLogo
                 alt="Pulse Logo"
-                className="w-full h-full object-contain logo-squircle drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
+                className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
@@ -178,7 +178,7 @@ const LoginPage = () => {
           <div className="w-full max-w-[400px] mx-auto animate-slide-up">
             {/* Mobile Header with Logo */}
             <div className="flex items-center gap-3 mb-6 lg:hidden justify-center">
-              <img src="/logo.png" alt="Pulse Logo" className="w-12 h-12 object-contain logo-squircle drop-shadow" />
+              <PulseLogo className="w-12 h-12 object-contain drop-shadow" />
               <span className="text-2xl font-extrabold tracking-tight text-theme-main">Pulse</span>
             </div>
 
