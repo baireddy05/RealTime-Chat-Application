@@ -1,6 +1,7 @@
 import Message from "../models/Message.model.js";
 import User from "../models/User.model.js";
 import Room from "../models/Room.model.js";
+import Reminder from "../models/Reminder.model.js";
 import mongoose from "mongoose";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 
@@ -1257,13 +1258,108 @@ export const toggleArchiveChat = async (req, res) => {
     await user.save();
     
     res.status(200).json({ 
-      success: true, 
+      success: true,
       chatId,
       archived: !isArchived,
       preferences: user.chatPreferences.get(chatId)
     });
   } catch (error) {
     console.error("Error in toggleArchiveChat: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Message Reminders ("Remind me later") ----
+
+export const createReminder = async (req, res) => {
+  try {
+    const { messageId, remindAt, note } = req.body;
+    const userId = req.user._id;
+
+    if (!messageId || !remindAt) {
+      return res.status(400).json({ error: "messageId and remindAt are required" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ error: "Invalid message id" });
+    }
+    const at = new Date(remindAt);
+    if (isNaN(at.getTime())) {
+      return res.status(400).json({ error: "Invalid reminder time" });
+    }
+    if (at.getTime() <= Date.now()) {
+      return res.status(400).json({ error: "Reminder time must be in the future" });
+    }
+    if (at.getTime() - Date.now() > 365 * 24 * 60 * 60 * 1000) {
+      return res.status(400).json({ error: "Reminder time is too far in the future" });
+    }
+
+    const message = await Message.findById(messageId)
+      .select("roomId senderId receiverId isDeleted")
+      .lean();
+    if (!message || message.isDeleted) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    // Only participants of the conversation may set reminders on it
+    let allowed = false;
+    if (message.roomId) {
+      const room = await Room.findById(message.roomId).select("members").lean();
+      allowed =
+        !!room &&
+        (room.members || []).some((m) => m.toString() === userId.toString());
+    } else {
+      allowed = [message.senderId?.toString(), message.receiverId?.toString()].includes(
+        userId.toString()
+      );
+    }
+    if (!allowed) {
+      return res.status(403).json({ error: "You are not part of this conversation" });
+    }
+
+    const reminder = await Reminder.create({
+      userId,
+      messageId,
+      remindAt: at,
+      note: typeof note === "string" ? note.slice(0, 200) : "",
+    });
+    res.status(201).json(reminder);
+  } catch (error) {
+    console.error("Error in createReminder: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getReminders = async (req, res) => {
+  try {
+    const reminders = await Reminder.find({ userId: req.user._id })
+      .populate({
+        path: "messageId",
+        populate: { path: "senderId", select: "username profilePic" },
+      })
+      .sort({ remindAt: 1 })
+      .limit(100)
+      .lean();
+    res.status(200).json(reminders);
+  } catch (error) {
+    console.error("Error in getReminders: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const cancelReminder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid reminder id" });
+    }
+    const reminder = await Reminder.findOne({ _id: id, userId: req.user._id });
+    if (!reminder) {
+      return res.status(404).json({ error: "Reminder not found" });
+    }
+    await reminder.deleteOne();
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error in cancelReminder: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

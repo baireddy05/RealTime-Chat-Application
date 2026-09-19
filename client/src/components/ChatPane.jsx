@@ -27,6 +27,7 @@ import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
 import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
+import RemindModal from "./RemindModal";
 import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import MessageBubble from "./MessageBubble";
@@ -127,7 +128,6 @@ const ChatPane = ({ onBack }) => {
     isChatThemeOpen, setIsChatThemeOpen, getEffectiveChatTheme,
     isScheduledOpen, setIsScheduledOpen,
     scheduledMessages, getScheduledMessages,
-    openThread, closeThread, isThreadOpen,
     archivedChats, toggleArchiveChat,
   } = useChatStore();
   const { authUser, onlineUsers } = useAuthStore();
@@ -136,8 +136,6 @@ const ChatPane = ({ onBack }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
-  const [hoveredMessageId, setHoveredMessageId] = useState(null);
-  const [activePickerId, setActivePickerId] = useState(null);
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -145,6 +143,7 @@ const ChatPane = ({ onBack }) => {
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [infoModalMessage, setInfoModalMessage] = useState(null);
+  const [remindMessage, setRemindMessage] = useState(null);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(
     notificationManager.hasPermission()
@@ -191,6 +190,7 @@ const ChatPane = ({ onBack }) => {
   useBackHandler(isScheduledOpen, () => setIsScheduledOpen(false), "chat-modal-scheduled");
   useBackHandler(isThreadOpen, () => closeThread(), "chat-drawer-thread");
   useBackHandler(!!infoModalMessage, () => setInfoModalMessage(null), "chat-modal-message-info");
+  useBackHandler(!!remindMessage, () => setRemindMessage(null), "chat-modal-remind");
   useBackHandler(isSearchOpen, () => setIsSearchOpen(false), "chat-search-bar");
   useBackHandler(showChatOptions, () => setShowChatOptions(false), "chat-dropdown-options");
   useBackHandler(!!openMenuMessageId, () => { setOpenMenuMessageId(null); setMenuAnchor(null); }, "chat-message-options");
@@ -231,11 +231,11 @@ const ChatPane = ({ onBack }) => {
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
   const selectedUserId = (selectedChat?.id || selectedChat?._id)?.toString();
   const isUserOnline = selectedChat?.type === "user" && onlineUsersSet.has(selectedUserId);
-  const activeTypers = useMemo(() => {
+  const activeTypers = (() => {
     if (!selectedChat?.id) return [];
     const list = typingUsers[selectedChat.id] || [];
     return list.filter((u) => u && u !== authUser?.username);
-  }, [typingUsers, selectedChat?.id, authUser?.username]);
+  })();
 
   const searchMatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1230,6 +1230,7 @@ const ChatPane = ({ onBack }) => {
                   setEditingMessage={setEditingMessage}
                   deleteMessage={handleDelete}
                   forwardMessage={setForwardingMessage}
+                  setRemindMessage={setRemindMessage}
                   togglePinMessage={togglePinMessage}
                   openMessageInfo={setInfoModalMessage}
                   setActiveImage={setActiveImage}
@@ -1378,6 +1379,7 @@ const ChatPane = ({ onBack }) => {
       {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
       {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
       {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
+      {remindMessage && <RemindModal message={remindMessage} onClose={() => setRemindMessage(null)} />}
 
       {/* Full Reaction Emoji Picker Modal */}
       {fullReactionPickerMsgId && (

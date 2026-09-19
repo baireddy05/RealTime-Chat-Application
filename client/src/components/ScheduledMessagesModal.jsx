@@ -1,19 +1,32 @@
 import { useEffect, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
-import { X, Clock, Trash2, Calendar, Loader } from "lucide-react";
+import { X, Clock, Trash2, Calendar, Loader, BellRing, ExternalLink } from "lucide-react";
 import { isEncryptedMessage } from "../lib/crypto";
 
 const ScheduledMessagesModal = ({ isOpen, onClose }) => {
-  const { selectedChat, scheduledMessages, getScheduledMessages, cancelScheduledMessage } = useChatStore();
+  const {
+    selectedChat,
+    scheduledMessages,
+    getScheduledMessages,
+    cancelScheduledMessage,
+    reminders,
+    getReminders,
+    cancelReminder,
+    jumpToMessage,
+  } = useChatStore();
   const [loading, setLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
+  const [tab, setTab] = useState("scheduled");
 
   useEffect(() => {
     if (isOpen && selectedChat) {
       queueMicrotask(() => setLoading(true));
       getScheduledMessages(selectedChat.id, selectedChat.type).finally(() => setLoading(false));
     }
-  }, [isOpen, selectedChat, getScheduledMessages]);
+    if (isOpen) {
+      getReminders();
+    }
+  }, [isOpen, selectedChat, getScheduledMessages, getReminders]);
 
   if (!isOpen) return null;
 
@@ -21,6 +34,19 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
     setCancellingId(id);
     await cancelScheduledMessage(id);
     setCancellingId(null);
+  };
+
+  const handleCancelReminder = async (id) => {
+    setCancellingId(id);
+    await cancelReminder(id);
+    setCancellingId(null);
+  };
+
+  const handleJump = (reminder) => {
+    if (reminder?.messageId) {
+      onClose();
+      jumpToMessage(reminder.messageId);
+    }
   };
 
   const formatScheduledTime = (dateStr) => {
@@ -68,8 +94,77 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
+        <div className="px-4 pt-3 flex items-center gap-1.5">
+          {[
+            { id: "scheduled", label: "Scheduled" },
+            { id: "reminders", label: `Reminders (${reminders.filter((r) => !r.isSent).length})` },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                tab === t.id
+                  ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30"
+                  : "text-theme-muted hover:text-theme-main border border-transparent"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         <div className="p-4 overflow-y-auto space-y-2.5 flex-1 min-h-[160px]">
-          {loading ? (
+          {tab === "reminders" ? (
+            reminders.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <BellRing size={32} className="mx-auto mb-2.5 text-theme-muted/40" />
+                <p className="text-[13px] font-medium text-theme-main">No reminders</p>
+                <p className="text-[11px] text-theme-muted mt-0.5">
+                  Open any message menu and choose "Remind Me Later".
+                </p>
+              </div>
+            ) : (
+              reminders.map((r) => (
+                <div
+                  key={r._id}
+                  className={`p-3.5 rounded-2xl bg-[var(--glass-surface)] border border-[var(--glass-border)] flex items-start justify-between gap-3 group hover:border-accent-primary/40 transition-all ${r.isSent ? "opacity-60" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-accent-primary font-medium mb-1">
+                      <BellRing size={12} />
+                      <span>{r.isSent ? `Reminded ${formatScheduledTime(r.sentAt)}` : `Reminds ${formatScheduledTime(r.remindAt)}`}</span>
+                    </div>
+                    <p className="text-[13px] text-theme-main break-words">
+                      {r.preview || "Saved message"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {!r.isSent && r.messageId && (
+                      <button
+                        onClick={() => handleJump(r)}
+                        className="p-2 rounded-xl text-theme-muted/70 hover:text-accent-primary hover:bg-accent-primary/15 transition-all"
+                        title="Jump to message"
+                      >
+                        <ExternalLink size={14} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleCancelReminder(r._id)}
+                      disabled={cancellingId === r._id}
+                      className="p-2 rounded-xl text-theme-muted/70 hover:text-red-400 hover:bg-red-500/15 transition-all"
+                      title="Delete reminder"
+                    >
+                      {cancellingId === r._id ? (
+                        <Loader size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )
+          ) : loading ? (
             <div className="flex items-center justify-center py-12 text-theme-muted gap-2">
               <Loader size={18} className="animate-spin text-accent-primary" />
               <span className="text-[13px]">Loading scheduled messages...</span>

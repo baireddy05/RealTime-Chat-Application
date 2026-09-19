@@ -25,6 +25,9 @@ import {
   votePoll,
   viewWhisper,
   toggleArchiveChat,
+  createReminder,
+  getReminders,
+  cancelReminder,
 } from "../controllers/chat.controller.js";
 
 const router = express.Router();
@@ -40,6 +43,9 @@ router.get("/preview-link", protectRoute, previewLink);
 router.get("/download/file", protectRoute, proxyDownloadFile);
 router.get("/scheduled/:id", protectRoute, getScheduledMessages);
 router.delete("/scheduled/:messageId", protectRoute, cancelScheduledMessage);
+router.get("/reminders", protectRoute, getReminders);
+router.post("/reminders", protectRoute, createReminder);
+router.delete("/reminders/:id", protectRoute, cancelReminder);
 
 router.get("/starred/:id", protectRoute, getStarredMessages);
 router.get("/thread/:messageId", protectRoute, getThreadReplies);

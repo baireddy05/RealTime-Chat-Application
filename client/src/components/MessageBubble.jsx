@@ -85,6 +85,7 @@ const MessageBubble = memo(({
   deleteMessage,
   forwardMessage,
   togglePinMessage,
+  setRemindMessage,
   openMessageInfo,
   setActiveImage,
   setDownloadingFileId,
@@ -777,6 +778,21 @@ const MessageBubble = memo(({
                               <CheckCheck size={14} className="text-theme-muted" />
                               <span>Message Info</span>
                             </button>
+
+                            {typeof setRemindMessage === 'function' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRemindMessage(message);
+                                  setOpenMenuMessageId(null);
+                                  setMenuAnchor(null);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                              >
+                                <Clock size={14} className="text-theme-muted" />
+                                <span>Remind Me Later</span>
+                              </button>
+                            )}
 
                             {isMine && !message.image && !message.audio && !message.file && !message.contact && (
                               <button

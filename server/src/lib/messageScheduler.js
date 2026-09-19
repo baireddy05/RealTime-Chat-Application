@@ -1,4 +1,5 @@
 import Message from "../models/Message.model.js";
+import Reminder from "../models/Reminder.model.js";
 import { getReceiverSocketId, io } from "./socket.js";
 
 export const startMessageScheduler = () => {
@@ -53,6 +54,28 @@ export const startMessageScheduler = () => {
           const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
           if (receiverIdStr) io.to(receiverIdStr).emit("messageExpired", payload);
           if (senderIdStr) io.to(senderIdStr).emit("messageExpired", payload);
+        }
+      }
+      // 3. Fire due message reminders ("remind me later")
+      const dueReminders = await Reminder.find({
+        isSent: false,
+        remindAt: { $lte: now },
+      })
+        .limit(50)
+        .populate({
+          path: "messageId",
+          populate: { path: "senderId", select: "username profilePic" },
+        })
+        .lean();
+
+      if (dueReminders.length > 0) {
+        await Reminder.updateMany(
+          { _id: { $in: dueReminders.map((r) => r._id) } },
+          { $set: { isSent: true, sentAt: now } }
+        );
+
+        for (const reminder of dueReminders) {
+          io.to(reminder.userId.toString()).emit("reminderDue", { reminder });
         }
       }
     } catch (error) {

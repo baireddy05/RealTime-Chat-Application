@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useMemo, lazy, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -26,6 +26,7 @@ const GifPicker = lazy(() => import("./GifPicker"));
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import ContactModal from "./ContactModal";
 import CreatePollModal from "./CreatePollModal";
+import { getSmartReplies } from "../lib/smartReplies";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -131,8 +132,27 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setDisappearingTimer,
     drafts,
     setDraft,
+    messages,
   } = useChatStore();
   const { authUser, socket } = useAuthStore();
+
+  // On-device smart quick replies from the latest incoming message
+  const smartReplies = (() => {
+    if (!selectedChat || editingMessage || replyingTo || text.trim() || imagePreview || documentFile || isRecording) {
+      return [];
+    }
+    const myId = authUser?._id?.toString();
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.isDeleted) continue;
+      const senderId = (m.senderId?._id || m.senderId)?.toString();
+      if (!senderId || senderId === myId) continue;
+      const incomingText = m.decryptedText || m.text;
+      if (!incomingText || m.image || m.audio || m.file || m.contact || m.poll) continue;
+      return getSmartReplies(incomingText);
+    }
+    return [];
+  })();
 
   // Populate text when editing a message
   useEffect(() => {
@@ -172,7 +192,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         setText(savedDraft || "");
       }
     });
-  }, [selectedChat?.id]);
+  }, [selectedChat?.id, editingMessage, drafts]);
 
   // Save draft on text change
   useEffect(() => {
@@ -533,7 +553,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     return `${mins}:${s < 10 ? "0" : ""}${s}`;
   };
 
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = async (e, presetText) => {
     e?.preventDefault();
     if (isSending) return; // Prevent rapid fire sending duplicates
 
@@ -546,7 +566,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       return;
     }
 
-    if (!text.trim() && !imagePreview && !documentFile) return;
+    if (!text.trim() && !imagePreview && !documentFile && !presetText) return;
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (socket && selectedChat) {
@@ -561,9 +581,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     let filePayload = null;
     
     // Save current values and clear UI synchronously to prevent race conditions during rapid typing
-    const currentText = text.trim();
-    const currentImage = imagePreview;
-    const currentDoc = documentFile;
+    // A presetText (smart quick reply) always wins over attachments/drafts.
+    const currentText = (presetText || text).trim();
+    const currentImage = presetText ? null : imagePreview;
+    const currentDoc = presetText ? null : documentFile;
     const currentSchedule = scheduledFor;
     const currentReply = replyingTo;
 
@@ -1192,6 +1213,25 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </div>
       ) : (
         <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
+          {/* Smart quick replies (on-device suggestions from latest incoming message) */}
+          {smartReplies.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5 animate-fadeIn">
+              <span className="text-[10px] font-semibold text-accent-primary uppercase tracking-wider shrink-0 pl-1">
+                ✨
+              </span>
+              {smartReplies.map((reply) => (
+                <button
+                  key={reply}
+                  type="button"
+                  disabled={isSending}
+                  onClick={() => handleSendMessage(null, reply)}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium text-accent-primary bg-accent-primary/10 border border-accent-primary/30 hover:bg-accent-primary/20 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {reply}
+                </button>
+              ))}
+            </div>
+          )}
           <div className={`flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass capsule-typing-pulse ${
             isTypingPulse ? "active" : ""
           }`}>

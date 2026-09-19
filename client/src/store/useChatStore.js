@@ -11,6 +11,32 @@ import {
   getConversationKey,
 } from "../lib/crypto";
 
+// Decrypt a single message doc with the key of ITS OWN conversation
+// (not the currently open chat) — used for starred messages & reminders.
+const decryptMessageDoc = async (m, authUserId) => {
+  if (!m || (!m.isEncrypted && !isEncryptedMessage(m.text))) return m;
+  try {
+    let key = null;
+    const roomIdStr = (m.roomId?._id || m.roomId)?.toString();
+    if (roomIdStr) {
+      key = `pulse-room-key-${roomIdStr}`;
+    } else {
+      const senderStr = (m.senderId?._id || m.senderId)?.toString();
+      const receiverStr = (m.receiverId?._id || m.receiverId)?.toString();
+      const otherId = senderStr === String(authUserId) ? receiverStr : senderStr;
+      if (otherId) {
+        const ids = [String(authUserId), String(otherId)].sort();
+        key = `pulse-dm-key-${ids[0]}-${ids[1]}`;
+      }
+    }
+    if (!key) return m;
+    const dec = await decryptMessage(m.text, key);
+    return { ...m, decryptedText: dec };
+  } catch {
+    return m;
+  }
+};
+
 export const useChatStore = create((set, get) => ({
   messages: [],
   users: [],
@@ -786,33 +812,7 @@ export const useChatStore = create((set, get) => ({
       const authUser = useAuthStore.getState().authUser;
 
       const decryptedMessages = await Promise.all(
-        res.data.map(async (m) => {
-          if (m.isEncrypted || isEncryptedMessage(m.text)) {
-            try {
-              // Derive the correct key per-message (not just current chat)
-              let key = null;
-              if (m.roomId) {
-                const roomIdStr = (m.roomId?._id || m.roomId)?.toString();
-                key = `pulse-room-key-${roomIdStr}`;
-              } else {
-                const senderStr = (m.senderId?._id || m.senderId)?.toString();
-                const receiverStr = (m.receiverId?._id || m.receiverId)?.toString();
-                const otherId = senderStr === authUser?._id?.toString() ? receiverStr : senderStr;
-                if (otherId) {
-                  const ids = [String(authUser?._id), String(otherId)].sort();
-                  key = `pulse-dm-key-${ids[0]}-${ids[1]}`;
-                }
-              }
-              if (key) {
-                const dec = await decryptMessage(m.text, key);
-                return { ...m, decryptedText: dec };
-              }
-            } catch {
-              // Fallback if key doesn't match
-            }
-          }
-          return m;
-        })
+        res.data.map((m) => decryptMessageDoc(m, authUser?._id))
       );
 
       set({ starredMessages: decryptedMessages });
@@ -820,6 +820,59 @@ export const useChatStore = create((set, get) => ({
       console.error("Error fetching starred messages:", error);
     } finally {
       set({ isStarredLoading: false });
+    }
+  },
+
+  reminders: [],
+  isRemindersLoading: false,
+
+  getReminders: async () => {
+    set({ isRemindersLoading: true });
+    try {
+      const res = await axiosInstance.get("/chat/reminders");
+      const authUser = useAuthStore.getState().authUser;
+      const decrypted = await Promise.all(
+        (res.data || []).map(async (r) => {
+          if (!r.messageId) return r;
+          const msg = await decryptMessageDoc(r.messageId, authUser?._id);
+          const preview =
+            msg.decryptedText ||
+            (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text) ||
+            (msg.image ? "📷 Photo" : msg.file ? `📎 ${msg.file.name}` : msg.audio ? "🎤 Voice Note" : "Message");
+          return { ...r, messageId: msg, preview };
+        })
+      );
+      set({ reminders: decrypted });
+      return decrypted;
+    } catch (error) {
+      console.error("Error fetching reminders:", error);
+      return [];
+    } finally {
+      set({ isRemindersLoading: false });
+    }
+  },
+
+  createReminder: async (messageId, remindAt, note) => {
+    try {
+      const res = await axiosInstance.post("/chat/reminders", { messageId, remindAt, note });
+      get().getReminders();
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error creating reminder:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  cancelReminder: async (reminderId) => {
+    try {
+      await axiosInstance.delete(`/chat/reminders/${reminderId}`);
+      set((state) => ({
+        reminders: state.reminders.filter((r) => r._id !== reminderId),
+      }));
+      return { success: true };
+    } catch (error) {
+      console.error("Error cancelling reminder:", error);
+      return { success: false };
     }
   },
 
@@ -847,6 +900,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("newStatus");
     socket.off("deletedStatus");
     socket.off("messageDelivered");
+    socket.off("reminderDue");
     socket.off("chat:reconnect-resync");
 
     const { selectedChat } = get();
@@ -1084,6 +1138,29 @@ export const useChatStore = create((set, get) => ({
           }).filter(person => person.stories.length > 0)
         };
       });
+    });
+
+    // Message reminder fired by the server scheduler
+    socket.on("reminderDue", async ({ reminder }) => {
+      soundManager.playReceiveSound();
+      get().getReminders();
+      if (reminder) {
+        const myId = useAuthStore.getState().authUser?._id;
+        const msg = reminder.messageId && typeof reminder.messageId === "object"
+          ? await decryptMessageDoc(reminder.messageId, myId)
+          : null;
+        const preview = msg
+          ? msg.decryptedText ||
+            (isEncryptedMessage(msg.text) ? "Message" : msg.text) ||
+            (msg.image ? "📷 Photo" : msg.file ? `📎 ${msg.file.name}` : "Message")
+          : "You asked to be reminded about a message";
+        notificationManager.sendNotification({
+          title: "⏰ Message reminder",
+          body: String(preview).slice(0, 120),
+          icon: "/favicon.png",
+        });
+        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+      }
     });
 
     // Real-time message edited
@@ -1329,6 +1406,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("newStatus");
     socket.off("deletedStatus");
     socket.off("messageDelivered");
+    socket.off("reminderDue");
   },
 
   deleteMessage: async (messageId) => {
