@@ -52,7 +52,7 @@ class DesktopNotificationManager {
   async sendNotification({
     title,
     body,
-    icon = "/favicon.ico",
+    icon = "/favicon.png",
     tag = "pulse-message",
     data = null,
     onClick = null,
@@ -69,8 +69,8 @@ class DesktopNotificationManager {
       if (this.swRegistration && "showNotification" in this.swRegistration) {
         await this.swRegistration.showNotification(title || "Pulse Message", {
           body: body || "New message received",
-          icon: icon || "/favicon.ico",
-          badge: "/favicon.ico",
+          icon: icon || "/favicon.png",
+          badge: "/favicon.png",
           tag,
           vibrate: [150, 80, 150],
           data: data || { url: window.location.href },
@@ -81,8 +81,8 @@ class DesktopNotificationManager {
       // Fallback to standard Notification API
       const notification = new Notification(title || "Pulse Message", {
         body: body || "New message received",
-        icon: icon || "/favicon.ico",
-        badge: "/favicon.ico",
+        icon: icon || "/favicon.png",
+        badge: "/favicon.png",
         tag,
         silent: true,
       });

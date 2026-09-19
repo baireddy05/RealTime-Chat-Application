@@ -41,8 +41,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body || "New activity in Pulse Messenger",
-    icon: data.icon || "/favicon.ico",
-    badge: data.badge || "/favicon.ico",
+    icon: data.icon || "/favicon.png",
+    badge: data.badge || "/favicon.png",
     vibrate: [150, 80, 150],
     data: {
       url: data.url || "/",

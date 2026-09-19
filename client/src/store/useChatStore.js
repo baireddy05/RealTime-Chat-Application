@@ -951,7 +951,7 @@ export const useChatStore = create((set, get) => ({
           notificationManager.sendNotification({
             title,
             body,
-            icon: processedMessage.senderId?.profilePic || "/favicon.ico",
+            icon: processedMessage.senderId?.profilePic || "/favicon.png",
           });
           window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         } else {
@@ -981,7 +981,7 @@ export const useChatStore = create((set, get) => ({
           notificationManager.sendNotification({
             title,
             body,
-            icon: processedMessage.senderId?.profilePic || "/favicon.ico",
+            icon: processedMessage.senderId?.profilePic || "/favicon.png",
           });
         }
       }
