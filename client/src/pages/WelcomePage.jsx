@@ -84,7 +84,7 @@ const WelcomePage = () => {
       <div className="w-full flex items-center justify-between z-20 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center hover:scale-105 transition-transform">
-            <img src="/logo.png" alt="Pulse" className="w-10 h-10 object-contain drop-shadow-sm" />
+            <img src="/logo.png" alt="Pulse" className="w-10 h-10 object-contain logo-squircle drop-shadow-sm" />
           </div>
           <span className="text-lg font-extrabold tracking-tight text-theme-main">Pulse</span>
         </div>
@@ -116,7 +116,7 @@ const WelcomePage = () => {
             <img
               src="/logo.png"
               alt="Pulse Logo"
-              className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
+              className="w-full h-full object-contain logo-squircle drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
             />
           </div>
         </div>

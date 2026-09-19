@@ -139,7 +139,7 @@ const LoginPage = () => {
               <img
                 src="/logo.png"
                 alt="Pulse Logo"
-                className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
+                className="w-full h-full object-contain logo-squircle drop-shadow-[0_8px_20px_rgba(0,240,255,0.3)] transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
@@ -178,7 +178,7 @@ const LoginPage = () => {
           <div className="w-full max-w-[400px] mx-auto animate-slide-up">
             {/* Mobile Header with Logo */}
             <div className="flex items-center gap-3 mb-6 lg:hidden justify-center">
-              <img src="/logo.png" alt="Pulse Logo" className="w-12 h-12 object-contain drop-shadow" />
+              <img src="/logo.png" alt="Pulse Logo" className="w-12 h-12 object-contain logo-squircle drop-shadow" />
               <span className="text-2xl font-extrabold tracking-tight text-theme-main">Pulse</span>
             </div>
 

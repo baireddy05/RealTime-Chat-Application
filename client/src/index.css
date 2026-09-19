@@ -874,3 +874,8 @@ img.emoji {
   touch-action: pan-y;
 }
 
+/* App logo rendered as a squircle (superellipse approximation used by iOS icons) */
+.logo-squircle {
+  border-radius: 28%;
+}
+
