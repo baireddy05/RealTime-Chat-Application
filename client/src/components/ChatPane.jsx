@@ -15,7 +15,7 @@ import { notificationManager } from "../lib/notification";
 import { 
   Loader, Search, X, CheckCheck, Pin, Trash2, Ban,
   Lock, MessageCircle, Volume2, VolumeX, Reply,
-  Edit3, Forward, Star, Info, Plus,
+  Edit3, Forward, Star, Info, Plus, Copy,
   UploadCloud, Sparkles, ChevronUp, ChevronDown, DownloadCloud, Bell, BellOff,
   Clock, Flame, Palette, MessageSquare, MoreVertical
 } from "lucide-react";
@@ -153,12 +153,40 @@ const ChatPane = ({ onBack }) => {
   const [droppedFile, setDroppedFile] = useState(null);
   const [selectedMessageIds, setSelectedMessageIds] = useState([]);
   const isSelectionMode = selectedMessageIds.length > 0;
+  const [bulkForwardMessages, setBulkForwardMessages] = useState(null);
+  const selectedMessages = useMemo(() => {
+    const byId = new Set(selectedMessageIds);
+    return messages
+      .filter((m) => byId.has(m._id))
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [messages, selectedMessageIds]);
+
+  const handleCopySelected = async () => {
+    const msg = selectedMessages[0];
+    const text = msg?.decryptedText || msg?.text;
+    if (selectedMessages.length === 1 && text && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {}
+    }
+  };
+
+  const handleStarSelected = async () => {
+    const targets = [...selectedMessages];
+    setSelectedMessageIds([]);
+    for (const m of targets) {
+      try {
+        await toggleStarMessage(m._id);
+      } catch {}
+    }
+  };
   const dragCounterRef = useRef(0);
 
   // Mobile Back Navigation handlers for ChatPane overlays
   useBackHandler(!!activeImage, () => setActiveImage(null), "chat-modal-image");
   useBackHandler(!!messageToDelete, () => setMessageToDelete(null), "chat-modal-delete");
   useBackHandler(!!forwardingMessage, () => setForwardingMessage(null), "chat-modal-forward");
+  useBackHandler(!!bulkForwardMessages, () => setBulkForwardMessages(null), "chat-modal-bulk-forward");
   useBackHandler(isGroupInfoOpen, () => setIsGroupInfoOpen(false), "chat-modal-group-info");
   useBackHandler(isScheduledOpen, () => setIsScheduledOpen(false), "chat-modal-scheduled");
   useBackHandler(isThreadOpen, () => closeThread(), "chat-drawer-thread");
@@ -1056,12 +1084,27 @@ const ChatPane = ({ onBack }) => {
               {selectedMessageIds.length} Selected
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            {selectedMessages.length === 1 && selectedMessages[0] && (selectedMessages[0].decryptedText || selectedMessages[0].text) && (
+              <button
+                onClick={handleCopySelected}
+                className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface transition-colors flex items-center gap-2"
+                title="Copy Text"
+              >
+                <Copy size={18} />
+                <span className="hidden sm:inline text-sm font-medium">Copy</span>
+              </button>
+            )}
             <button
-              onClick={() => {
-                // Future bulk forward logic
-                setSelectedMessageIds([]);
-              }}
+              onClick={handleStarSelected}
+              className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface transition-colors flex items-center gap-2"
+              title="Star Selected"
+            >
+              <Star size={18} />
+              <span className="hidden sm:inline text-sm font-medium">Star</span>
+            </button>
+            <button
+              onClick={() => setBulkForwardMessages(selectedMessages)}
               className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface transition-colors flex items-center gap-2"
               title="Forward Selected"
             >
@@ -1315,6 +1358,15 @@ const ChatPane = ({ onBack }) => {
       )}
 
       {forwardingMessage && <ForwardModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />}
+      {bulkForwardMessages && (
+        <ForwardModal
+          messages={bulkForwardMessages}
+          onClose={() => {
+            setBulkForwardMessages(null);
+            setSelectedMessageIds([]);
+          }}
+        />
+      )}
       {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
       {isGroupInfoOpen && selectedChat.type === "room" && (
         <GroupInfoModal group={selectedChat} onClose={() => setIsGroupInfoOpen(false)} onSelectUser={(userChat) => setSelectedChat(userChat)} />

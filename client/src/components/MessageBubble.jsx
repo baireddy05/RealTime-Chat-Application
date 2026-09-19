@@ -889,7 +889,9 @@ const MessageBubble = memo(({
     prevProps.index === nextProps.index &&
     prevProps.isMenuOpen === nextProps.isMenuOpen &&
     prevProps.searchQuery === nextProps.searchQuery &&
-    prevProps.downloadingFileId === nextProps.downloadingFileId
+    prevProps.downloadingFileId === nextProps.downloadingFileId &&
+    prevProps.isSelectionMode === nextProps.isSelectionMode &&
+    prevProps.isSelected === nextProps.isSelected
   );
 });
 

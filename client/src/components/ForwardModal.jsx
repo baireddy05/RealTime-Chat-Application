@@ -4,14 +4,22 @@ import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
 import { isEncryptedMessage } from "../lib/crypto";
 
-const ForwardModal = ({ message, onClose }) => {
+const ForwardModal = ({ message, messages, onClose }) => {
   const [search, setSearch] = useState("");
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const [successText, setSuccessText] = useState("");
 
-  const { rooms, forwardMessage } = useChatStore();
+  const { rooms, forwardMessage, forwardMessages } = useChatStore();
   const { friends } = useFriendStore();
+
+  // Single message (legacy prop) or a list (bulk select like WhatsApp)
+  const messageList = Array.isArray(messages) && messages.length > 0
+    ? messages
+    : message
+    ? [message]
+    : [];
+  const isBulk = messageList.length > 1;
 
   const filteredRooms = rooms.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())
@@ -21,27 +29,34 @@ const ForwardModal = ({ message, onClose }) => {
   );
 
   const handleForward = async () => {
-    if (!selectedTarget) return;
+    if (!selectedTarget || messageList.length === 0) return;
 
     setIsSending(true);
-    const res = await forwardMessage({
-      message,
-      targetChat: selectedTarget,
-    });
+    const res = isBulk
+      ? await forwardMessages({ messages: messageList, targetChat: selectedTarget })
+      : await forwardMessage({
+          message: messageList[0],
+          targetChat: selectedTarget,
+        });
     setIsSending(false);
 
     if (res.success) {
-      setSuccessText(`Forwarded to ${selectedTarget.name}!`);
+      const label = isBulk
+        ? `Forwarded ${res.forwardedCount || messageList.length} messages to ${selectedTarget.name}!`
+        : `Forwarded to ${selectedTarget.name}!`;
+      setSuccessText(label);
       setTimeout(() => {
         onClose();
       }, 900);
     }
   };
 
-  const previewSnippet =
-    message.decryptedText ||
-    (isEncryptedMessage(message.text) ? "🔒 Encrypted Message" : message.text) ||
-    (message.image ? "Photo" : message.file ? message.file.name : message.audio ? "Voice memo" : "Message");
+  const firstMessage = messageList[0] || {};
+  const previewSnippet = isBulk
+    ? `${messageList.length} selected messages`
+    : firstMessage.decryptedText ||
+      (isEncryptedMessage(firstMessage.text) ? "🔒 Encrypted Message" : firstMessage.text) ||
+      (firstMessage.image ? "Photo" : firstMessage.file ? firstMessage.file.name : firstMessage.audio ? "Voice memo" : "Message");
 
   return (
     <div
@@ -59,7 +74,7 @@ const ForwardModal = ({ message, onClose }) => {
               <Forward size={18} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm text-theme-main">Forward Message</h3>
+              <h3 className="font-semibold text-sm text-theme-main">{isBulk ? `Forward ${messageList.length} Messages` : "Forward Message"}</h3>
               <p className="text-[11px] text-theme-muted truncate max-w-[220px]">
                 "{previewSnippet.slice(0, 30)}{previewSnippet.length > 30 ? "..." : ""}"
               </p>

@@ -1567,7 +1567,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  forwardMessage: async ({ message, targetChat }) => {
+  forwardMessage: async ({ message, targetChat, silent }) => {
     try {
       const authUser = useAuthStore.getState().authUser;
       const plainText = message.decryptedText || message.text || "";
@@ -1585,6 +1585,8 @@ export const useChatStore = create((set, get) => ({
         image: message.image || null,
         audio: message.audio || null,
         file: message.file || null,
+        contact: message.contact || null,
+        poll: message.poll || null,
         isForwarded: true,
         isEncrypted,
       };
@@ -1605,11 +1607,34 @@ export const useChatStore = create((set, get) => ({
       if (selectedChat && selectedChat.id === targetChat.id) {
         set({ messages: [...messages, returnedMessage] });
       }
-      soundManager.playSendSound();
+      if (!silent) soundManager.playSendSound();
       return { success: true, data: returnedMessage };
     } catch (error) {
       console.error("Error in forwardMessage:", error);
       return { success: false, error: error.message };
     }
+  },
+
+  // WhatsApp-style bulk forward: forwards every selected message in order
+  forwardMessages: async ({ messages: messagesToForward, targetChat }) => {
+    const list = Array.isArray(messagesToForward) ? messagesToForward : [];
+    if (list.length === 0 || !targetChat) {
+      return { success: false, error: "Nothing to forward" };
+    }
+    // Preserve chronological order regardless of selection order
+    const ordered = [...list].sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+    );
+    const results = [];
+    for (const message of ordered) {
+      results.push(await get().forwardMessage({ message, targetChat, silent: true }));
+    }
+    const okCount = results.filter((r) => r.success).length;
+    if (okCount > 0) soundManager.playSendSound();
+    return {
+      success: okCount === ordered.length,
+      forwardedCount: okCount,
+      totalCount: ordered.length,
+    };
   },
 }));
