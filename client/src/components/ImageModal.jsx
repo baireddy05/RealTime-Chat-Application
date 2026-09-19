@@ -119,7 +119,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-2xl animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
       {/* Top Floating Controls */}
       <div className="absolute top-4 inset-x-3 md:inset-x-8 z-20 pointer-events-none flex flex-col items-center gap-2 md:flex-row md:justify-between">
         <div className="bg-[var(--glass-heavy)] backdrop-blur-xl border border-[var(--glass-border)] rounded-full px-4 py-1.5 text-xs text-theme-muted pointer-events-auto flex items-center gap-2 shadow-glass">
@@ -263,8 +263,14 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
 
       {/* Forwarding Modal Dialog */}
       {isForwardOpen && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[var(--modal-backdrop)] backdrop-blur-xl p-4 animate-fadeIn">
-          <div className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] w-full max-w-md rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] text-theme-main">
+        <div
+          className="absolute inset-0 z-30 flex items-center justify-center bg-[var(--modal-backdrop)] backdrop-blur-md p-4 animate-fadeIn"
+          onClick={() => setIsForwardOpen(false)}
+        >
+          <div
+            className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] w-full max-w-md rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] text-theme-main"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-5 py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-[var(--glass-hover)]">
               <div className="flex items-center gap-2">
                 <Forward size={18} className="text-accent-primary" />

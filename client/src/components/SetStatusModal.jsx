@@ -55,7 +55,7 @@ const SetStatusModal = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/25 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none overflow-y-auto"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none overflow-y-auto"
     >
       <section
         onClick={(e) => e.stopPropagation()}

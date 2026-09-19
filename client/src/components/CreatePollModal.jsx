@@ -49,7 +49,7 @@ const CreatePollModal = ({ isOpen, onClose, onSubmit }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
       <div className="fixed inset-0" onClick={onClose} />
       
       <div className="relative w-full max-w-md bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[90vh] animate-scaleIn">

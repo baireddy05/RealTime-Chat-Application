@@ -198,7 +198,7 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-fadeIn select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn select-none">
       {/* Click outside backdrop */}
       <div className="fixed inset-0" onClick={onClose} />
 

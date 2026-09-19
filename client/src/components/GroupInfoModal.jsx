@@ -51,7 +51,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}

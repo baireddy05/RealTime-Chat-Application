@@ -199,7 +199,7 @@ const StatusModal = ({ onClose }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xl flex items-center justify-center animate-fadeIn p-4 select-none"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center animate-fadeIn p-4 select-none"
       onClick={onClose}
     >
       {/* Story Viewer Overlay */}

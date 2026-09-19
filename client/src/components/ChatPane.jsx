@@ -1279,7 +1279,7 @@ const ChatPane = ({ onBack }) => {
 
       {/* Delete confirmation */}
       {messageToDelete && (
-        <div onClick={() => setMessageToDelete(null)} className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+        <div onClick={() => setMessageToDelete(null)} className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
           <div onClick={(e) => e.stopPropagation()} className="bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl p-6 max-w-sm w-full shadow-glass space-y-4 animate-scaleIn text-theme-main">
             <div className="flex items-start gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-500 flex items-center justify-center flex-shrink-0"><Trash2 size={18} /></div>
@@ -1311,7 +1311,7 @@ const ChatPane = ({ onBack }) => {
       {fullReactionPickerMsgId && (
         <div
           onClick={() => setFullReactionPickerMsgId(null)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+          className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
         >
           <div
             onClick={(e) => e.stopPropagation()}

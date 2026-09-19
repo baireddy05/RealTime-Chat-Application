@@ -72,7 +72,7 @@ const ThreadDrawer = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex justify-end animate-fadeIn"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex justify-end animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}

@@ -60,7 +60,7 @@ const AddFriendModal = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/50 dark:bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4 animate-fadeIn select-none"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
