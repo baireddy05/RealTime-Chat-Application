@@ -607,7 +607,7 @@ const Sidebar = ({
               </button>
 
               {showOptionsDropdown && (
-                <div className="absolute right-0 top-9 z-50 w-56 rounded-2xl bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px]">
+                <div className="absolute right-0 top-9 z-50 w-56 rounded-2xl overflow-hidden bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px]">
                   {onOpenProfile && (
                     <button
                       onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
