@@ -8,14 +8,14 @@ import {
   Bell,
   Activity,
   Sliders,
-  Sun,
-  Moon,
+  Check,
   Shield,
   Lock,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useThemeStore } from "../store/useThemeStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { UI_THEMES } from "../lib/uiThemes";
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const {
@@ -23,11 +23,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setBackgroundAnimationsEnabled,
     typingShockwavesEnabled,
     setTypingShockwavesEnabled,
-    setIsChatThemeOpen,
     soundMuted,
     toggleSound,
   } = useChatStore();
-  const { theme, setTheme } = useThemeStore();
+  const { uiThemeId, setUiTheme } = useThemeStore();
   const { authUser, updateProfile } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState("appearance");
@@ -36,10 +35,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
   );
 
   if (!isOpen) return null;
-
-  const handleToggleTheme = (mode) => {
-    setTheme(mode);
-  };
 
   const handleRequestNotification = async () => {
     if (typeof Notification !== "undefined") {
@@ -195,73 +190,57 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              {/* Section 2: Theme Customization */}
+              {/* Section 2: Whole-App UI Themes */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Palette size={15} className="text-zinc-500 dark:text-zinc-400" />
                   <h3 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                    Interface Theme
+                    App Theme
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2.5 sm:gap-3">
-                  <button
-                    onClick={() => handleToggleTheme("light")}
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${
-                      theme === "light"
-                        ? "border-zinc-900 bg-zinc-900/5 dark:border-white dark:bg-white/10 shadow-sm"
-                        : "border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10 bg-black/[0.01] dark:bg-white/[0.01]"
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                      <Sun size={17} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-zinc-900 dark:text-white">Light Mode</div>
-                      <div className="text-[11px] text-zinc-500">Crisp bright glass</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => handleToggleTheme("dark")}
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${
-                      theme === "dark"
-                        ? "border-zinc-900 bg-zinc-900/5 dark:border-white dark:bg-white/10 shadow-sm"
-                        : "border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10 bg-black/[0.01] dark:bg-white/[0.01]"
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
-                      <Moon size={17} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-zinc-900 dark:text-white">Dark Mode</div>
-                      <div className="text-[11px] text-zinc-500">OLED Midnight Glass</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Section 3: Chat Themes & Custom Wallpapers */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Palette size={15} className="text-zinc-500 dark:text-zinc-400" />
-                    <h3 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                      Chat Themes & Wallpapers
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      setIsChatThemeOpen(true);
-                    }}
-                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer"
-                  >
-                    Customize Themes
-                  </button>
+                  {UI_THEMES.map((t) => {
+                    const isActive = uiThemeId === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setUiTheme(t.id)}
+                        className={`flex items-center gap-3 p-3 rounded-2xl border transition-all text-left cursor-pointer active:scale-[0.98] ${
+                          isActive
+                            ? "border-accent-primary bg-accent-primary/10 shadow-sm ring-1 ring-accent-primary/40"
+                            : "border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10 bg-black/[0.01] dark:bg-white/[0.01]"
+                        }`}
+                      >
+                        <span
+                          className="w-10 h-10 rounded-xl shrink-0 border border-black/10 dark:border-white/10 shadow-inner"
+                          style={{ background: t.preview }}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                            {t.name}
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                              {t.scheme}
+                            </span>
+                          </span>
+                          <span className="text-[11px] text-zinc-500 block truncate">{t.tagline}</span>
+                        </span>
+                        <span
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                            isActive
+                              ? "border-accent-primary bg-accent-primary text-white"
+                              : "border-black/15 dark:border-white/15"
+                          }`}
+                        >
+                          {isActive && <Check size={12} strokeWidth={3} />}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                  Select curated color presets, custom message bubble colors, or upload personalized chat wallpapers.
+                  Applies instantly across chats, calls, and menus on this device.
                 </p>
               </div>
             </>
