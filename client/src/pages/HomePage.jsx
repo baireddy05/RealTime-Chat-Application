@@ -475,20 +475,6 @@ const HomePage = () => {
             </span>
           </button>
 
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="group relative flex items-center justify-center w-9 h-9 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-colors"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-lg">
-              {theme === "dark" ? "light_mode" : "dark_mode"}
-            </span>
-            <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
-              {theme === "dark" ? "Light Mode" : "Dark Mode"}
-            </span>
-          </button>
-
           {/* User Profile Avatar */}
           <div
             onClick={() => setIsProfileOpen(true)}
