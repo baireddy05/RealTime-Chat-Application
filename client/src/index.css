@@ -235,6 +235,14 @@ img.emoji {
     font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
   }
 
+  /* Opaque canvas behind the app: keeps task-switcher thumbnails,
+     overscroll areas, and first paint solid in every UI theme.
+     The body gradient paints over this. */
+  html {
+    background-color: rgb(var(--bg-app-rgb));
+    min-height: 100%;
+  }
+
   body {
     background: var(--bg-gradient);
     color: rgb(var(--text-main-rgb));
