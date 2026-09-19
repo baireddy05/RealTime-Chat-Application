@@ -93,19 +93,22 @@ const Sidebar = ({
   const searchInputRef = useRef(null);
   const optionsDropdownRef = useRef(null);
 
-  // Close options dropdown on outside click
+  // Close options dropdown on outside click / tap, anywhere on screen.
+  // Document-level capture listener (not an overlay div): overlay divs get
+  // clipped to their own pane by ancestor backdrop-filters, so taps in the
+  // chat pane would never dismiss this menu.
   useEffect(() => {
     if (!showOptionsDropdown) return;
-    const handleClickOutside = (e) => {
+    const handlePointerDown = (e) => {
       if (optionsDropdownRef.current && !optionsDropdownRef.current.contains(e.target)) {
         setShowOptionsDropdown(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("mousedown", handlePointerDown, true);
+    document.addEventListener("touchstart", handlePointerDown, true);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("mousedown", handlePointerDown, true);
+      document.removeEventListener("touchstart", handlePointerDown, true);
     };
   }, [showOptionsDropdown]);
 
@@ -604,51 +607,49 @@ const Sidebar = ({
               </button>
 
               {showOptionsDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowOptionsDropdown(false)} />
-                  <div className="absolute right-0 top-9 w-52 rounded-2xl bg-white/95 dark:bg-[#14131a]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 p-1.5 shadow-2xl z-50 animate-scaleIn select-none text-zinc-900 dark:text-white">
+                <div className="absolute right-0 top-9 w-56 rounded-2xl bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px]">
                   {onOpenProfile && (
                     <button
                       onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
-                      className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="md:hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
-                      <span className="material-symbols-outlined text-sm">person</span>
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">person</span>
                       <span>My Profile</span>
                     </button>
                   )}
                   {onOpenStarred && (
                     <button
                       onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
-                      className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="md:hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
-                      <span className="material-symbols-outlined text-sm">star</span>
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">star</span>
                       <span>Starred Messages</span>
                     </button>
                   )}
                   {onOpenSetStatus && (
                     <button
                       onClick={() => { onOpenSetStatus(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
-                      <span className="material-symbols-outlined text-sm">sentiment_satisfied</span>
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">sentiment_satisfied</span>
                       <span>Set Status Mood</span>
                     </button>
                   )}
                   {handleInstallPWA && (
                     <button
                       onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
-                      <span className="material-symbols-outlined text-sm">install_desktop</span>
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">install_desktop</span>
                       <span>Install Pulse PWA</span>
                     </button>
                   )}
                   {onToggleTheme && (
                     <button
                       onClick={() => { onToggleTheme(); setShowOptionsDropdown(false); }}
-                      className="md:hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left"
+                      className="md:hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
-                      <span className="material-symbols-outlined text-sm">
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">
                         {theme === "dark" ? "light_mode" : "dark_mode"}
                       </span>
                       <span>Switch Theme</span>
@@ -659,26 +660,25 @@ const Sidebar = ({
                       setIsSettingsOpen(true);
                       setShowOptionsDropdown(false);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-700 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">settings</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary">settings</span>
                     <span>Settings & Animations</span>
                   </button>
 
                   {logout && (
                     <>
-                      <div className="my-1 border-t border-black/10 dark:border-white/10" />
+                      <div className="my-1 border-t border-[var(--glass-border)]" />
                       <button
                         onClick={() => { logout(); setShowOptionsDropdown(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-red-500 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors text-left"
                       >
-                        <span className="material-symbols-outlined text-sm">logout</span>
+                        <span className="material-symbols-outlined text-[16px]">logout</span>
                         <span>Sign Out</span>
                       </button>
                     </>
                   )}
                 </div>
-                </>
               )}
             </div>
           </div>

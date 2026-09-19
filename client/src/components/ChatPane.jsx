@@ -170,9 +170,29 @@ const ChatPane = ({ onBack }) => {
 
   useBackHandler(isSelectionMode, () => setSelectedMessageIds([]), "chat-selection-mode");
 
+  // Close the header options dropdown on outside click / tap, anywhere on
+  // screen. Document-level capture listener (not an overlay div): overlay
+  // divs get clipped to their own pane by ancestor backdrop-filters, so taps
+  // in the sidebar would never dismiss this menu.
+  useEffect(() => {
+    if (!showChatOptions) return;
+    const handlePointerDown = (e) => {
+      if (chatOptionsRef.current && !chatOptionsRef.current.contains(e.target)) {
+        setShowChatOptions(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown, true);
+    document.addEventListener("touchstart", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, true);
+      document.removeEventListener("touchstart", handlePointerDown, true);
+    };
+  }, [showChatOptions]);
+
   const scrollerElementRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const chatOptionsRef = useRef(null);
   const isAtBottomRef = useRef(true);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
   const [unreadBelowCount, setUnreadBelowCount] = useState(0);
@@ -863,7 +883,7 @@ const ChatPane = ({ onBack }) => {
                 <span className="material-symbols-outlined text-lg">search</span>
               </button>
 
-          <div className="relative">
+          <div className="relative" ref={chatOptionsRef}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -876,8 +896,6 @@ const ChatPane = ({ onBack }) => {
               <span className="material-symbols-outlined text-lg">more_vert</span>
             </button>
             {showChatOptions && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowChatOptions(false)} />
                 <div className="absolute right-0 top-10 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-2xl shadow-glass py-1.5 w-56 animate-scaleIn smooth-gpu text-[13px]">
                   {selectedChat.type === "room" && (
                     <button
@@ -1016,7 +1034,6 @@ const ChatPane = ({ onBack }) => {
                     </>
                   )}
                 </div>
-              </>
             )}
           </div>
         </div>
