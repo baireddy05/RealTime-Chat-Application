@@ -141,6 +141,7 @@ const ChatPane = ({ onBack }) => {
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [activePickerId, setActivePickerId] = useState(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState(null);
   const [downloadingFileId, setDownloadingFileId] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);

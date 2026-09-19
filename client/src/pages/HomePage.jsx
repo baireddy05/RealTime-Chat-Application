@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatPane from "../components/ChatPane";
+import ErrorBoundary from "../components/ErrorBoundary";
 import ProfileModal from "../components/ProfileModal";
 import CallModal from "../components/CallModal";
 import IncomingCallModal from "../components/IncomingCallModal";
@@ -559,7 +560,9 @@ const HomePage = () => {
         }`}
       >
         {selectedChat ? (
-          <ChatPane onBack={() => setSelectedChat(null)} />
+          <ErrorBoundary>
+            <ChatPane onBack={() => setSelectedChat(null)} />
+          </ErrorBoundary>
         ) : (
           /* Web Style Command Center */
           <div className="flex-1 h-full flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden select-none">
