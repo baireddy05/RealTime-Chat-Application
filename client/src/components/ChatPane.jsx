@@ -3,6 +3,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import { useCallStore } from "../store/useCallStore";
+import { useGroupCallStore } from "../store/useGroupCallStore";
 import MessageInput from "./MessageInput";
 import ImageModal from "./ImageModal";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -28,6 +29,7 @@ import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
 import RemindModal from "./RemindModal";
+import GroupCallModal from "./GroupCallModal";
 import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import MessageBubble from "./MessageBubble";
@@ -454,7 +456,7 @@ const ChatPane = ({ onBack }) => {
   const handleStartCall = (type) => {
     if (!selectedChat) return;
     if (selectedChat.type === "room") {
-      alert("1-on-1 audio and video calls are supported for direct contacts. Please select a user to call.");
+      useGroupCallStore.getState().joinGroupCall(selectedChat.id || selectedChat._id);
       return;
     }
     const peerId = selectedChat.id || selectedChat._id;
@@ -1424,6 +1426,8 @@ const ChatPane = ({ onBack }) => {
           </div>
         </div>
       )}
+
+      <GroupCallModal />
     </div>
   );
 };

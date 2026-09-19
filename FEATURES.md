@@ -87,3 +87,4 @@ This document serves as the central source of truth for all features currently i
 - **PWA Support:** Install the application as a Progressive Web App directly to the user's home screen.
 - **App Settings:** Configure general application preferences.
 - **API Health Monitoring:** Dedicated endpoints for uptime monitoring and cron-job keep-alives.
+Enhanced Communication & Media

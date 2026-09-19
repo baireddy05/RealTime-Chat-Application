@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Check, Copy, Terminal } from "lucide-react";
 import { parseEmojiToHtml } from "../lib/emoji";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export const CodeSnippetBlock = ({ code, language }) => {
   const [copied, setCopied] = useState(false);
@@ -50,126 +52,100 @@ export const CodeSnippetBlock = ({ code, language }) => {
   );
 };
 
+// Helper to recursively parse text nodes for Emoji and Search Highlights
+const processText = (textStr, searchQuery) => {
+  if (typeof textStr !== "string") return textStr;
+  
+  // Format URLs
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const urlParts = textStr.split(urlRegex);
+
+  return urlParts.map((urlSub, j) => {
+    if (urlSub.match(urlRegex)) {
+      return (
+        <a
+          key={j}
+          href={urlSub}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 break-all transition-opacity font-semibold opacity-95 hover:opacity-75"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {urlSub}
+        </a>
+      );
+    }
+
+    // Search match highlight
+    if (searchQuery && searchQuery.trim()) {
+      const trimmed = searchQuery.trim();
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(`(${escaped})`, "gi");
+      const matchParts = urlSub.split(searchRegex);
+
+      return matchParts.map((m, k) =>
+        m.toLowerCase() === trimmed.toLowerCase() ? (
+          <mark
+            key={k}
+            className="bg-yellow-400/35 text-current font-bold px-1 rounded border border-yellow-500/30"
+            dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
+          />
+        ) : (
+          <span
+            key={k}
+            dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
+          />
+        )
+      );
+    }
+
+    return (
+      <span
+        key={j}
+        dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(urlSub) }}
+      />
+    );
+  });
+};
+
 export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
   if (!text) return null;
 
-  // Split text by markdown code blocks: ```lang ... ```
-  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
-  const parts = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({
-        type: "text",
-        content: text.substring(lastIndex, match.index),
-      });
-    }
-    parts.push({
-      type: "code",
-      language: match[1],
-      code: match[2].trimEnd(),
-    });
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push({
-      type: "text",
-      content: text.substring(lastIndex),
-    });
-  }
-
-  // Render normal text with links, inline code, search highlight, and Twemoji
-  const renderInlineText = (str) => {
-    // Split by inline code `...`
-    const inlineParts = str.split(/(`[^`]+`)/g);
-
-    return inlineParts.map((sub, i) => {
-      if (sub.startsWith("`") && sub.endsWith("`") && sub.length > 2) {
-        const inlineCode = sub.slice(1, -1);
-        return (
-          <code
-            key={i}
-            className="px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] bg-current/10 border border-current/15 font-semibold"
-          >
-            {inlineCode}
-          </code>
-        );
-      }
-
-      // Format URLs in sub
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urlParts = sub.split(urlRegex);
-
-      return urlParts.map((urlSub, j) => {
-        if (urlSub.match(urlRegex)) {
-          return (
-            <a
-              key={j}
-              href={urlSub}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 break-all transition-opacity font-semibold opacity-95 hover:opacity-75"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {urlSub}
-            </a>
-          );
-        }
-
-        // Search match highlight
-        if (searchQuery && searchQuery.trim()) {
-          const trimmed = searchQuery.trim();
-          const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const searchRegex = new RegExp(`(${escaped})`, "gi");
-          const matchParts = urlSub.split(searchRegex);
-
-          return matchParts.map((m, k) =>
-            m.toLowerCase() === trimmed.toLowerCase() ? (
-              <mark
-                key={k}
-                className="bg-yellow-400/35 text-current font-bold px-1 rounded border border-yellow-500/30"
-                dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
-              />
-            ) : (
-              <span
-                key={k}
-                dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
-              />
-            )
-          );
-        }
-
-        return (
-          <span
-            key={j}
-            dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(urlSub) }}
-          />
-        );
-      });
-    });
-  };
-
   return (
-    <div className="space-y-1 select-text break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap min-w-0 max-w-full">
-      {parts.map((part, idx) => {
-        if (part.type === "code") {
-          return (
-            <CodeSnippetBlock
-              key={idx}
-              code={part.code}
-              language={part.language}
-            />
-          );
-        }
-        return (
-          <span key={idx} className="break-words [overflow-wrap:anywhere] [word-break:break-word]">
-            {renderInlineText(part.content)}
-          </span>
-        );
-      })}
+    <div className={`space-y-1 select-text break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full prose prose-sm ${isMine ? 'prose-invert' : ''} dark:prose-invert prose-p:my-1 prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({node, inline, className, children, ...props}) {
+            const match = /language-(\w+)/.exec(className || '')
+            return !inline && match ? (
+              <CodeSnippetBlock code={String(children).replace(/\n$/, '')} language={match[1]} />
+            ) : !inline ? (
+              <CodeSnippetBlock code={String(children).replace(/\n$/, '')} language="text" />
+            ) : (
+              <code className="px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] bg-current/10 border border-current/15 font-semibold" {...props}>
+                {children}
+              </code>
+            )
+          },
+          p({children}) {
+            return <p className="whitespace-pre-wrap leading-relaxed m-0">{
+              Array.isArray(children) 
+                ? children.map((child, i) => <span key={i}>{typeof child === 'string' ? processText(child, searchQuery) : child}</span>)
+                : typeof children === 'string' ? processText(children, searchQuery) : children
+            }</p>;
+          },
+          li({children}) {
+            return <li className="leading-relaxed m-0">{
+              Array.isArray(children) 
+                ? children.map((child, i) => <span key={i}>{typeof child === 'string' ? processText(child, searchQuery) : child}</span>)
+                : typeof children === 'string' ? processText(children, searchQuery) : children
+            }</li>;
+          }
+        }}
+      >
+        {text}
+      </ReactMarkdown>
     </div>
   );
 };

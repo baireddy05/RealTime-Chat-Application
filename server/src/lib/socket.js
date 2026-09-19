@@ -25,6 +25,7 @@ const io = new Server(server, {
 // Store user socket mappings for multi-device support, private messaging, and online status
 const userSocketMap = {}; // { userId: Set<socketId> }
 const hiddenUsers = new Set(); // { userId }
+const groupCalls = {}; // { roomId: Set<userId> }
 
 export const getReceiverSocketId = (receiverId) => {
   if (!receiverId) return undefined;
@@ -196,6 +197,45 @@ io.on("connection", (socket) => {
     io.to(to.toString()).emit("peerLayout", { isPortrait, isMobile });
   });
 
+  // Mesh Network Group Calls
+  socket.on("joinGroupCall", ({ roomId }) => {
+    if (!roomId) return;
+    if (!groupCalls[roomId]) {
+      groupCalls[roomId] = new Set();
+    }
+    const currentUsersInCall = Array.from(groupCalls[roomId]);
+    groupCalls[roomId].add(userId);
+    socket.join(`call_${roomId}`);
+    
+    // Send existing users in the call to the newly joined user so they can initiate peer connections
+    socket.emit("allUsersInCall", { users: currentUsersInCall });
+    
+    // Broadcast to other users in the room that someone started/joined a call
+    socket.to(roomId).emit("groupCallStarted", { roomId, startedBy: userId });
+  });
+
+  socket.on("signalGroupUser", ({ userToSignal, callerId, signal }) => {
+    // Send a WebRTC signal to a specific user in the group call
+    io.to(userToSignal.toString()).emit("userJoinedGroupCall", { signal, callerId });
+  });
+
+  socket.on("returnGroupSignal", ({ signal, callerId }) => {
+    // Return a WebRTC signal back to the initiator
+    io.to(callerId.toString()).emit("receivingReturnedGroupSignal", { signal, id: userId });
+  });
+
+  socket.on("leaveGroupCall", ({ roomId }) => {
+    if (!roomId || !groupCalls[roomId]) return;
+    groupCalls[roomId].delete(userId);
+    socket.leave(`call_${roomId}`);
+    io.to(`call_${roomId}`).emit("userLeftGroupCall", { userId });
+    
+    if (groupCalls[roomId].size === 0) {
+      delete groupCalls[roomId];
+      io.to(roomId).emit("groupCallEnded", { roomId });
+    }
+  });
+
   // Message Delivery Receipt
   socket.on("messageDelivered", async ({ messageId, senderId }) => {
     try {
@@ -237,6 +277,18 @@ io.on("connection", (socket) => {
       }
       const getVisibleUsers = () => Object.keys(userSocketMap).filter(id => !hiddenUsers.has(id));
       io.emit("getOnlineUsers", getVisibleUsers());
+
+      // Clean up group calls
+      for (const roomId in groupCalls) {
+        if (groupCalls[roomId].has(userId)) {
+          groupCalls[roomId].delete(userId);
+          io.to(`call_${roomId}`).emit("userLeftGroupCall", { userId });
+          if (groupCalls[roomId].size === 0) {
+            delete groupCalls[roomId];
+            io.to(roomId).emit("groupCallEnded", { roomId });
+          }
+        }
+      }
     }
   });
 });

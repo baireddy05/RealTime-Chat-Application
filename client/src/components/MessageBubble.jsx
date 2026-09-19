@@ -1,6 +1,6 @@
 import { memo, Fragment, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown, Languages } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -99,6 +99,24 @@ const MessageBubble = memo(({
 }) => {
   const [isViewingWhisper, setIsViewingWhisper] = useState(false);
   const [whisperContent, setWhisperContent] = useState(null);
+  const [translatedText, setTranslatedText] = useState(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const handleTranslate = async () => {
+    setIsTranslating(true);
+    setOpenMenuMessageId(null);
+    setMenuAnchor(null);
+    try {
+      const { axiosInstance } = await import("../lib/axios");
+      const targetLanguage = navigator.language.split('-')[0] || 'en';
+      const res = await axiosInstance.post(`/messages/message/${message._id}/translate`, { targetLanguage });
+      setTranslatedText(res.data.translatedText);
+    } catch (err) {
+      console.error("Translation failed:", err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   // Shadow the message prop so we can view the local copy while holding
   const message = isViewingWhisper && whisperContent ? { ...msgProp, ...whisperContent } : msgProp;
@@ -224,9 +242,9 @@ const MessageBubble = memo(({
     statusTitle += `\nSeen: ${new Date(readObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
   const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
-  const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
+  const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.videoNote && !message.location && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
   const isSticker = message.isSticker || Boolean(message.image && (message.image.includes("/stickers/") || message.image.includes("giphy-preview.gif") || message.image.includes("sticker")));
-  const isStickerOnly = !message.isDeleted && isSticker && (!message.text || !message.text.trim()) && !message.file && !message.audio && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned;
+  const isStickerOnly = !message.isDeleted && isSticker && (!message.text || !message.text.trim()) && !message.file && !message.audio && !message.videoNote && !message.location && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned;
   const isTransparentBubble = isJustEmoji || isStickerOnly;
   const isVisuallyDeleted = message.isDeleted && !isViewingWhisper;
 
@@ -523,6 +541,31 @@ const MessageBubble = memo(({
                         <ContactCard contact={message.contact} isMine={isMine} />
                       )}
                       {message.audio && <div className="mb-0.5"><AudioMessagePlayer audioUrl={message.audio} isMine={isMine} /></div>}
+                      {message.videoNote && (
+                        <div className="mb-1 overflow-hidden rounded-full w-48 h-48 sm:w-60 sm:h-60 flex items-center justify-center bg-black/10 dark:bg-black/40 border-[3px] border-accent-primary/20 shadow-md">
+                          <video src={message.videoNote} controls playsInline loop className="w-full h-full object-cover rounded-full" />
+                        </div>
+                      )}
+                      {message.location && (
+                        <div className="mb-1 overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-black/5 dark:bg-white/5 p-1 w-[200px] sm:w-[240px]">
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${message.location.lat},${message.location.lng}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="block w-full h-32 rounded-xl bg-cover bg-center relative group"
+                            style={{ backgroundImage: `url(https://maps.googleapis.com/maps/api/staticmap?center=${message.location.lat},${message.location.lng}&zoom=15&size=400x300&markers=color:red%7C${message.location.lat},${message.location.lng}&key=YOUR_API_KEY_HERE)` }}
+                          >
+                            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors rounded-xl flex items-center justify-center">
+                              <div className="w-10 h-10 rounded-full bg-accent-primary flex items-center justify-center shadow-lg text-white">
+                                <span className="material-symbols-outlined">location_on</span>
+                              </div>
+                            </div>
+                          </a>
+                          <div className="px-2 py-1.5 text-[10px] text-theme-muted truncate">
+                            Location Shared
+                          </div>
+                        </div>
+                      )}
                       {message.poll && (
                         <div className={`mt-1 mb-2 p-3 rounded-2xl border ${isMine ? 'bg-black/10 border-white/10 text-white' : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-zinc-900 dark:text-zinc-100'}`}>
                           <div className="flex items-start gap-2 mb-3">
@@ -568,26 +611,42 @@ const MessageBubble = memo(({
                         </div>
                       )}
                       {message.text && (
-                        <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1 max-w-full min-w-0">
-                          <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[15.5px] leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap font-normal min-w-0 max-w-full"}`}>
-                            <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
+                        <div className="flex flex-col max-w-full min-w-0">
+                          <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1 max-w-full min-w-0">
+                            <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[15.5px] leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap font-normal min-w-0 max-w-full"}`}>
+                              <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
+                            </div>
+                            <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">
+                              {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}
+                              <span className={isJustEmoji ? "text-theme-muted drop-shadow-sm font-semibold" : ""}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                              {isMine && !message.isDeleted && (
+                                message.isOptimistic ? (
+                                  <Clock size={11} className={`opacity-70 animate-pulse ${isJustEmoji ? "text-theme-muted drop-shadow-sm" : ""}`} title="Sending..." />
+                                ) : (
+                                  <span 
+                                    title={statusTitle}
+                                    className={`material-symbols-outlined text-sm cursor-help ${isJustEmoji ? "text-theme-muted drop-shadow-sm " : ""}${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold opacity-70"}`}
+                                  >
+                                    {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
+                                  </span>
+                                )
+                              )}
+                            </div>
                           </div>
-                          <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">
-                            {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}
-                            <span className={isJustEmoji ? "text-theme-muted drop-shadow-sm font-semibold" : ""}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                            {isMine && !message.isDeleted && (
-                              message.isOptimistic ? (
-                                <Clock size={11} className={`opacity-70 animate-pulse ${isJustEmoji ? "text-theme-muted drop-shadow-sm" : ""}`} title="Sending..." />
-                              ) : (
-                                <span 
-                                  title={statusTitle}
-                                  className={`material-symbols-outlined text-sm cursor-help ${isJustEmoji ? "text-theme-muted drop-shadow-sm " : ""}${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold opacity-70"}`}
-                                >
-                                  {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
-                                </span>
-                              )
-                            )}
-                          </div>
+                          {isTranslating && (
+                            <div className="text-[10px] italic opacity-70 flex items-center gap-1 mt-1 font-semibold">
+                              <Loader size={10} className="animate-spin" /> Translating...
+                            </div>
+                          )}
+                          {translatedText && (
+                            <div className="mt-1.5 pt-1.5 border-t border-current/10 text-[14px]">
+                              <div className="flex items-center gap-1 opacity-70 mb-1 text-accent-primary">
+                                <Languages size={12} />
+                                <span className="text-[10px] uppercase font-bold tracking-wider">Translated</span>
+                              </div>
+                              <FormattedMessageText text={translatedText} isMine={isMine} />
+                            </div>
+                          )}
                         </div>
                       )}
                       
@@ -750,6 +809,17 @@ const MessageBubble = memo(({
                               >
                                 <Copy size={14} className="text-theme-muted" />
                                 <span>Copy Text</span>
+                              </button>
+                            )}
+
+                            {(message.decryptedText || message.text) && (
+                              <button
+                                type="button"
+                                onClick={handleTranslate}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                              >
+                                <Languages size={14} className="text-theme-muted" />
+                                <span>Translate</span>
                               </button>
                             )}
 

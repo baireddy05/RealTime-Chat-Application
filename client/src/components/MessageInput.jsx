@@ -19,6 +19,8 @@ import {
   Flame,
   Delete,
   Sparkles,
+  MapPin,
+  MonitorPlay,
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
@@ -501,18 +503,70 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
   };
 
+  const startVideoRecording = async () => {
+    try {
+      audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: "user" } });
+      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.start(100);
+      setIsRecording(true);
+      setIsRecordingVideo(true);
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to access camera/microphone", err);
+      alert("Camera/Microphone permission was denied or is not available.");
+    }
+  };
+
   const cancelRecording = () => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    if (mediaRecorderRef.current && isRecording) {
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    setIsRecordingVideo(false);
+    if (mediaRecorderRef.current) {
       mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
+      const tracks = mediaRecorderRef.current.stream?.getTracks();
+      if (tracks) {
+        tracks.forEach(track => track.stop());
+      }
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
     }
     audioChunksRef.current = [];
-    setIsRecording(false);
-    setRecordingSeconds(0);
+  };
+
+  const handleShareLocation = () => {
+    setShowAttachMenu(false);
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+        await sendMessage({ text: "", location: { lat: latitude, lng: longitude } });
+        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+      },
+      (error) => {
+        alert("Unable to retrieve your location: " + error.message);
+      }
+    );
   };
 
   const stopAndSendRecording = () => {
@@ -520,18 +574,22 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const mimeType = isRecordingVideo ? "video/webm" : "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         if (audioBlob.size > 0) {
           setIsUploading(true);
-          const audioUrl = await uploadAudioToCloudinary(audioBlob);
+          const mediaUrl = await uploadAudioToCloudinary(audioBlob);
           setIsUploading(false);
 
-          if (audioUrl) {
+          if (mediaUrl) {
             window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-            await sendMessage({
-              text: "",
-              audio: audioUrl,
-            });
+            const payload = { text: "" };
+            if (isRecordingVideo) {
+              payload.videoNote = mediaUrl;
+            } else {
+              payload.audio = mediaUrl;
+            }
+            await sendMessage(payload);
             window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
           }
         }
@@ -540,6 +598,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         }
         audioChunksRef.current = [];
         setIsRecording(false);
+        setIsRecordingVideo(false);
         setRecordingSeconds(0);
       };
 
@@ -966,6 +1025,16 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <span>Share Contact</span>
           </button>
+          <button
+            type="button"
+            onClick={handleShareLocation}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-green-500/20 text-green-500 flex items-center justify-center">
+              <MapPin size={14} />
+            </div>
+            <span>Share Location</span>
+          </button>
           <div className="h-px bg-[var(--glass-border)] my-1" />
           <button
             type="button"
@@ -1367,6 +1436,18 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 title="Schedule Message"
               >
                 <Clock size={15} />
+              </button>
+
+              {/* Video Memo: visible on mobile only when text is empty */}
+              <button
+                type="button"
+                onClick={startVideoRecording}
+                className={`p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ${
+                  hasContent || editingMessage ? "hidden sm:flex" : "flex"
+                }`}
+                title="Record Video Note"
+              >
+                <MonitorPlay size={18} />
               </button>
 
               {/* Voice Memo: visible on mobile only when text is empty */}

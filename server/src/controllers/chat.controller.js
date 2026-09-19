@@ -1363,3 +1363,24 @@ export const cancelReminder = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+export const translateMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { targetLanguage } = req.body;
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+    const textToTranslate = message.decryptedText || message.text;
+    if (!textToTranslate) {
+      return res.status(400).json({ error: "No text to translate" });
+    }
+    const { translate } = await import('@vitalets/google-translate-api');
+    const { text } = await translate(textToTranslate, { to: targetLanguage || 'en' });
+    res.status(200).json({ translatedText: text, originalText: textToTranslate });
+  } catch (error) {
+    console.error("Error in translateMessage: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

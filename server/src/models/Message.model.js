@@ -24,6 +24,13 @@ const messageSchema = new mongoose.Schema(
     audio: {
       type: String,
     },
+    videoNote: {
+      type: String,
+    },
+    location: {
+      lat: Number,
+      lng: Number,
+    },
     isSticker: {
       type: Boolean,
       default: false,
