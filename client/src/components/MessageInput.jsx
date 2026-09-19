@@ -622,7 +622,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         senderName: currentReply.senderId?.username || currentReply.senderName || "User",
         text: currentReply.decryptedText || currentReply.text || (currentReply.image ? "📷 Photo" : currentReply.file ? `📎 ${currentReply.file.name}` : "Attachment"),
         image: currentReply.image || null,
-        image: currentReply.image || null,
         file: currentReply.file || null,
       } : undefined,
       isWhisper: isWhisperMode,

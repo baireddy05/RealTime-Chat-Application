@@ -2,7 +2,24 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { io } from "socket.io-client";
 
-const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || "http://localhost:5000";
+const getSocketBaseUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  try {
+    const u = new URL(apiUrl);
+    // Socket.io server lives at the origin (no /api path)
+    return u.origin;
+  } catch {
+    return apiUrl.replace(/\/api\/?$/, "") || "http://localhost:5000";
+  }
+};
+
+const BASE_URL = getSocketBaseUrl();
+
+const stripToken = (data) => {
+  if (!data || typeof data !== "object") return data;
+  const { token, ...user } = data;
+  return user;
+};
 
 let visibilityHandler = null;
 
@@ -20,7 +37,7 @@ export const useAuthStore = create((set, get) => ({
       if (res.data.token) {
         localStorage.setItem("pulse-token", res.data.token);
       }
-      set({ authUser: res.data });
+      set({ authUser: stripToken(res.data) });
       get().connectSocket();
     } catch {
       localStorage.removeItem("pulse-token");
@@ -37,7 +54,7 @@ export const useAuthStore = create((set, get) => ({
       if (res.data.token) {
         localStorage.setItem("pulse-token", res.data.token);
       }
-      set({ authUser: res.data });
+      set({ authUser: stripToken(res.data) });
       get().connectSocket();
       return true;
     } catch (error) {
@@ -55,7 +72,7 @@ export const useAuthStore = create((set, get) => ({
       if (res.data.token) {
         localStorage.setItem("pulse-token", res.data.token);
       }
-      set({ authUser: res.data });
+      set({ authUser: stripToken(res.data) });
       get().connectSocket();
       return true;
     } catch (error) {
@@ -69,11 +86,33 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try {
       await axiosInstance.post("/auth/logout");
+    } catch (error) {
+      console.error(error.response?.data?.message || "Logout failed");
+    } finally {
       localStorage.removeItem("pulse-token");
       set({ authUser: null });
       get().disconnectSocket();
-    } catch (error) {
-      console.error(error.response?.data?.message || "Logout failed");
+      // Clear chat + call state so next login starts fresh
+      try {
+        const { useChatStore } = await import("./useChatStore");
+        useChatStore.setState({
+          selectedChat: null,
+          messages: [],
+          scheduledMessages: [],
+          unreadCounts: {},
+          lastMessages: {},
+          replyingTo: null,
+          editingMessage: null,
+          forwardingMessage: null,
+          activeThreadMessage: null,
+          threadReplies: [],
+          isThreadOpen: false,
+        });
+      } catch {}
+      try {
+        const { useCallStore } = await import("./useCallStore");
+        useCallStore.getState().cleanupCall?.();
+      } catch {}
     }
   },
 
@@ -141,3 +180,13 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 }));
+
+// Global 401 handler (dispatched from lib/axios.js to avoid a static+dynamic import cycle)
+if (typeof window !== "undefined") {
+  window.addEventListener("pulse:unauthorized", () => {
+    try {
+      useAuthStore.setState({ authUser: null });
+      useAuthStore.getState().disconnectSocket?.();
+    } catch {}
+  });
+}

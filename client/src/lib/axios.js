@@ -13,3 +13,23 @@ axiosInstance.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// On 401 (expired/invalid token), clear auth so the app returns to login instead of looping
+axiosInstance.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error?.response?.status === 401 && !error.config?._retryAuth) {
+      const url = error.config?.url || "";
+      // Don't trigger logout loop for the auth check itself
+      if (!url.includes("/auth/check") && !url.includes("/auth/login") && !url.includes("/auth/signup")) {
+        localStorage.removeItem("pulse-token");
+        // Avoid static+dynamic double import of the auth store (vite warning);
+        // notify via event and let useAuthStore handle the state reset.
+        try {
+          window.dispatchEvent(new CustomEvent("pulse:unauthorized"));
+        } catch {}
+      }
+    }
+    return Promise.reject(error);
+  }
+);

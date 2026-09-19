@@ -177,19 +177,19 @@ export const useChatStore = create((set, get) => ({
       const authUser = useAuthStore.getState().authUser;
       const allStatuses = res.data;
       
-      const myStatuses = allStatuses.filter((s) => s.userId._id === authUser._id || s.userId === authUser._id);
+      const myStatuses = allStatuses.filter((s) => (s.userId?._id || s.userId)?.toString() === authUser?._id?.toString());
       
       // Group network statuses by user
       const networkMap = {};
       allStatuses.forEach((s) => {
-        const uId = s.userId._id || s.userId;
-        if (uId === authUser._id) return;
+        const uId = (s.userId?._id || s.userId)?.toString();
+        if (!uId || uId === authUser?._id?.toString()) return;
         
         if (!networkMap[uId]) {
           networkMap[uId] = {
             id: uId,
-            user: s.userId.username,
-            avatar: s.userId.profilePic,
+            user: s.userId?.username || "User",
+            avatar: s.userId?.profilePic || "",
             stories: [],
           };
         }
@@ -784,13 +784,25 @@ export const useChatStore = create((set, get) => ({
       const url = chatId && chatId !== "all" ? `/chat/starred/${chatId}?type=${type || ""}` : "/chat/starred/all";
       const res = await axiosInstance.get(url);
       const authUser = useAuthStore.getState().authUser;
-      const currentChat = get().selectedChat;
-      const key = currentChat ? getConversationKey(currentChat, authUser?._id) : null;
 
       const decryptedMessages = await Promise.all(
         res.data.map(async (m) => {
           if (m.isEncrypted || isEncryptedMessage(m.text)) {
             try {
+              // Derive the correct key per-message (not just current chat)
+              let key = null;
+              if (m.roomId) {
+                const roomIdStr = (m.roomId?._id || m.roomId)?.toString();
+                key = `pulse-room-key-${roomIdStr}`;
+              } else {
+                const senderStr = (m.senderId?._id || m.senderId)?.toString();
+                const receiverStr = (m.receiverId?._id || m.receiverId)?.toString();
+                const otherId = senderStr === authUser?._id?.toString() ? receiverStr : senderStr;
+                if (otherId) {
+                  const ids = [String(authUser?._id), String(otherId)].sort();
+                  key = `pulse-dm-key-${ids[0]}-${ids[1]}`;
+                }
+              }
               if (key) {
                 const dec = await decryptMessage(m.text, key);
                 return { ...m, decryptedText: dec };
@@ -817,6 +829,8 @@ export const useChatStore = create((set, get) => ({
 
     // Remove any existing listeners first to prevent duplicates
     // (React StrictMode double-mounts effects in dev mode)
+    // NOTE: do NOT off("connect") here — that would remove the
+    // useAuthStore presence handler. Use a namespaced handler instead.
     socket.off("newMessage");
     socket.off("threadUpdated");
     socket.off("messageExpired");
@@ -829,6 +843,11 @@ export const useChatStore = create((set, get) => ({
     socket.off("messagesRead");
     socket.off("messageDeleted");
     socket.off("messagePinned");
+    socket.off("pollUpdated");
+    socket.off("newStatus");
+    socket.off("deletedStatus");
+    socket.off("messageDelivered");
+    socket.off("chat:reconnect-resync");
 
     const { selectedChat } = get();
     // Join room if it's a room chat
@@ -836,9 +855,9 @@ export const useChatStore = create((set, get) => ({
       socket.emit("joinRoom", selectedChat.id);
     }
 
-    // Auto-resync active chat and metadata on reconnect
-    socket.off("connect");
-    socket.on("connect", () => {
+    // Auto-resync active chat and metadata on reconnect (namespaced to avoid clobbering auth handler)
+    socket.off("chat:reconnect-resync");
+    const handleReconnectResync = () => {
       get().resyncCurrentChat();
       get().getUsers();
       get().getRooms();
@@ -846,7 +865,10 @@ export const useChatStore = create((set, get) => ({
       if (current?.type === "room") {
         socket.emit("joinRoom", current.id);
       }
-    });
+    };
+    socket.on("connect", handleReconnectResync);
+    // Tag handler so unsubscribe can remove only ours
+    socket._chatReconnectHandler = handleReconnectResync;
 
     socket.on("newMessage", async (newMessage) => {
       const { selectedChat } = get();
@@ -1020,12 +1042,12 @@ export const useChatStore = create((set, get) => ({
     // Real-time status updates
     socket.on("newStatus", (status) => {
       const authUser = useAuthStore.getState().authUser;
-      const uId = status.userId._id || status.userId;
-      if (uId === authUser._id) return;
+      const uId = (status.userId?._id || status.userId)?.toString();
+      if (!uId || uId === authUser?._id?.toString()) return;
 
       set((state) => {
         let networkMap = [...state.networkStatuses];
-        const personIndex = networkMap.findIndex((p) => p.id === uId);
+        const personIndex = networkMap.findIndex((p) => p.id?.toString() === uId);
         
         const newStory = {
           id: status._id,
@@ -1039,8 +1061,8 @@ export const useChatStore = create((set, get) => ({
         } else {
           networkMap.push({
             id: uId,
-            user: status.userId.username || "User",
-            avatar: status.userId.profilePic || "",
+            user: status.userId?.username || "User",
+            avatar: status.userId?.profilePic || "",
             stories: [newStory],
           });
         }
@@ -1137,15 +1159,6 @@ export const useChatStore = create((set, get) => ({
       const { messages } = get();
       const updated = messages.map((m) =>
         m._id === messageId ? { ...m, poll } : m
-      );
-      set({ messages: updated });
-    });
-
-    // Message Deleted
-    socket.on("messageDeleted", ({ messageId }) => {
-      const { messages } = get();
-      const updated = messages.map((m) =>
-        m._id === messageId ? { ...m, isDeleted: true, text: "This whisper has vanished.", image: null, file: null, audio: null } : m
       );
       set({ messages: updated });
     });
@@ -1294,7 +1307,12 @@ export const useChatStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
     
-    socket.off("connect");
+    // Only remove our chat reconnect handler, not the auth presence handler
+    if (socket._chatReconnectHandler) {
+      socket.off("connect", socket._chatReconnectHandler);
+      socket._chatReconnectHandler = null;
+    }
+    socket.off("chat:reconnect-resync");
     socket.off("newMessage");
     socket.off("threadUpdated");
     socket.off("messageReaction");
@@ -1307,6 +1325,10 @@ export const useChatStore = create((set, get) => ({
     socket.off("messagePinned");
     socket.off("messageExpired");
     socket.off("roomUpdated");
+    socket.off("pollUpdated");
+    socket.off("newStatus");
+    socket.off("deletedStatus");
+    socket.off("messageDelivered");
   },
 
   deleteMessage: async (messageId) => {

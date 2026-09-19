@@ -1,6 +1,6 @@
 import { memo, Fragment, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader, Ban, Clock, Star, Reply, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -102,8 +102,8 @@ const MessageBubble = memo(({
   // Shadow the message prop so we can view the local copy while holding
   const message = isViewingWhisper && whisperContent ? { ...msgProp, ...whisperContent } : msgProp;
 
-  const isMine = message.senderId._id === authUser._id || message.senderId === authUser._id;
-  const sender = message.senderId;
+  const isMine = (message.senderId?._id || message.senderId) === authUser._id || message.senderId?._id === authUser._id;
+  const sender = message.senderId || {};
 
   // Long press handling for touch devices (mobile) & context menu support
   const bubbleRef = useRef(null);
@@ -210,10 +210,10 @@ const MessageBubble = memo(({
     return acc;
   }, {});
 
-  const readObj = (message.reads || []).find(r => r.userId === selectedChat.id);
-  const isReadByRecipient = selectedChat.type === "user" && authUser.readReceipts !== false && (readObj || (message.readBy || []).includes(selectedChat.id));
-  const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat.id);
-  const isDeliveredToRecipient = selectedChat.type === "user" && !!deliveryObj;
+  const readObj = (message.reads || []).find(r => r.userId === selectedChat?.id);
+  const isReadByRecipient = selectedChat?.type === "user" && authUser.readReceipts !== false && (readObj || (message.readBy || []).includes(selectedChat?.id));
+  const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat?.id);
+  const isDeliveredToRecipient = selectedChat?.type === "user" && !!deliveryObj;
   
   let statusTitle = `Sent: ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   if (isDeliveredToRecipient && deliveryObj?.at) {
@@ -251,7 +251,7 @@ const MessageBubble = memo(({
             isSameSenderAsPrev ? "mt-1" : "mt-3.5"
           } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
         >
-          {!isMine && selectedChat.type === "room" && !isSelectionMode && (
+          {!isMine && selectedChat?.type === "room" && !isSelectionMode && (
             <div className="w-7 h-7 flex-shrink-0 self-end mb-0.5 mr-2">
               {!isSameSenderAsNext ? (
                 <img
@@ -348,8 +348,8 @@ const MessageBubble = memo(({
                 
                 {/* Bubble Content Area */}
                 <div className="relative z-10 flex flex-col w-full min-w-0 max-w-full">
-                  {!isMine && selectedChat.type === "room" && !message.isDeleted && !isSameSenderAsPrev && (
-                    <p className={`text-[11.5px] font-bold mb-1 tracking-tight ${getSenderColor(sender.username)}`}>{sender.username}</p>
+                  {!isMine && selectedChat?.type === "room" && !message.isDeleted && !isSameSenderAsPrev && (
+                    <p className={`text-[11.5px] font-bold mb-1 tracking-tight ${getSenderColor(sender?.username)}`}>{sender?.username || "User"}</p>
                   )}
                   {message.isPinned && !message.isDeleted && (
                     <div className="flex items-center gap-1 text-[9px] font-medium mb-1 pb-1 border-b border-current/15 opacity-75">
@@ -793,7 +793,7 @@ const MessageBubble = memo(({
                               </button>
                             )}
 
-                            {selectedChat.type === "room" && (
+                            {selectedChat?.type === "room" && (
                               <button
                                 type="button"
                                 onClick={() => {

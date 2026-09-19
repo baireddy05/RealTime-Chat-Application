@@ -531,7 +531,7 @@ const HomePage = () => {
         <Sidebar
           onChatSelect={() => {}}
           onOpenProfile={() => setIsProfileOpen(true)}
-          onOpenSetStatus={() => setIsProfileOpen(true)}
+          onOpenSetStatus={() => setIsSetStatusOpen(true)}
           onOpenAddFriend={() => setIsAddFriendOpen(true)}
           onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
           onOpenStatus={() => setIsStatusStoriesOpen(true)}

@@ -4,6 +4,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import Room from "../models/Room.model.js";
+import Message from "../models/Message.model.js";
 import { isOriginAllowed } from "./corsConfig.js";
 
 const app = express();
@@ -104,10 +105,10 @@ io.on("connection", (socket) => {
       const isMember = (room.members || []).some(
         (m) => m.toString() === userId.toString()
       );
-      if (!isMember) {
-        await Room.findByIdAndUpdate(roomId, { $addToSet: { members: userId } });
-      }
-      socket.join(roomId);
+      // Do NOT auto-add non-members — joining is allowed only for members.
+      // This prevents privilege escalation by guessing room ids.
+      if (!isMember) return;
+      socket.join(roomId.toString());
       console.log(`User ${userId} joined room ${roomId}`);
     } catch (err) {
       console.error("Error in socket joinRoom:", err.message);
@@ -121,24 +122,31 @@ io.on("connection", (socket) => {
 
   // Typing indicators
   socket.on("typing", ({ targetId, targetType, username }) => {
-    if (targetType === "room") {
-      socket.to(targetId).emit("userTyping", { userId, username, targetId, targetType });
-    } else {
-      io.to(targetId.toString()).emit("userTyping", { userId, username, targetId: userId, targetType: "user" });
-    }
+    if (!targetId) return;
+    try {
+      if (targetType === "room") {
+        socket.to(targetId.toString()).emit("userTyping", { userId, username, targetId, targetType });
+      } else {
+        io.to(targetId.toString()).emit("userTyping", { userId, username, targetId: userId, targetType: "user" });
+      }
+    } catch {}
   });
 
   socket.on("stopTyping", ({ targetId, targetType, username }) => {
-    if (targetType === "room") {
-      socket.to(targetId).emit("userStoppedTyping", { userId, username, targetId, targetType });
-    } else {
-      io.to(targetId.toString()).emit("userStoppedTyping", { userId, username, targetId: userId, targetType: "user" });
-    }
+    if (!targetId) return;
+    try {
+      if (targetType === "room") {
+        socket.to(targetId.toString()).emit("userStoppedTyping", { userId, username, targetId, targetType });
+      } else {
+        io.to(targetId.toString()).emit("userStoppedTyping", { userId, username, targetId: userId, targetType: "user" });
+      }
+    } catch {}
   });
 
   // WebRTC Audio/Video Calling Signaling
   socket.on("callUser", ({ userToCall, signalData, callType, callerInfo }) => {
-    const targetSockets = userSocketMap[userToCall];
+    if (!userToCall) return;
+    const targetSockets = userSocketMap[userToCall.toString()];
     if (targetSockets && targetSockets.size > 0) {
       io.to(userToCall.toString()).emit("incomingCall", {
         signal: signalData,
@@ -152,26 +160,32 @@ io.on("connection", (socket) => {
   });
 
   socket.on("answerCall", ({ to, signal }) => {
+    if (!to) return;
     io.to(to.toString()).emit("callAccepted", { signal });
   });
 
   socket.on("rejectCall", ({ to }) => {
+    if (!to) return;
     io.to(to.toString()).emit("callRejected");
   });
 
   socket.on("endCall", ({ to }) => {
+    if (!to) return;
     io.to(to.toString()).emit("callEnded");
   });
 
   socket.on("iceCandidate", ({ to, candidate }) => {
+    if (!to) return;
     io.to(to.toString()).emit("iceCandidate", { candidate });
   });
 
   socket.on("peerToggleVideo", ({ to, isVideoOff }) => {
+    if (!to) return;
     io.to(to.toString()).emit("peerToggleVideo", { isVideoOff });
   });
 
   socket.on("peerToggleMute", ({ to, isMuted }) => {
+    if (!to) return;
     io.to(to.toString()).emit("peerToggleMute", { isMuted });
   });
 
@@ -179,12 +193,11 @@ io.on("connection", (socket) => {
   socket.on("messageDelivered", async ({ messageId, senderId }) => {
     try {
       if (!messageId || !userId) return;
-      await import("../models/Message.model.js").then(({ default: Message }) => {
-        Message.findOneAndUpdate(
-          { _id: messageId, "deliveries.userId": { $ne: userId } },
-          { $push: { deliveries: { userId, at: new Date() } } }
-        ).exec();
-      });
+      await Message.findOneAndUpdate(
+        { _id: messageId, "deliveries.userId": { $ne: userId } },
+        { $push: { deliveries: { userId, at: new Date() } } }
+      ).exec();
+      if (!senderId) return;
       io.to(senderId.toString()).emit("messageDelivered", { 
         messageId, 
         delivererId: userId,

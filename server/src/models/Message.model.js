@@ -178,8 +178,10 @@ messageSchema.index({ parentMessageId: 1, createdAt: 1 });
 messageSchema.index({ isScheduled: 1, scheduledFor: 1 });
 messageSchema.index({ starredBy: 1 });
 messageSchema.index({ expiresAt: 1, isDeleted: 1 });
-// Native MongoDB TTL index to automatically purge expired disappearing messages
-messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0, sparse: true });
+// NOTE: No TTL hard-delete index here on purpose — expiring messages are
+// soft-deleted by messageScheduler.js (isDeleted=true) so read/delivery
+// receipts and history stay consistent. A TTL index would hard-delete docs
+// and race the scheduler.
 
 const Message = mongoose.model("Message", messageSchema);
 

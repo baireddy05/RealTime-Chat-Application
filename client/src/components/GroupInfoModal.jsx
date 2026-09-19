@@ -7,13 +7,15 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const { authUser, onlineUsers } = useAuthStore();
   const { updateGroupInfo, kickGroupMember, toggleGroupAdmin } = useChatStore();
 
+  const groupId = group._id || group.id;
   const members = group.members || [];
-  const displayName = group.name.replace(/^#/, "");
-  const myId = authUser?._id;
+  const displayName = (group.name || "Channel").replace(/^#/, "");
+  const myId = authUser?._id?.toString();
 
-  const isCreator = group.createdBy && (group.createdBy._id === myId || group.createdBy === myId);
+  const createdById = group.createdBy?._id || group.createdBy;
+  const isCreator = createdById && createdById.toString() === myId;
   const admins = group.admins || (group.createdBy ? [group.createdBy] : []);
-  const amIAdmin = isCreator || admins.some((a) => (a._id || a) === myId);
+  const amIAdmin = isCreator || admins.some((a) => (a?._id || a)?.toString() === myId);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(displayName);
@@ -24,7 +26,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const handleSaveInfo = async () => {
     if (!editedName.trim()) return;
     setIsSaving(true);
-    await updateGroupInfo(group._id, {
+    await updateGroupInfo(groupId, {
       name: editedName.trim(),
       description: editedDesc.trim(),
     });
@@ -35,14 +37,14 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const handleKickMember = async (memberId) => {
     if (window.confirm("Are you sure you want to remove this member from the channel?")) {
       setLoadingMemberId(memberId);
-      await kickGroupMember(group._id, memberId);
+      await kickGroupMember(groupId, memberId);
       setLoadingMemberId(null);
     }
   };
 
   const handleToggleAdmin = async (memberId) => {
     setLoadingMemberId(memberId);
-    await toggleGroupAdmin(group._id, memberId);
+    await toggleGroupAdmin(groupId, memberId);
     setLoadingMemberId(null);
   };
 
@@ -144,11 +146,12 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
               </div>
             ) : (
               members.map((member) => {
-                const memberId = member._id || member;
+                const memberId = (member._id || member)?.toString();
                 const username = member.username || "Member";
-                const isOnline = onlineUsers.includes(memberId);
-                const isThisMemberCreator = group.createdBy && (group.createdBy._id === memberId || group.createdBy === memberId);
-                const isThisMemberAdmin = isThisMemberCreator || admins.some((a) => (a._id || a) === memberId);
+                const isOnline = (onlineUsers || []).includes(memberId);
+                const thisCreatorId = (group.createdBy?._id || group.createdBy)?.toString();
+                const isThisMemberCreator = thisCreatorId && thisCreatorId === memberId;
+                const isThisMemberAdmin = isThisMemberCreator || admins.some((a) => (a?._id || a)?.toString() === memberId);
                 const isMe = memberId === myId;
                 const isLoading = loadingMemberId === memberId;
 

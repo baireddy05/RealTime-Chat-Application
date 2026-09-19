@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useFriendStore } from "../store/useFriendStore";
 import { downloadFile } from "../lib/download";
 
 const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
@@ -36,7 +37,9 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
   const [forwardSuccess, setForwardSuccess] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const { users, rooms, forwardMessage } = useChatStore();
+  const { rooms, forwardMessage } = useChatStore();
+  const { friends } = useFriendStore();
+  const users = friends;
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -88,8 +91,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
     setIsForwarding(true);
     try {
       const res = await forwardMessage({
-        image: currentImageUrl,
-        text: caption.trim(),
+        message: { image: currentImageUrl, text: caption.trim() },
         targetChat: selectedTarget,
       });
 
@@ -109,11 +111,11 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
     }
   };
 
-  const filteredRooms = rooms.filter((r) =>
-    r.name.toLowerCase().includes(forwardSearch.toLowerCase())
+  const filteredRooms = (rooms || []).filter((r) =>
+    (r.name || "").toLowerCase().includes(forwardSearch.toLowerCase())
   );
-  const filteredUsers = users.filter((u) =>
-    u.username.toLowerCase().includes(forwardSearch.toLowerCase())
+  const filteredUsers = (users || []).filter((u) =>
+    (u.username || "").toLowerCase().includes(forwardSearch.toLowerCase())
   );
 
   return createPortal(

@@ -265,8 +265,9 @@ const Sidebar = ({
       const chatId = (c._id || c.id)?.toString();
       const isArchived = archivedChats.includes(chatId);
       if (activeFilter === "archived") return isArchived;
-      if (activeFilter === "all") return !isArchived;
-      return true; // other filters handle themselves or we can filter them too
+      // Archived chats are hidden from all other views
+      if (isArchived) return false;
+      return true;
     });
   }, [allChats, archivedChats, activeFilter]);
 
@@ -306,10 +307,15 @@ const Sidebar = ({
         onClick={() =>
           selectChat({
             id: roomId,
+            _id: room._id || roomId,
             name: room.name,
             type: "room",
             description: room.description,
             members: room.members,
+            createdBy: room.createdBy,
+            admins: room.admins,
+            avatar: room.avatar,
+            profilePic: room.profilePic,
           })
         }
         className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${

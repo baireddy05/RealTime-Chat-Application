@@ -1,6 +1,7 @@
 import Message from "../models/Message.model.js";
 import User from "../models/User.model.js";
 import Room from "../models/Room.model.js";
+import mongoose from "mongoose";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 
 // Helper to prevent Server-Side Request Forgery (SSRF)
@@ -100,7 +101,7 @@ export const getUsersForSidebar = async (req, res) => {
 export const getRooms = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const rooms = await Room.find()
+    const rooms = await Room.find({ members: loggedInUserId })
       .populate("members", "username profilePic status")
       .populate("createdBy", "username profilePic")
       .populate("admins", "username profilePic")
@@ -192,11 +193,9 @@ export const getMessages = async (req, res) => {
     const myId = req.user._id;
     const now = new Date();
 
-    const baseFilter = {
-      isScheduled: { $ne: true },
-      parentMessageId: { $in: [null, undefined] },
-      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
-    };
+    const notExpired = { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] };
+    const notThreadReply = { parentMessageId: null };
+    const notScheduled = { isScheduled: { $ne: true } };
 
     if (type === "room") {
       const room = await Room.findById(id).select("members").lean();
@@ -207,10 +206,10 @@ export const getMessages = async (req, res) => {
         (m) => m.toString() === myId.toString()
       );
       if (!isMember) {
-        await Room.findByIdAndUpdate(id, { $addToSet: { members: myId } });
+        return res.status(403).json({ error: "You are not a member of this room" });
       }
 
-      const messages = await Message.find({ roomId: id, ...baseFilter })
+      const messages = await Message.find({ roomId: id, ...notScheduled, ...notThreadReply, ...notExpired })
         .populate("senderId", "username profilePic")
         .sort({ createdAt: 1 })
         .lean();
@@ -225,7 +224,9 @@ export const getMessages = async (req, res) => {
       return res.status(200).json(messages);
     } else {
       const messages = await Message.find({
-        ...baseFilter,
+        ...notScheduled,
+        ...notThreadReply,
+        ...notExpired,
         $or: [
           { senderId: myId, receiverId: id },
           { senderId: id, receiverId: myId },
@@ -271,6 +272,26 @@ export const sendMessage = async (req, res) => {
     } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
+
+    // Validate: at least one content field is required
+    if (!text && !image && !audio && !file && !contact && !poll) {
+      return res.status(400).json({ error: "Message must contain text, media, file, contact, or poll" });
+    }
+    if (!roomId && !receiverId) {
+      return res.status(400).json({ error: "Missing receiver or room" });
+    }
+    if (!roomId && receiverId && !mongoose.Types.ObjectId.isValid(receiverId)) {
+      return res.status(400).json({ error: "Invalid receiver id" });
+    }
+    if (roomId && !mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({ error: "Invalid room id" });
+    }
+    if (!roomId && receiverId) {
+      const receiverExists = await User.findById(receiverId).select("_id").lean();
+      if (!receiverExists) {
+        return res.status(404).json({ error: "Receiver not found" });
+      }
+    }
 
     // Calculate expiresAt if expiresIn seconds provided
     let computedExpiresAt = null;
@@ -339,7 +360,7 @@ export const sendMessage = async (req, res) => {
         (m) => m.toString() === senderId.toString()
       );
       if (!isMember) {
-        await Room.findByIdAndUpdate(roomId, { $addToSet: { members: senderId } });
+        return res.status(403).json({ error: "You are not a member of this room" });
       }
 
       // Room message
@@ -368,7 +389,7 @@ export const sendMessage = async (req, res) => {
 
       // Broadcast to room immediately only if NOT scheduled
       if (!isScheduled) {
-        io.to(roomId).emit("newMessage", newMessage);
+        io.to(roomId.toString()).emit("newMessage", newMessage);
       }
     } else {
       // Direct message
@@ -396,7 +417,7 @@ export const sendMessage = async (req, res) => {
       await newMessage.populate("senderId", "username profilePic");
 
       // Send to receiver and sender immediately only if NOT scheduled
-      if (!isScheduled) {
+      if (!isScheduled && receiverId && senderId) {
         io.to(receiverId.toString()).emit("newMessage", newMessage);
         io.to(senderId.toString()).emit("newMessage", newMessage);
       }
@@ -404,6 +425,16 @@ export const sendMessage = async (req, res) => {
 
     // If this is a thread reply, update parent message thread count & last reply time
     if (parentMessageId) {
+      // Verify parent belongs to the same conversation to prevent cross-chat pollution
+      const parentMsg = await Message.findById(parentMessageId).select("roomId senderId receiverId").lean();
+      const sameRoom = roomId ? parentMsg?.roomId?.toString() === roomId.toString() : false;
+      const sameDm = !roomId && parentMsg && !parentMsg.roomId && (
+        (parentMsg.senderId?.toString() === senderId.toString() && parentMsg.receiverId?.toString() === receiverId?.toString()) ||
+        (parentMsg.senderId?.toString() === receiverId?.toString() && parentMsg.receiverId?.toString() === senderId.toString())
+      );
+      if (!parentMsg || (!sameRoom && !sameDm)) {
+        // Don't increment thread count for cross-chat parent
+      } else {
       const parent = await Message.findByIdAndUpdate(
         parentMessageId,
         {
@@ -424,6 +455,7 @@ export const sendMessage = async (req, res) => {
         } else {
           io.to(receiverId.toString()).emit("threadUpdated", threadPayload);
           io.to(senderId.toString()).emit("threadUpdated", threadPayload);
+        }
         }
       }
     }
@@ -453,6 +485,10 @@ export const deleteMessage = async (req, res) => {
     message.text = "This message was deleted";
     message.image = null;
     message.audio = null;
+    message.file = null;
+    message.contact = null;
+    message.poll = null;
+    message.linkPreview = null;
     message.reactions = [];
     await message.save();
 
@@ -465,7 +501,7 @@ export const deleteMessage = async (req, res) => {
 
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messageDeleted", payload);
-    } else {
+    } else if (message.receiverId && message.senderId) {
       io.to(message.receiverId.toString()).emit("messageDeleted", payload);
       io.to(message.senderId.toString()).emit("messageDeleted", payload);
     }
@@ -486,6 +522,19 @@ export const togglePinMessage = async (req, res) => {
       return res.status(404).json({ error: "Message not found" });
     }
 
+    // Only room members can pin; DMs allow either participant
+    if (message.roomId) {
+      const room = await Room.findById(message.roomId).select("members").lean();
+      if (!room) return res.status(404).json({ error: "Room not found" });
+      const isMember = (room.members || []).some((m) => m.toString() === req.user._id.toString());
+      if (!isMember) return res.status(403).json({ error: "Not a room member" });
+    } else if (message.receiverId && message.senderId) {
+      const uid = req.user._id.toString();
+      const isParticipant =
+        message.receiverId.toString() === uid || message.senderId.toString() === uid;
+      if (!isParticipant) return res.status(403).json({ error: "Not a participant" });
+    }
+
     message.isPinned = !message.isPinned;
     await message.save();
 
@@ -499,7 +548,7 @@ export const togglePinMessage = async (req, res) => {
 
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messagePinned", payload);
-    } else {
+    } else if (message.receiverId && message.senderId) {
       io.to(message.receiverId.toString()).emit("messagePinned", payload);
       io.to(message.senderId.toString()).emit("messagePinned", payload);
     }
@@ -549,7 +598,7 @@ export const reactToMessage = async (req, res) => {
 
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messageReaction", payload);
-    } else {
+    } else if (message.receiverId && message.senderId) {
       io.to(message.receiverId.toString()).emit("messageReaction", payload);
       io.to(message.senderId.toString()).emit("messageReaction", payload);
     }
@@ -569,13 +618,16 @@ export const markMessagesAsRead = async (req, res) => {
     const sendReadReceipts = req.user.readReceipts !== false;
 
     if (type === "room") {
+      const filter = { roomId: id, readBy: { $ne: myId } };
       const updateOp = { $addToSet: { readBy: myId } };
       if (sendReadReceipts) {
+        // Only push a read entry if this user hasn't already read (prevents unbounded growth)
+        filter["reads.userId"] = { $ne: myId };
         updateOp.$push = { reads: { userId: myId, at: new Date() } };
       }
       
       await Message.updateMany(
-        { roomId: id, readBy: { $ne: myId } },
+        filter,
         updateOp
       );
       
@@ -583,13 +635,15 @@ export const markMessagesAsRead = async (req, res) => {
         io.to(id.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
       }
     } else {
+      const filter = { senderId: id, receiverId: myId, readBy: { $ne: myId } };
       const updateOp = { $addToSet: { readBy: myId } };
       if (sendReadReceipts) {
+        filter["reads.userId"] = { $ne: myId };
         updateOp.$push = { reads: { userId: myId, at: new Date() } };
       }
 
       await Message.updateMany(
-        { senderId: id, receiverId: myId, readBy: { $ne: myId } },
+        filter,
         updateOp
       );
       

@@ -429,6 +429,41 @@ const ChatPane = ({ onBack }) => {
     return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }, [messages]);
 
+  const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned && !m.isDeleted), [messages]);
+  const currentPinned = pinnedMessages.length > 0 ? pinnedMessages[pinnedIndex % pinnedMessages.length] : null;
+  const [pinnedDecryptedText, setPinnedDecryptedText] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!currentPinned) {
+      setPinnedDecryptedText(null);
+      return;
+    }
+    if (currentPinned.decryptedText) {
+      setPinnedDecryptedText(currentPinned.decryptedText);
+      return;
+    }
+    if (currentPinned.text && isEncryptedMessage(currentPinned.text)) {
+      const key = selectedChat ? getConversationKey(selectedChat, authUser?._id) : null;
+      if (!key) {
+        setPinnedDecryptedText("🔒 Encrypted Message");
+        return;
+      }
+      decryptMessage(currentPinned.text, key)
+        .then((dec) => {
+          if (active) setPinnedDecryptedText(dec);
+        })
+        .catch(() => {
+          if (active) setPinnedDecryptedText("🔒 Encrypted Message");
+        });
+    } else {
+      setPinnedDecryptedText(currentPinned.text || "");
+    }
+    return () => {
+      active = false;
+    };
+  }, [currentPinned, selectedChat, authUser?._id]);
+
   if (!selectedChat) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none relative bg-transparent overflow-hidden">
@@ -592,37 +627,6 @@ const ChatPane = ({ onBack }) => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-
-  const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
-  const currentPinned = pinnedMessages.length > 0 ? pinnedMessages[pinnedIndex % pinnedMessages.length] : null;
-  const [pinnedDecryptedText, setPinnedDecryptedText] = useState(null);
-
-  useEffect(() => {
-    let active = true;
-    if (!currentPinned) {
-      setPinnedDecryptedText(null);
-      return;
-    }
-    if (currentPinned.decryptedText) {
-      setPinnedDecryptedText(currentPinned.decryptedText);
-      return;
-    }
-    if (currentPinned.text && isEncryptedMessage(currentPinned.text)) {
-      const key = getConversationKey(selectedChat, authUser?._id);
-      decryptMessage(currentPinned.text, key)
-        .then((dec) => {
-          if (active) setPinnedDecryptedText(dec);
-        })
-        .catch(() => {
-          if (active) setPinnedDecryptedText("🔒 Encrypted Message");
-        });
-    } else {
-      setPinnedDecryptedText(currentPinned.text || "");
-    }
-    return () => {
-      active = false;
-    };
-  }, [currentPinned, selectedChat, authUser?._id]);
 
   const scrollToMessage = (msgId) => {
     const el = document.getElementById(`msg-${msgId}`);
@@ -962,7 +966,7 @@ const ChatPane = ({ onBack }) => {
 
                   <button
                     onClick={async () => {
-                      const success = await toggleArchiveChat(selectedChat._id || selectedChat.id);
+                      const success = await toggleArchiveChat(selectedChat.id);
                       if (success) {
                         setShowChatOptions(false);
                         onBack();
@@ -971,7 +975,7 @@ const ChatPane = ({ onBack }) => {
                     className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px] text-accent-primary leading-none">archive</span> 
-                    {archivedChats.includes((selectedChat._id || selectedChat.id)?.toString()) ? "Unarchive Chat" : "Archive Chat"}
+                    {archivedChats.includes((selectedChat.id)?.toString()) ? "Unarchive Chat" : "Archive Chat"}
                   </button>
 
                   {/* Scheduled Messages Option */}
@@ -1048,10 +1052,13 @@ const ChatPane = ({ onBack }) => {
               <span className="hidden sm:inline text-sm font-medium">Forward</span>
             </button>
             <button
-              onClick={() => {
-                // Delete all selected
-                selectedMessageIds.forEach(id => handleDelete(id));
+              onClick={async () => {
+                // Delete all selected messages directly
+                const ids = [...selectedMessageIds];
                 setSelectedMessageIds([]);
+                for (const id of ids) {
+                  try { await deleteMessage(id); } catch {}
+                }
               }}
               className="p-2 rounded-lg hover:bg-error/20 text-error transition-colors flex items-center gap-2"
               title="Delete Selected"
