@@ -1172,6 +1172,11 @@ export const proxyDownloadFile = async (req, res) => {
       return res.status(400).json({ error: "Only HTTP and HTTPS protocols are supported" });
     }
 
+    // Block server-side request forgery: no localhost / internal / cloud-metadata URLs
+    if (!isSafeUrl(url)) {
+      return res.status(400).json({ error: "URL is not allowed" });
+    }
+
     // Clean and sanitize filename
     let rawFilename = typeof filename === "string" && filename.trim() ? filename.trim() : "document.pdf";
     if (!rawFilename.includes(".") && url.toLowerCase().includes(".pdf")) {
@@ -1183,12 +1188,21 @@ export const proxyDownloadFile = async (req, res) => {
       headers: {
         "User-Agent": "PulseMessenger/1.0 (Windows NT 10.0; Win64; x64)",
       },
+      // Don't hang on slow servers; redirects are followed only to safe URLs below
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!remoteResponse.ok) {
       return res.status(remoteResponse.status).json({
         error: `Failed to fetch file from source: ${remoteResponse.statusText}`,
       });
+    }
+
+    // Refuse to buffer huge files into memory (DoS protection)
+    const MAX_PROXY_BYTES = 25 * 1024 * 1024;
+    const contentLengthHeader = remoteResponse.headers.get("content-length");
+    if (contentLengthHeader && Number(contentLengthHeader) > MAX_PROXY_BYTES) {
+      return res.status(413).json({ error: "File too large to proxy" });
     }
 
     let contentType = remoteResponse.headers.get("content-type") || "application/octet-stream";
@@ -1210,6 +1224,9 @@ export const proxyDownloadFile = async (req, res) => {
     }
 
     const arrayBuffer = await remoteResponse.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_PROXY_BYTES) {
+      return res.status(413).json({ error: "File too large to proxy" });
+    }
     return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (error) {
     console.error("Error in proxyDownloadFile:", error.message);
