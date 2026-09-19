@@ -144,7 +144,7 @@ io.on("connection", (socket) => {
   });
 
   // WebRTC Audio/Video Calling Signaling
-  socket.on("callUser", ({ userToCall, signalData, callType, callerInfo }) => {
+  socket.on("callUser", ({ userToCall, signalData, callType, callerInfo, deviceInfo }) => {
     if (!userToCall) return;
     const targetSockets = userSocketMap[userToCall.toString()];
     if (targetSockets && targetSockets.size > 0) {
@@ -153,15 +153,16 @@ io.on("connection", (socket) => {
         from: userId,
         callType: callType || "video",
         callerInfo: callerInfo || { _id: userId },
+        deviceInfo: deviceInfo || callerInfo?.deviceInfo || null,
       });
     } else {
       socket.emit("callUnavailable", { message: "User is currently offline" });
     }
   });
 
-  socket.on("answerCall", ({ to, signal }) => {
+  socket.on("answerCall", ({ to, signal, deviceInfo }) => {
     if (!to) return;
-    io.to(to.toString()).emit("callAccepted", { signal });
+    io.to(to.toString()).emit("callAccepted", { signal, deviceInfo });
   });
 
   socket.on("rejectCall", ({ to }) => {
@@ -187,6 +188,12 @@ io.on("connection", (socket) => {
   socket.on("peerToggleMute", ({ to, isMuted }) => {
     if (!to) return;
     io.to(to.toString()).emit("peerToggleMute", { isMuted });
+  });
+
+  // Live device-orientation sync so a portrait phone stays portrait on the laptop
+  socket.on("peerLayout", ({ to, isPortrait, isMobile }) => {
+    if (!to) return;
+    io.to(to.toString()).emit("peerLayout", { isPortrait, isMobile });
   });
 
   // Message Delivery Receipt

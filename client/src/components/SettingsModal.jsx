@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   X,
   Sparkles,
@@ -11,7 +11,6 @@ import {
   Sun,
   Moon,
   Shield,
-  Laptop,
   Lock,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
@@ -50,71 +49,71 @@ const SettingsModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
       {/* Backdrop */}
       <div className="fixed inset-0" onClick={onClose} />
 
-      {/* Main Modal Card */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[90vh] animate-scaleIn">
+      {/* Main Modal Card — bottom sheet on mobile, centered dialog on desktop */}
+      <div className="relative w-full sm:max-w-xl bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl rounded-b-none sm:rounded-b-3xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-scaleIn">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 flex items-center justify-center font-bold shadow-sm">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 flex items-center justify-center font-bold shadow-sm shrink-0">
               <Sliders size={16} />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-base font-bold text-zinc-900 dark:text-white leading-tight">Settings</h2>
-              <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">Manage animations, theme, and workspace preferences</p>
+              <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 truncate">Manage animations, theme, and preferences</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
             title="Close"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 px-6 pt-3 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01]">
+        {/* Tab Navigation — horizontally scrollable on mobile */}
+        <div className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 pt-3 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] overflow-x-auto no-scrollbar shrink-0">
           <button
             onClick={() => setActiveTab("appearance")}
-            className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 pb-2.5 px-2 text-[11px] sm:text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "appearance"
                 ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                 : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
           >
-            <Sparkles size={14} />
-            <span>Appearance & Animations</span>
+            <Sparkles size={14} className="shrink-0" />
+            <span>Appearance</span>
           </button>
           <button
             onClick={() => setActiveTab("sound")}
-            className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 pb-2.5 px-2 text-[11px] sm:text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "sound"
                 ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                 : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
           >
-            <Volume2 size={14} />
+            <Volume2 size={14} className="shrink-0" />
             <span>Sound & Alerts</span>
           </button>
           <button
             onClick={() => setActiveTab("privacy")}
-            className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 pb-2.5 px-2 text-[11px] sm:text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "privacy"
                 ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                 : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
           >
-            <Lock size={14} />
+            <Lock size={14} className="shrink-0" />
             <span>Privacy</span>
           </button>
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 select-none">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 select-none">
           {activeTab === "appearance" && (
             <>
               {/* Section 1: Background Visual Animations */}
@@ -126,10 +125,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </h3>
                 </div>
 
-                <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-4 space-y-4">
+                <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 space-y-4">
                   {/* Toggle: Ambient Home Pulse Shockwaves */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5 max-w-[78%]">
+                  <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
+                    <div className="space-y-0.5 min-w-0 flex-1">
                       <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                         <span>Ambient Logo Pulse Shockwaves</span>
                         {backgroundAnimationsEnabled && (
@@ -163,8 +162,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   <div className="w-full h-[1px] bg-black/5 dark:bg-white/5" />
 
                   {/* Toggle: Keystroke Ripple Shockwaves */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5 max-w-[78%]">
+                  <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
+                    <div className="space-y-0.5 min-w-0 flex-1">
                       <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                         <span>Interactive Keystroke Ripple Waves</span>
                         {typingShockwavesEnabled && (
@@ -205,7 +204,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2.5 sm:gap-3">
                   <button
                     onClick={() => handleToggleTheme("light")}
                     className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${
@@ -271,8 +270,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
           {activeTab === "sound" && (
             <div className="space-y-4">
               {/* Audio Chimes */}
-              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex items-center justify-between">
-                <div className="space-y-0.5 max-w-[80%]">
+              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                     {soundMuted ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} className="text-emerald-400" />}
                     <span>Sound Effects & Audio Chimes</span>
@@ -298,8 +297,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
               </div>
 
               {/* Desktop Notifications */}
-              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex items-center justify-between">
-                <div className="space-y-0.5 max-w-[80%]">
+              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                     <Bell size={15} />
                     <span>Browser Desktop Notifications</span>
@@ -336,8 +335,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
           {activeTab === "privacy" && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex items-center justify-between">
-                <div className="space-y-0.5 max-w-[80%]">
+              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                     <Lock size={15} />
                     <span>Read Receipts (Blue Ticks)</span>
@@ -367,7 +366,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 py-3.5 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02]">
+        <div className="flex items-center justify-end px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"

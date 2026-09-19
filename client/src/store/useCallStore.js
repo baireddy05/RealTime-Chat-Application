@@ -24,6 +24,14 @@ const getAudioConstraints = () => ({
   autoGainControl: true,
 });
 
+const getDeviceLayout = () => {
+  const isPortrait =
+    typeof window !== "undefined" ? window.innerHeight >= window.innerWidth : false;
+  const isMobile =
+    typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
+  return { isPortrait, isMobile };
+};
+
 const getVideoConstraints = (facingMode = "user") => {
   // Request portrait capture on portrait phones so a mobile publisher
   // actually sends portrait (9:16) instead of a forced landscape crop.
@@ -60,10 +68,23 @@ export const useCallStore = create((set, get) => ({
   currentFacingMode: "user", // 'user' | 'environment'
   hasMultipleCameras: false,
   isSwapped: false,
+  // Peer's device layout, signaled end-to-end (null = unknown yet)
+  peerIsPortrait: null,
+  peerIsMobile: false,
   callDuration: 0,
   incomingSignal: null,
   peerConnection: null,
   activeSocket: null,
+
+  // Broadcast our current window orientation to the peer (debounced by caller)
+  sendLayoutUpdate: () => {
+    const { activeSocket, peerUser, callState } = get();
+    if (!activeSocket || !peerUser?._id || (callState !== "calling" && callState !== "connected")) return;
+    try {
+      const layout = getDeviceLayout();
+      activeSocket.emit("peerLayout", { to: peerUser._id, ...layout });
+    } catch {}
+  },
 
   checkMultipleCameras: async () => {
     try {
@@ -141,8 +162,9 @@ export const useCallStore = create((set, get) => ({
     socket.off("iceCandidate");
     socket.off("peerToggleVideo");
     socket.off("peerToggleMute");
+    socket.off("peerLayout");
 
-    socket.on("incomingCall", ({ signal, from, callType, callerInfo }) => {
+    socket.on("incomingCall", ({ signal, from, callType, callerInfo, deviceInfo }) => {
       // If already in a call, reject the incoming call automatically
       if (get().callState !== "idle") {
         socket.emit("rejectCall", { to: from });
@@ -169,10 +191,13 @@ export const useCallStore = create((set, get) => ({
         incomingSignal: signal,
         isPeerMuted: false,
         isPeerVideoOff: false,
+        // Caller tells us its orientation up-front so the first frame already lays out right
+        peerIsPortrait: deviceInfo?.isPortrait ?? callerInfo?.deviceInfo?.isPortrait ?? null,
+        peerIsMobile: deviceInfo?.isMobile ?? callerInfo?.deviceInfo?.isMobile ?? false,
       });
     });
 
-    socket.on("callAccepted", async ({ signal }) => {
+    socket.on("callAccepted", async ({ signal, deviceInfo }) => {
       soundManager.stopRinging();
       const pc = get().peerConnection;
       if (pc && signal) {
@@ -196,7 +221,11 @@ export const useCallStore = create((set, get) => ({
 
       // Start call duration counter
       if (timerInterval) clearInterval(timerInterval);
-      set({ callState: "connected", callDuration: 0 });
+      set({
+        callState: "connected",
+        callDuration: 0,
+        ...(deviceInfo ? { peerIsPortrait: deviceInfo.isPortrait ?? null, peerIsMobile: !!deviceInfo.isMobile } : {}),
+      });
       timerInterval = setInterval(() => {
         set((state) => ({ callDuration: state.callDuration + 1 }));
       }, 1000);
@@ -241,6 +270,13 @@ export const useCallStore = create((set, get) => ({
 
     socket.on("peerToggleMute", ({ isMuted }) => {
       set({ isPeerMuted: !!isMuted });
+    });
+
+    socket.on("peerLayout", ({ isPortrait, isMobile }) => {
+      set({
+        peerIsPortrait: typeof isPortrait === "boolean" ? isPortrait : null,
+        peerIsMobile: !!isMobile,
+      });
     });
   },
 
@@ -350,15 +386,18 @@ export const useCallStore = create((set, get) => ({
       await pc.setLocalDescription(offer);
 
       const currentAuthUser = useAuthStore.getState().authUser;
+      const deviceInfo = getDeviceLayout();
       socket.emit("callUser", {
         userToCall: targetUser._id || targetUser.id,
         signalData: offer,
         callType,
+        deviceInfo,
         callerInfo: {
           _id: currentAuthUser?._id,
           name: currentAuthUser?.username || "Pulse User",
           username: currentAuthUser?.username || "Pulse User",
           profilePic: currentAuthUser?.profilePic || "",
+          deviceInfo,
         },
       });
     } catch (error) {
@@ -465,6 +504,7 @@ export const useCallStore = create((set, get) => ({
       activeSocket.emit("answerCall", {
         to: peerUser._id,
         signal: answer,
+        deviceInfo: getDeviceLayout(),
       });
 
       if (timerInterval) clearInterval(timerInterval);

@@ -30,6 +30,8 @@ const CallModal = () => {
     screenStream,
     currentFacingMode,
     isSwapped,
+    peerIsPortrait,
+    sendLayoutUpdate,
     callDuration,
     endCall,
     toggleMute,
@@ -153,6 +155,42 @@ const CallModal = () => {
     };
   }, [checkOrientation]);
 
+  // Poll orientation while in a call: metadata/resize events are unreliable
+  // on some mobile browsers, and a missed event = cropped face. Cheap (~1/s).
+  useEffect(() => {
+    if (callState !== "calling" && callState !== "connected") return;
+    const id = setInterval(checkOrientation, 1000);
+    return () => clearInterval(id);
+  }, [callState, checkOrientation]);
+
+  // Drop stale dimensions when the call ends so the next call starts fresh
+  useEffect(() => {
+    if (callState === "idle") {
+      setLocalVideoSize({ w: 0, h: 0 });
+      setRemoteVideoSize({ w: 0, h: 0 });
+      setAspectMode("auto");
+    }
+  }, [callState]);
+
+  // Tell the peer our window orientation (debounced) so their stage can
+  // lay out portrait even before our first video frame's dimensions arrive.
+  const layoutEmitTimer = useRef(null);
+  useEffect(() => {
+    if (callState !== "calling" && callState !== "connected") return;
+    const emit = () => {
+      if (layoutEmitTimer.current) clearTimeout(layoutEmitTimer.current);
+      layoutEmitTimer.current = setTimeout(() => sendLayoutUpdate?.(), 300);
+    };
+    emit();
+    window.addEventListener("resize", emit);
+    window.addEventListener("orientationchange", emit);
+    return () => {
+      window.removeEventListener("resize", emit);
+      window.removeEventListener("orientationchange", emit);
+      if (layoutEmitTimer.current) clearTimeout(layoutEmitTimer.current);
+    };
+  }, [callState, sendLayoutUpdate]);
+
   // Callback refs to instantly attach streams whenever elements mount or swap
   const bindLocalVideo = useCallback((node) => {
     localVideoRef.current = node;
@@ -220,15 +258,22 @@ const CallModal = () => {
   }
 
   // Orientation of each publisher: portrait video stays portrait on BOTH ends.
-  const isLocalPortrait = localVideoSize.h > 0 && localVideoSize.w > 0
+  // Priority per side: measured video dimensions -> signaled peer layout -> window fallback.
+  const hasLocalSize = localVideoSize.h > 0 && localVideoSize.w > 0;
+  const hasRemoteSize = remoteVideoSize.h > 0 && remoteVideoSize.w > 0;
+  const isLocalPortrait = hasLocalSize
     ? localVideoSize.h > localVideoSize.w
     : isWindowPortrait;
-  const isRemotePortrait = remoteVideoSize.h > 0 && remoteVideoSize.w > 0
+  const isRemotePortrait = hasRemoteSize
     ? remoteVideoSize.h > remoteVideoSize.w
+    : typeof peerIsPortrait === "boolean"
+    ? peerIsPortrait
     : false;
 
   // Which stream is currently on the main stage vs the mini preview?
   // Normal: main = remote, PiP = local. Swapped: main = local, PiP = remote.
+  // NOTE: the main stage below uses object-contain, so a wrong guess here can
+  // never crop a face — it only affects the portrait badge/stage hint.
   const mainShowsLocal = isSwapped;
   const autoMainPortrait = isScreenSharing && mainShowsLocal
     ? false // shared screens are landscape
@@ -236,11 +281,13 @@ const CallModal = () => {
     ? isLocalPortrait
     : hasRemoteVideo
     ? isRemotePortrait
+    : typeof peerIsPortrait === "boolean"
+    ? peerIsPortrait
     : isLocalPortrait;
   const autoPipPortrait = isScreenSharing && !mainShowsLocal
     ? false
     : mainShowsLocal
-    ? (hasRemoteVideo ? isRemotePortrait : false)
+    ? (hasRemoteVideo || hasRemoteSize ? isRemotePortrait : (typeof peerIsPortrait === "boolean" ? peerIsPortrait : false))
     : isLocalPortrait;
 
   // Manual override (PiP corner button) wins when not 'auto'.
@@ -338,6 +385,8 @@ const CallModal = () => {
             {!isSwapped ? (
               hasRemoteVideo ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-black min-h-0">
+                  {/* object-contain: NEVER crop the remote frame — a portrait
+                      phone feed pillarboxes instead of cutting the face off */}
                   <video
                     ref={bindRemoteVideo}
                     autoPlay
@@ -345,11 +394,7 @@ const CallModal = () => {
                     muted
                     onLoadedMetadata={handleRemoteMetadata}
                     onResize={handleRemoteResize}
-                    className={
-                      isMainPortrait
-                        ? "h-full w-auto aspect-[9/16] max-w-full object-cover"
-                        : "w-full h-full object-cover"
-                    }
+                    className="w-full h-full object-contain bg-black"
                   />
                 </div>
               ) : (
@@ -389,7 +434,7 @@ const CallModal = () => {
                 </div>
               )
             ) : (
-              /* Swapped: Local stream on main canvas — keeps its own orientation */
+              /* Swapped: Local stream on main canvas — same no-crop rule */
               <div className="absolute inset-0 flex items-center justify-center bg-black min-h-0">
                 <video
                   ref={bindLocalVideo}
@@ -398,11 +443,7 @@ const CallModal = () => {
                   muted
                   onLoadedMetadata={handleLocalMetadata}
                   onResize={handleLocalResize}
-                  className={`${
-                    isMainPortrait
-                      ? "h-full w-auto aspect-[9/16] max-w-full object-cover"
-                      : "w-full h-full object-cover"
-                  } ${
+                  className={`w-full h-full object-contain bg-black ${
                     currentFacingMode === "user" && !isScreenSharing ? "-scale-x-100" : ""
                   } ${isVideoOff ? "hidden" : "block"}`}
                 />
