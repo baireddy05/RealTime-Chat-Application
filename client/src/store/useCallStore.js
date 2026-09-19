@@ -24,11 +24,25 @@ const getAudioConstraints = () => ({
   autoGainControl: true,
 });
 
-const getVideoConstraints = (facingMode = "user") => ({
-  facingMode: facingMode ? { ideal: facingMode } : "user",
-  width: { ideal: 1280, max: 1920 },
-  height: { ideal: 720, max: 1080 },
-});
+const getVideoConstraints = (facingMode = "user") => {
+  // Request portrait capture on portrait phones so a mobile publisher
+  // actually sends portrait (9:16) instead of a forced landscape crop.
+  // On laptop/desktop (landscape window) keep the HD landscape default.
+  const isPortraitWindow =
+    typeof window !== "undefined" && window.innerHeight > window.innerWidth;
+  if (isPortraitWindow) {
+    return {
+      facingMode: facingMode ? { ideal: facingMode } : "user",
+      width: { ideal: 720, max: 1080 },
+      height: { ideal: 1280, max: 1920 },
+    };
+  }
+  return {
+    facingMode: facingMode ? { ideal: facingMode } : "user",
+    width: { ideal: 1280, max: 1920 },
+    height: { ideal: 720, max: 1080 },
+  };
+};
 
 export const useCallStore = create((set, get) => ({
   callState: "idle", // 'idle' | 'calling' | 'incoming' | 'connected'

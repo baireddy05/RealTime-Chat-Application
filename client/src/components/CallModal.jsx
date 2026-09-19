@@ -46,9 +46,12 @@ const CallModal = () => {
   const [reactions, setReactions] = useState([]);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   
-  // Aspect ratio mode: 'auto' | 'portrait' | 'landscape'
+  // Aspect ratio mode: 'auto' | 'portrait' | 'landscape' (manual PiP override)
   const [aspectMode, setAspectMode] = useState("auto");
-  const [isLocalStreamPortrait, setIsLocalStreamPortrait] = useState(false);
+  // Track actual captured dimensions for BOTH ends so portrait stays portrait
+  // on the publisher's phone AND on the receiver's laptop.
+  const [localVideoSize, setLocalVideoSize] = useState({ w: 0, h: 0 });
+  const [remoteVideoSize, setRemoteVideoSize] = useState({ w: 0, h: 0 });
   const [isWindowPortrait, setIsWindowPortrait] = useState(
     typeof window !== "undefined" ? window.innerHeight > window.innerWidth : false
   );
@@ -74,18 +77,71 @@ const CallModal = () => {
     !isPeerVideoOff && 
     Boolean(remoteStream && remoteStream.getVideoTracks().some((t) => t.readyState === "live"));
 
-  // Track window and stream orientation
+  // Read dimensions from a <video> element (publisher's real orientation)
+  const readVideoSize = (videoEl) => {
+    if (!videoEl) return null;
+    const { videoWidth, videoHeight } = videoEl;
+    if (videoWidth && videoHeight) return { w: videoWidth, h: videoHeight };
+    return null;
+  };
+
+  const handleLocalMetadata = useCallback((e) => {
+    const size = readVideoSize(e.target);
+    if (size) setLocalVideoSize(size);
+  }, []);
+
+  const handleRemoteMetadata = useCallback((e) => {
+    const size = readVideoSize(e.target);
+    if (size) setRemoteVideoSize(size);
+  }, []);
+
+  // <video> fires `resize` when the track dimensions change mid-call
+  // (e.g. phone rotated from portrait to landscape). Keep both ends in sync.
+  const handleLocalResize = useCallback((e) => {
+    const size = readVideoSize(e.target);
+    if (size) setLocalVideoSize((prev) => (prev.w === size.w && prev.h === size.h ? prev : size));
+  }, []);
+
+  const handleRemoteResize = useCallback((e) => {
+    const size = readVideoSize(e.target);
+    if (size) setRemoteVideoSize((prev) => (prev.w === size.w && prev.h === size.h ? prev : size));
+  }, []);
+
+  // Track window and stream orientation (fallback when metadata not ready yet)
   const checkOrientation = useCallback(() => {
     if (typeof window !== "undefined") {
       setIsWindowPortrait(window.innerHeight > window.innerWidth);
     }
-    if (localVideoRef.current) {
-      const { videoWidth, videoHeight } = localVideoRef.current;
-      if (videoWidth && videoHeight) {
-        setIsLocalStreamPortrait(videoHeight > videoWidth);
+    const localSize = readVideoSize(localVideoRef.current);
+    if (localSize) {
+      setLocalVideoSize((prev) => (prev.w === localSize.w && prev.h === localSize.h ? prev : localSize));
+    } else if (localStream) {
+      // Fall back to the capture track settings (works before first frame)
+      const track = localStream.getVideoTracks?.()?.[0];
+      const settings = track?.getSettings?.();
+      if (settings?.width && settings?.height) {
+        setLocalVideoSize((prev) =>
+          prev.w === settings.width && prev.h === settings.height
+            ? prev
+            : { w: settings.width, h: settings.height }
+        );
       }
     }
-  }, []);
+    const remoteSize = readVideoSize(remoteVideoRef.current);
+    if (remoteSize) {
+      setRemoteVideoSize((prev) => (prev.w === remoteSize.w && prev.h === remoteSize.h ? prev : remoteSize));
+    } else if (remoteStream) {
+      const track = remoteStream.getVideoTracks?.()?.[0];
+      const settings = track?.getSettings?.();
+      if (settings?.width && settings?.height) {
+        setRemoteVideoSize((prev) =>
+          prev.w === settings.width && prev.h === settings.height
+            ? prev
+            : { w: settings.width, h: settings.height }
+        );
+      }
+    }
+  }, [localStream, remoteStream]);
 
   useEffect(() => {
     checkOrientation();
@@ -106,7 +162,9 @@ const CallModal = () => {
         node.srcObject = streamToBind;
       }
       node.play?.().catch(() => {});
-      checkOrientation();
+      const size = readVideoSize(node);
+      if (size) setLocalVideoSize(size);
+      else checkOrientation();
     }
   }, [localStream, screenStream, isScreenSharing, checkOrientation]);
 
@@ -117,6 +175,8 @@ const CallModal = () => {
         node.srcObject = remoteStream;
       }
       node.play?.().catch(() => {});
+      const size = readVideoSize(node);
+      if (size) setRemoteVideoSize(size);
     }
   }, [remoteStream]);
 
@@ -159,14 +219,33 @@ const CallModal = () => {
     return null;
   }
 
-  // Calculate effective PiP aspect ratio
-  const isEffectivePortrait = isScreenSharing
+  // Orientation of each publisher: portrait video stays portrait on BOTH ends.
+  const isLocalPortrait = localVideoSize.h > 0 && localVideoSize.w > 0
+    ? localVideoSize.h > localVideoSize.w
+    : isWindowPortrait;
+  const isRemotePortrait = remoteVideoSize.h > 0 && remoteVideoSize.w > 0
+    ? remoteVideoSize.h > remoteVideoSize.w
+    : false;
+
+  // Which stream is currently on the main stage vs the mini preview?
+  // Normal: main = remote, PiP = local. Swapped: main = local, PiP = remote.
+  const mainShowsLocal = isSwapped;
+  const autoMainPortrait = isScreenSharing && mainShowsLocal
+    ? false // shared screens are landscape
+    : mainShowsLocal
+    ? isLocalPortrait
+    : hasRemoteVideo
+    ? isRemotePortrait
+    : isLocalPortrait;
+  const autoPipPortrait = isScreenSharing && !mainShowsLocal
     ? false
-    : aspectMode === "portrait"
-    ? true
-    : aspectMode === "landscape"
-    ? false
-    : isLocalStreamPortrait || isWindowPortrait;
+    : mainShowsLocal
+    ? (hasRemoteVideo ? isRemotePortrait : false)
+    : isLocalPortrait;
+
+  // Manual override (PiP corner button) wins when not 'auto'.
+  const isMainPortrait = aspectMode === "portrait" ? true : aspectMode === "landscape" ? false : autoMainPortrait;
+  const isPipPortrait = aspectMode === "portrait" ? true : aspectMode === "landscape" ? false : autoPipPortrait;
 
   const cycleAspectMode = (e) => {
     e.stopPropagation();
@@ -248,20 +327,31 @@ const CallModal = () => {
         </div>
       </div>
 
-      {/* Main View Area */}
-      <div className="w-full max-w-4xl flex-1 my-2 sm:my-3 relative rounded-3xl overflow-hidden glass-panel border border-[var(--glass-border)] shadow-glass flex items-center justify-center bg-black/20 backdrop-blur-xl z-10">
+      {/* Main View Area — portrait publisher => portrait stage on BOTH phone & laptop */}
+      <div
+        data-layout={isMainPortrait ? "portrait" : "landscape"}
+        className="w-full max-w-4xl flex-1 my-2 sm:my-3 relative rounded-3xl overflow-hidden glass-panel border border-[var(--glass-border)] shadow-glass flex items-center justify-center bg-black backdrop-blur-xl z-10 min-h-0"
+      >
         {callType === "video" ? (
           <>
             {/* Primary Main Video (Remote or Swapped Local) */}
             {!isSwapped ? (
               hasRemoteVideo ? (
-                <video
-                  ref={bindRemoteVideo}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover rounded-3xl"
-                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black min-h-0">
+                  <video
+                    ref={bindRemoteVideo}
+                    autoPlay
+                    playsInline
+                    muted
+                    onLoadedMetadata={handleRemoteMetadata}
+                    onResize={handleRemoteResize}
+                    className={
+                      isMainPortrait
+                        ? "h-full w-auto aspect-[9/16] max-w-full object-cover"
+                        : "w-full h-full object-cover"
+                    }
+                  />
+                </div>
               ) : (
                 <div className="flex flex-col items-center gap-5 text-center p-6 animate-fadeIn">
                   <div className="relative">
@@ -299,17 +389,24 @@ const CallModal = () => {
                 </div>
               )
             ) : (
-              /* Swapped: Local stream on main canvas */
-              <video
-                ref={bindLocalVideo}
-                autoPlay
-                playsInline
-                muted
-                onLoadedMetadata={checkOrientation}
-                className={`w-full h-full object-cover rounded-3xl ${
-                  currentFacingMode === "user" && !isScreenSharing ? "-scale-x-100" : ""
-                } ${isVideoOff ? "hidden" : "block"}`}
-              />
+              /* Swapped: Local stream on main canvas — keeps its own orientation */
+              <div className="absolute inset-0 flex items-center justify-center bg-black min-h-0">
+                <video
+                  ref={bindLocalVideo}
+                  autoPlay
+                  playsInline
+                  muted
+                  onLoadedMetadata={handleLocalMetadata}
+                  onResize={handleLocalResize}
+                  className={`${
+                    isMainPortrait
+                      ? "h-full w-auto aspect-[9/16] max-w-full object-cover"
+                      : "w-full h-full object-cover"
+                  } ${
+                    currentFacingMode === "user" && !isScreenSharing ? "-scale-x-100" : ""
+                  } ${isVideoOff ? "hidden" : "block"}`}
+                />
+              </div>
             )}
 
             {/* Screen Share Active Badge */}
@@ -317,6 +414,14 @@ const CallModal = () => {
               <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium backdrop-blur-md animate-pulse shadow-md">
                 <Monitor size={13} />
                 <span>Screen Share Active</span>
+              </div>
+            )}
+
+            {/* Portrait-stage badge: shows when the publisher on main stage is portrait (mobile) */}
+            {!isScreenSharing && isMainPortrait && (mainShowsLocal ? !isVideoOff : hasRemoteVideo) && (
+              <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 border border-white/15 text-white/85 text-[10px] font-medium backdrop-blur-md shadow-md">
+                <Smartphone size={12} />
+                <span>Portrait</span>
               </div>
             )}
 
@@ -333,14 +438,15 @@ const CallModal = () => {
               ))}
             </div>
 
-            {/* Picture-in-Picture (PiP) Video Preview */}
+            {/* Picture-in-Picture (PiP) Video Preview — mirrors its own publisher */}
             <div
               onClick={toggleSwapVideo}
               title="Click to swap main view and mini view"
+              data-layout={isPipPortrait ? "portrait" : "landscape"}
               className={`absolute bottom-3 sm:bottom-4 right-3 sm:right-4 z-20 cursor-pointer overflow-hidden rounded-2xl border-2 border-[var(--glass-border)] shadow-2xl bg-slate-950 backdrop-blur-xl transition-all duration-300 hover:scale-105 group ${
-                isEffectivePortrait
-                  ? "w-24 xs:w-28 sm:w-32 md:w-36 aspect-[3/4]"
-                  : "w-32 xs:w-36 sm:w-44 md:w-48 aspect-video"
+                isPipPortrait
+                  ? "w-24 sm:w-32 md:w-36 aspect-[3/4]"
+                  : "w-32 sm:w-44 md:w-48 aspect-video"
               }`}
             >
               {!isSwapped ? (
@@ -351,7 +457,8 @@ const CallModal = () => {
                     autoPlay
                     playsInline
                     muted
-                    onLoadedMetadata={checkOrientation}
+                    onLoadedMetadata={handleLocalMetadata}
+                    onResize={handleLocalResize}
                     className={`w-full h-full object-cover ${
                       currentFacingMode === "user" && !isScreenSharing ? "-scale-x-100" : ""
                     } ${isVideoOff ? "hidden" : "block"}`}
@@ -372,6 +479,8 @@ const CallModal = () => {
                       autoPlay
                       playsInline
                       muted
+                      onLoadedMetadata={handleRemoteMetadata}
+                      onResize={handleRemoteResize}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -405,7 +514,7 @@ const CallModal = () => {
                   className="p-1 rounded text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
                   title={`Aspect Ratio: ${aspectMode.toUpperCase()}`}
                 >
-                  {isEffectivePortrait ? <RectangleHorizontal size={13} /> : <Smartphone size={13} />}
+                  {isPipPortrait ? <RectangleHorizontal size={13} /> : <Smartphone size={13} />}
                 </button>
 
                 {/* Swap View Button */}
@@ -425,7 +534,7 @@ const CallModal = () => {
               {/* PiP Label Badge */}
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 text-[9.5px] font-medium text-white/90 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md">
                 <span>{!isSwapped ? "You" : peerUser?.name || "Peer"}</span>
-                {isEffectivePortrait && (
+                {isPipPortrait && (
                   <span className="text-[8px] text-accent-primary font-mono font-semibold">9:16</span>
                 )}
               </div>
