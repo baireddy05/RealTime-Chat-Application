@@ -1377,6 +1377,79 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  pendingJumpMessageId: null,
+
+  // Jump to any message (e.g. from Starred drawer): switches chat first if
+  // the message lives in a different conversation, then scrolls to it.
+  jumpToMessage: (msg) => {
+    const msgId = msg?._id || msg;
+    if (!msgId) return;
+    const myId = useAuthStore.getState().authUser?._id?.toString();
+    const state = get();
+    const roomId = (msg?.roomId?._id || msg?.roomId)?.toString();
+
+    let target = null;
+    if (roomId) {
+      const room = (state.rooms || []).find(
+        (r) => (r._id || r.id)?.toString() === roomId
+      );
+      target = {
+        id: roomId,
+        _id: roomId,
+        type: "room",
+        name: room?.name || "Channel",
+        description: room?.description || "",
+        members: room?.members || [],
+        createdBy: room?.createdBy,
+        admins: room?.admins,
+        avatar: room?.avatar,
+        profilePic: room?.profilePic,
+      };
+    } else if (msg && typeof msg === "object") {
+      const senderId = (msg.senderId?._id || msg.senderId)?.toString();
+      const receiverId = (msg.receiverId?._id || msg.receiverId)?.toString();
+      const otherId = senderId === myId ? receiverId : senderId;
+      if (otherId) {
+        const friends = useFriendStore.getState().friends || [];
+        const users = state.users || [];
+        const person = [...friends, ...users].find(
+          (f) => (f._id || f.id)?.toString() === otherId
+        );
+        const fallbackName =
+          senderId === myId ? "Saved Messages" : msg.senderId?.username || "Chat";
+        target = {
+          id: otherId,
+          type: "user",
+          name: person?.username || fallbackName,
+          profilePic: person?.profilePic,
+          avatar: person?.profilePic || person?.avatar,
+        };
+      }
+    }
+
+    set({ pendingJumpMessageId: msgId, isStarredOpen: false });
+    if (target?.id && state.selectedChat?.id?.toString() !== target.id.toString()) {
+      get().setSelectedChat(target);
+    }
+
+    // Poll until the message element is rendered (covers chat-switch load time)
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries++;
+      const el = typeof document !== "undefined" && document.getElementById(`msg-${msgId}`);
+      if (el) {
+        clearInterval(timer);
+        set({ pendingJumpMessageId: null });
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-accent-primary", "rounded-2xl", "shadow-glow");
+        setTimeout(() => el.classList.remove("ring-2", "ring-accent-primary", "shadow-glow"), 2000);
+      } else if (tries > 25) {
+        clearInterval(timer);
+        set({ pendingJumpMessageId: null });
+      }
+    }, 300);
+  },
+
   setSelectedChat: (chat) => {
     const current = get().selectedChat;
     const socket = useAuthStore.getState().socket;

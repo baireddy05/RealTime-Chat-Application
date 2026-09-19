@@ -223,13 +223,19 @@ export const getMessages = async (req, res) => {
 
       return res.status(200).json(messages);
     } else {
+      // NOTE: expiry + DM pair filters are combined with $and — spreading two
+      // $or clauses would let the second overwrite the first.
       const messages = await Message.find({
         ...notScheduled,
         ...notThreadReply,
-        ...notExpired,
-        $or: [
-          { senderId: myId, receiverId: id },
-          { senderId: id, receiverId: myId },
+        $and: [
+          { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+          {
+            $or: [
+              { senderId: myId, receiverId: id },
+              { senderId: id, receiverId: myId },
+            ],
+          },
         ],
       })
         .populate("senderId", "username profilePic")

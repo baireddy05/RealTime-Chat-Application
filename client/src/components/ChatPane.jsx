@@ -1298,7 +1298,7 @@ const ChatPane = ({ onBack }) => {
       )}
 
       {forwardingMessage && <ForwardModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />}
-      {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} onJumpToMessage={(msgId) => scrollToMessage(msgId)} />}
+      {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
       {isGroupInfoOpen && selectedChat.type === "room" && (
         <GroupInfoModal group={selectedChat} onClose={() => setIsGroupInfoOpen(false)} onSelectUser={(userChat) => setSelectedChat(userChat)} />
       )}

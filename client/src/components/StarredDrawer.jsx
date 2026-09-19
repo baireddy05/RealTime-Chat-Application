@@ -9,6 +9,7 @@ const StarredDrawer = ({ onClose, onJumpToMessage }) => {
     isStarredLoading,
     getStarredMessages,
     toggleStarMessage,
+    jumpToMessage,
   } = useChatStore();
 
   useEffect(() => {
@@ -123,7 +124,8 @@ const StarredDrawer = ({ onClose, onJumpToMessage }) => {
                   <div className="mt-3 pt-2 border-t border-[var(--glass-border)] flex justify-end">
                     <button
                       onClick={() => {
-                        onJumpToMessage?.(msg._id);
+                        if (onJumpToMessage) onJumpToMessage(msg);
+                        else jumpToMessage(msg);
                         onClose();
                       }}
                       className="flex items-center gap-1 text-[11px] text-accent-primary hover:underline font-medium"

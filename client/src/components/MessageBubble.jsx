@@ -793,20 +793,18 @@ const MessageBubble = memo(({
                               </button>
                             )}
 
-                            {selectedChat?.type === "room" && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  togglePinMessage(message._id);
-                                  setOpenMenuMessageId(null);
-                                  setMenuAnchor(null);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
-                              >
-                                <Pin size={14} className="text-theme-muted" />
-                                <span>{message.isPinned ? "Unpin Message" : "Pin Message"}</span>
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                togglePinMessage(message._id);
+                                setOpenMenuMessageId(null);
+                                setMenuAnchor(null);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                            >
+                              <Pin size={14} className="text-theme-muted" />
+                              <span>{message.isPinned ? "Unpin Message" : "Pin Message"}</span>
+                            </button>
                             
                             <button
                               type="button"
