@@ -206,9 +206,9 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
       <div className="relative w-full max-w-4xl bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-10 overflow-hidden flex flex-col md:flex-row max-h-[92vh] animate-scaleIn text-zinc-900 dark:text-white">
         
         {/* LEFT COLUMN: Controls & Presets */}
-        <div className="w-full md:w-[54%] flex flex-col border-b md:border-b-0 md:border-r border-black/10 dark:border-white/10 max-h-[48vh] md:max-h-full overflow-hidden">
+        <div className="w-full md:w-[54%] flex flex-col border-b md:border-b-0 md:border-r border-black/10 dark:border-white/10 min-h-0 flex-1 md:flex-none md:max-h-full overflow-hidden">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between bg-black/[0.02] dark:bg-white/[0.02]">
+          <div className="px-4 sm:px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center font-bold shadow-md">
                 <Palette size={18} />
@@ -229,56 +229,56 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 px-6 pt-3 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01]">
+          {/* Navigation Tabs — horizontally scrollable on narrow screens */}
+          <div className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6 pt-3 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] overflow-x-auto no-scrollbar shrink-0">
             <button
               onClick={() => setActiveTab("presets")}
-              className={`flex items-center gap-1.5 pb-2.5 px-1.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 px-1.5 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === "presets"
                   ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                   : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
               }`}
             >
-              <Sparkles size={13} />
-              <span>Theme Presets</span>
+              <Sparkles size={13} className="shrink-0" />
+              <span>Presets</span>
             </button>
 
             <button
               onClick={() => setActiveTab("wallpaper")}
-              className={`flex items-center gap-1.5 pb-2.5 px-1.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 px-1.5 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === "wallpaper"
                   ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                   : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
               }`}
             >
-              <ImageIcon size={13} />
-              <span>Custom Wallpaper</span>
+              <ImageIcon size={13} className="shrink-0" />
+              <span>Wallpaper</span>
             </button>
 
             <button
               onClick={() => setActiveTab("bubbles")}
-              className={`flex items-center gap-1.5 pb-2.5 px-1.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 px-1.5 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === "bubbles"
                   ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                   : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
               }`}
             >
-              <Layers size={13} />
-              <span>Bubble Colors</span>
+              <Layers size={13} className="shrink-0" />
+              <span>Bubbles</span>
             </button>
           </div>
 
           {/* Tab Contents */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
             {activeTab === "presets" && (
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2.5">
                 {CHAT_THEME_PRESETS.map((preset) => {
                   const isSelected = activePresetId === preset.id && !customBubbleColor;
                   return (
                     <div
                       key={preset.id}
                       onClick={() => handleSelectPreset(preset.id)}
-                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-24 relative overflow-hidden group active:scale-[0.98] ${
+                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-20 min-[420px]:h-24 relative overflow-hidden group active:scale-[0.98] ${
                         isSelected
                           ? "border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/30 bg-black/5 dark:bg-white/10 shadow-md"
                           : "border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/30 bg-black/[0.02] dark:bg-white/[0.03]"
@@ -489,7 +489,7 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t border-black/10 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.02] flex flex-col gap-2.5">
+          <div className="p-4 border-t border-black/10 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.02] flex flex-col gap-2.5 shrink-0">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -533,8 +533,9 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Real-Time Interactive Live Chat Preview */}
-        <div className="w-full md:w-[46%] flex flex-col bg-zinc-100/80 dark:bg-[#0c0b10] relative overflow-hidden">
+        {/* RIGHT COLUMN: Real-Time Interactive Live Chat Preview (desktop only —
+            on mobile the sheet is controls-only so it fits the viewport) */}
+        <div className="hidden md:flex w-full md:w-[46%] flex-col bg-zinc-100/80 dark:bg-[#0c0b10] relative overflow-hidden">
           {/* Header of Mock Chat Preview */}
           <div className="px-4 py-3 bg-white/70 dark:bg-[#14131b]/80 backdrop-blur-md border-b border-black/5 dark:border-white/5 flex items-center justify-between relative z-10">
             <div className="flex items-center gap-2.5">
@@ -583,13 +584,13 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
               />
             )}
 
-            {/* 2. Optional SVG Doodle Overlay */}
+            {/* 2. WhatsApp-style doodle wallpaper overlay */}
             {styles.hasDoodles && (
               <div
-                className="absolute inset-0 z-0 pointer-events-none opacity-25 dark:opacity-20 transition-opacity"
+                className="absolute inset-0 z-0 pointer-events-none opacity-30 transition-opacity"
                 style={{
-                  backgroundImage: `url("${CHAT_DOODLE_SVG}")`,
-                  backgroundSize: "280px 280px",
+                  backgroundImage: `url("${styles.doodleSvg || CHAT_DOODLE_SVG}")`,
+                  backgroundSize: "400px 400px",
                 }}
               />
             )}

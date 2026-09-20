@@ -276,13 +276,26 @@ export const sendMessage = async (req, res) => {
       isSticker,
       poll,
       isWhisper,
+      videoMessage,
+      videoNote,
+      location,
     } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
+    const resolvedVideoNote = videoNote || (typeof videoMessage === "string" ? videoMessage : videoMessage?.videoUrl) || null;
+    let resolvedLocation = null;
+    if (location) {
+      const lat = location.lat ?? location.latitude;
+      const lng = location.lng ?? location.longitude;
+      if (lat !== undefined && lng !== undefined) {
+        resolvedLocation = { lat: Number(lat), lng: Number(lng) };
+      }
+    }
+
     // Validate: at least one content field is required
-    if (!text && !image && !audio && !file && !contact && !poll) {
-      return res.status(400).json({ error: "Message must contain text, media, file, contact, or poll" });
+    if (!text && !image && !audio && !file && !contact && !poll && !resolvedVideoNote && !resolvedLocation) {
+      return res.status(400).json({ error: "Message must contain text, media, file, contact, poll, video note, or location" });
     }
     if (!roomId && !receiverId) {
       return res.status(400).json({ error: "Missing receiver or room" });
@@ -390,6 +403,8 @@ export const sendMessage = async (req, res) => {
         isSticker: Boolean(isSticker),
         poll: poll || null,
         isWhisper: Boolean(isWhisper),
+        videoNote: resolvedVideoNote,
+        location: resolvedLocation,
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -419,6 +434,8 @@ export const sendMessage = async (req, res) => {
         isSticker: Boolean(isSticker),
         poll: poll || null,
         isWhisper: Boolean(isWhisper),
+        videoNote: resolvedVideoNote,
+        location: resolvedLocation,
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");

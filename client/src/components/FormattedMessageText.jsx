@@ -116,32 +116,61 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({node, inline, className, children, ...props}) {
-            const match = /language-(\w+)/.exec(className || '')
-            return !inline && match ? (
-              <CodeSnippetBlock code={String(children).replace(/\n$/, '')} language={match[1]} />
-            ) : !inline ? (
-              <CodeSnippetBlock code={String(children).replace(/\n$/, '')} language="text" />
-            ) : (
-              <code className="px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] bg-current/10 border border-current/15 font-semibold" {...props}>
+          code({node, className, children, ...props}) {
+            const match = /language-(\w+)/.exec(className || '');
+            // In react-markdown v10, block code is wrapped in <pre> or has newlines/language class
+            const isMultiLine = String(children).includes('\n');
+            const hasLang = Boolean(match);
+            if (hasLang || isMultiLine) {
+              return (
+                <CodeSnippetBlock
+                  code={String(children).replace(/\n$/, '')}
+                  language={match ? match[1] : 'code'}
+                />
+              );
+            }
+            return (
+              <code
+                className="px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[12px] bg-current/10 border border-current/15 font-semibold inline-block align-baseline"
+                {...props}
+              >
                 {children}
               </code>
-            )
+            );
+          },
+          pre({children}) {
+            return <>{children}</>;
           },
           p({children}) {
-            return <p className="whitespace-pre-wrap leading-relaxed m-0">{
-              Array.isArray(children) 
-                ? children.map((child, i) => <span key={i}>{typeof child === 'string' ? processText(child, searchQuery) : child}</span>)
-                : typeof children === 'string' ? processText(children, searchQuery) : children
-            }</p>;
+            return (
+              <div className="whitespace-pre-wrap leading-relaxed my-1">
+                {Array.isArray(children)
+                  ? children.map((child, i) => (
+                      <span key={i}>
+                        {typeof child === 'string' ? processText(child, searchQuery) : child}
+                      </span>
+                    ))
+                  : typeof children === 'string'
+                  ? processText(children, searchQuery)
+                  : children}
+              </div>
+            );
           },
           li({children}) {
-            return <li className="leading-relaxed m-0">{
-              Array.isArray(children) 
-                ? children.map((child, i) => <span key={i}>{typeof child === 'string' ? processText(child, searchQuery) : child}</span>)
-                : typeof children === 'string' ? processText(children, searchQuery) : children
-            }</li>;
-          }
+            return (
+              <li className="leading-relaxed m-0">
+                {Array.isArray(children)
+                  ? children.map((child, i) => (
+                      <span key={i}>
+                        {typeof child === 'string' ? processText(child, searchQuery) : child}
+                      </span>
+                    ))
+                  : typeof children === 'string'
+                  ? processText(children, searchQuery)
+                  : children}
+              </li>
+            );
+          },
         }}
       >
         {text}

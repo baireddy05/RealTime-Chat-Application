@@ -109,7 +109,7 @@ const MessageBubble = memo(({
     try {
       const { axiosInstance } = await import("../lib/axios");
       const targetLanguage = navigator.language.split('-')[0] || 'en';
-      const res = await axiosInstance.post(`/messages/message/${message._id}/translate`, { targetLanguage });
+      const res = await axiosInstance.post(`/chat/message/${message._id}/translate`, { targetLanguage });
       setTranslatedText(res.data.translatedText);
     } catch (err) {
       console.error("Translation failed:", err);

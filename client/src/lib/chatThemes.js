@@ -1,7 +1,15 @@
 // Standard Chat Themes & Acoustic Visual Presets for Pulse Chat
 
-// Subtle SVG Doodle pattern for chat background
-export const CHAT_DOODLE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" fill="none" viewBox="0 0 280 280"><g opacity="0.6" stroke="%238a8d91" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M25 40a15 15 0 1030 0 15 15 0 10-30 0zM35 35l10 10M45 35l-10 10M110 30h25a8 8 0 018 8v12a8 8 0 01-8 8h-15l-10 6v-6h0a8 8 0 010-16M195 25l12 20 22 4-16 16 4 22-22-12-22 12 4-22-16-16 22-4zM25 120c8 0 14 6 14 14v10a14 14 0 01-28 0v-10c0-8 6-14 14-14zM100 115a18 18 0 1136 0 18 18 0 01-36 0zM118 105v20M108 115h20M200 130a15 15 0 0125-5l5 25-25-5a15 15 0 01-5-15zM40 210l15-15 15 15-15 15zM120 200c0-10 8-18 18-18s18 8 18 18c0 12-18 25-18 25s-18-13-18-25zM210 205h30v25h-30zM225 195v10"/></g></svg>`;
+// WhatsApp-style doodle wallpaper: a dense hand-drawn tile (chat bubbles,
+// smileys, camera, mic, hearts, stars, music notes, pins, planes...) rendered
+// as a repeating background. Two variants so doodles stay visible on both
+// dark and light chat backgrounds. Single quotes inside the SVG keep the
+// CSS url("...") wrapper valid; '#' must stay %23-encoded.
+const buildDoodleSvg = (stroke) => `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400' fill='none' viewBox='0 0 400 400'><g stroke='${stroke}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><g transform='translate(58,64)'><circle r='20'/><path d='M-7,-6 v5 M7,-6 v5'/><path d='M-10,6 Q0,15 10,6'/></g><g transform='translate(190,52) rotate(-8)'><rect x='-26' y='-20' width='52' height='34' rx='9'/><path d='M-12,14 l-4,12 l14,-10'/></g><g transform='translate(318,60)'><path d='M0,14 C-14,4 -26,-4 -26,-14 C-26,-22 -20,-27 -13,-27 C-7,-27 -2,-23 0,-20 C2,-23 7,-27 13,-27 C20,-27 26,-22 26,-14 C26,-4 14,4 0,14 Z'/></g><g transform='translate(70,170) rotate(12)'><path d='M0,-16 L4.7,-5.5 L16,-5.5 L7,1.5 L10.5,12.5 L0,6 L-10.5,12.5 L-7,1.5 L-16,-5.5 L-4.7,-5.5 Z'/></g><g transform='translate(190,160)'><ellipse cx='-8' cy='12' rx='7' ry='5' transform='rotate(-20 -8 12)'/><path d='M-1,12 V-14'/><path d='M-1,-14 C8,-12 14,-6 13,2'/></g><g transform='translate(312,164) rotate(-6)'><rect x='-22' y='-12' width='44' height='30' rx='7'/><circle r='8'/><path d='M-8,-12 v-5 h16 v5'/></g><g transform='translate(64,272)'><rect x='-9' y='-22' width='18' height='32' rx='9'/><path d='M-16,-2 a16,16 0 0 0 32,0 M0,14 v10 M-9,28 h18'/></g><g transform='translate(185,268) rotate(18)'><path d='M6,-20 v26 a10,10 0 0 1 -20,0 v-30 a6,6 0 0 1 12,0 v24'/></g><g transform='translate(310,272)'><path d='M0,18 C-12,4 -18,-4 -18,-12 A18,18 0 0 1 18,-12 C18,-4 12,4 0,18 Z'/><circle cy='-11' r='6'/></g><g transform='translate(60,360)'><rect x='-22' y='-14' width='44' height='32' rx='6'/><circle cx='-10' cy='-4' r='3.5'/><path d='M-22,12 L-8,-2 L0,6 L8,-4 L22,10'/></g><g transform='translate(180,356)'><circle r='18'/><path d='M-5,-9 L9,0 L-5,9 Z'/></g><g transform='translate(300,356) rotate(-15)'><path d='M6,-14 A17,17 0 1,0 6,14 A13,13 0 1,1 6,-14 Z'/></g><g transform='translate(250,110) rotate(10)'><path d='M-20,-10 L20,-2 L-4,14 L-8,2 Z'/></g><g transform='translate(130,228)'><circle r='9'/><path d='M0,-16 v-6 M0,16 v6 M-16,0 h-6 M16,0 h6 M-11,-11 l-4,-4 M11,-11 l4,-4 M-11,11 l-4,4 M11,11 l4,4'/></g><g transform='translate(252,222)'><path d='M0,-12 V12 M-12,0 H12'/><circle cx='19' cy='-15' r='2.4'/></g><circle cx='128' cy='120' r='2.6'/><circle cx='352' cy='120' r='2.6'/><circle cx='120' cy='322' r='2.6'/><circle cx='250' cy='322' r='2.6'/><circle cx='24' cy='220' r='2.6'/><circle cx='362' cy='232' r='2.6'/></g></svg>`;
+
+// White doodles for dark chat backgrounds, dark-slate for light ones.
+export const CHAT_DOODLE_SVG = buildDoodleSvg('%23ffffff');
+export const CHAT_DOODLE_SVG_LIGHT = buildDoodleSvg('%23334155');
 
 export const CHAT_THEME_PRESETS = [
   {
@@ -201,6 +209,7 @@ const resolveDefaultPreset = (preset, isDark) => {
     ),
     wallpaperGradient: preset.wallpaperGradient || "transparent",
     hasDoodles: preset.hasDoodles ?? true,
+    doodleSvg: isDark ? CHAT_DOODLE_SVG : CHAT_DOODLE_SVG_LIGHT,
     customWallpaperUrl: null,
     wallpaperOpacity: 0.25,
   };
@@ -228,6 +237,7 @@ export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
       bubbleIncomingText: isDark ? preset.bubbleIncomingTextDark : preset.bubbleIncomingText,
       wallpaperGradient: preset.wallpaperGradient || "transparent",
       hasDoodles: preset.hasDoodles ?? true,
+      doodleSvg: isDark ? CHAT_DOODLE_SVG : CHAT_DOODLE_SVG_LIGHT,
       customWallpaperUrl: null,
       wallpaperOpacity: 0.25,
     };
@@ -246,6 +256,7 @@ export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
       accentColor: themeConfigOrId?.accentColor || preset.accentColor,
       wallpaperGradient: preset.wallpaperGradient || "transparent",
       hasDoodles: themeConfigOrId?.hasDoodles ?? preset.hasDoodles,
+      doodleSvg: isDark ? CHAT_DOODLE_SVG : CHAT_DOODLE_SVG_LIGHT,
       customWallpaperUrl: themeConfigOrId?.customWallpaperUrl || null,
       wallpaperOpacity: themeConfigOrId?.wallpaperOpacity ?? 0.35,
     };
@@ -261,6 +272,7 @@ export const resolveThemeStyles = (themeConfigOrId, isDark = true) => {
     bubbleIncomingText: isDark ? preset.bubbleIncomingTextDark : preset.bubbleIncomingText,
     wallpaperGradient: preset.wallpaperGradient || "transparent",
     hasDoodles: themeConfigOrId?.hasDoodles ?? preset.hasDoodles,
+    doodleSvg: isDark ? CHAT_DOODLE_SVG : CHAT_DOODLE_SVG_LIGHT,
     customWallpaperUrl: themeConfigOrId?.customWallpaperUrl || null,
     wallpaperOpacity: themeConfigOrId?.wallpaperOpacity ?? 0.35,
   };

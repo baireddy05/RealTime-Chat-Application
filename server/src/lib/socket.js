@@ -214,13 +214,13 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("groupCallStarted", { roomId, startedBy: userId });
   });
 
-  socket.on("signalGroupUser", ({ userToSignal, callerId, signal }) => {
-    // Send a WebRTC signal to a specific user in the group call
-    io.to(userToSignal.toString()).emit("userJoinedGroupCall", { signal, callerId });
+  socket.on("signalGroupUser", ({ userToSignal, signal }) => {
+    // Send a WebRTC signal to a specific user in the group call with authenticated userId as callerId
+    io.to(userToSignal.toString()).emit("userJoinedGroupCall", { signal, callerId: userId });
   });
 
-  socket.on("returnGroupSignal", ({ signal, callerId }) => {
-    // Return a WebRTC signal back to the initiator
+  socket.on("returnGroupSignal", ({ callerId, signal }) => {
+    // Return a WebRTC signal back to the initiator with authenticated userId as id
     io.to(callerId.toString()).emit("receivingReturnedGroupSignal", { signal, id: userId });
   });
 

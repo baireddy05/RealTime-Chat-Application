@@ -734,13 +734,13 @@ const ChatPane = ({ onBack }) => {
         />
       ) : null}
 
-      {/* 2. Optional SVG Doodle Overlay */}
+      {/* 2. WhatsApp-style doodle wallpaper overlay */}
       {themeStyles.hasDoodles && (
         <div
-          className="absolute inset-0 z-0 pointer-events-none opacity-20 dark:opacity-15 transition-opacity"
+          className="absolute inset-0 z-0 pointer-events-none opacity-30 transition-opacity"
           style={{
-            backgroundImage: `url("${CHAT_DOODLE_SVG}")`,
-            backgroundSize: "280px 280px",
+            backgroundImage: `url("${themeStyles.doodleSvg || CHAT_DOODLE_SVG}")`,
+            backgroundSize: "400px 400px",
           }}
         />
       )}

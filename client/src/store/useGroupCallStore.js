@@ -37,33 +37,43 @@ export const useGroupCallStore = create((set, get) => ({
       });
     });
 
-    // Someone else joined the room; they sent us an offer
+    // Someone else joined the room; they sent us an offer or ICE candidate
     socket.on("userJoinedGroupCall", async ({ signal, callerId }) => {
       const { localStream, activeSocket } = get();
       if (!localStream) return;
-      const peer = get().createPeer(callerId, false, localStream);
+      let peer = get().peers[callerId];
+      if (!peer) {
+        peer = get().createPeer(callerId, false, localStream);
+        set(state => ({ peers: { ...state.peers, [callerId]: peer } }));
+      }
       
       try {
-        await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp || signal));
-        if (signal.type === "offer" || signal.sdp?.type === "offer") {
-          const answer = await peer.createAnswer();
-          await peer.setLocalDescription(answer);
-          activeSocket.emit("returnGroupSignal", { signal: answer, callerId });
+        if (signal?.candidate) {
+          await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        } else if (signal?.sdp || signal?.type) {
+          await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp || signal));
+          if (signal.type === "offer" || signal.sdp?.type === "offer") {
+            const answer = await peer.createAnswer();
+            await peer.setLocalDescription(answer);
+            activeSocket.emit("returnGroupSignal", { signal: answer, callerId });
+          }
         }
       } catch (err) {
-        console.error("Error setting remote description for incoming peer:", err);
+        console.error("Error handling incoming group call signal:", err);
       }
-
-      set(state => ({ peers: { ...state.peers, [callerId]: peer } }));
     });
 
-    // We received an answer to our offer
+    // We received an answer to our offer or ICE candidate
     socket.on("receivingReturnedGroupSignal", async ({ signal, id }) => {
       const { peers } = get();
       const peer = peers[id];
       if (peer) {
         try {
-          await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp || signal));
+          if (signal?.candidate) {
+            await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } else if (signal?.sdp || signal?.type) {
+            await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp || signal));
+          }
         } catch (err) {
           console.error("Error setting remote description for returning signal:", err);
         }
@@ -101,6 +111,15 @@ export const useGroupCallStore = create((set, get) => ({
       }));
     };
 
+    peer.onicecandidate = (event) => {
+      if (event.candidate && activeSocket) {
+        activeSocket.emit("signalGroupUser", {
+          userToSignal,
+          signal: { candidate: event.candidate }
+        });
+      }
+    };
+
     if (isInitiator) {
       peer.onnegotiationneeded = async () => {
         try {
@@ -108,7 +127,6 @@ export const useGroupCallStore = create((set, get) => ({
           await peer.setLocalDescription(offer);
           activeSocket.emit("signalGroupUser", {
             userToSignal,
-            callerId: activeSocket.userId, 
             signal: offer
           });
         } catch (err) {
