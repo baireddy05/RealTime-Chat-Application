@@ -984,7 +984,7 @@ const Sidebar = ({
 
         {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
         <div className="relative select-none">
-          <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1 pr-7">
+          <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1">
             <button
               onClick={() => setActiveFilter("all")}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
@@ -1089,9 +1089,9 @@ const Sidebar = ({
                 type="button"
                 onClick={() => scrollTabs(-1)}
                 title="Scroll tabs left"
-                className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white dark:bg-[#1e1d26] border border-black/10 dark:border-white/15 shadow-md hidden md:flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                className="absolute left-0 top-0 bottom-0 w-7 hidden md:flex items-center justify-start text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
-                <span className="material-symbols-outlined text-base">chevron_left</span>
+                <span className="material-symbols-outlined text-xl drop-shadow">chevron_left</span>
               </button>
             </>
           )}
@@ -1105,9 +1105,9 @@ const Sidebar = ({
                 type="button"
                 onClick={() => scrollTabs(1)}
                 title="More filters — scroll right"
-                className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white dark:bg-[#1e1d26] border border-black/10 dark:border-white/15 shadow-md hidden md:flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors animate-fadeIn"
+                className="absolute right-0 top-0 bottom-0 w-7 hidden md:flex items-center justify-end animate-fadeIn text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
-                <span className="material-symbols-outlined text-base">chevron_right</span>
+                <span className="material-symbols-outlined text-xl drop-shadow">chevron_right</span>
               </button>
             </>
           )}
