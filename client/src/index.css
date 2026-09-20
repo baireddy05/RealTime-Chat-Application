@@ -887,6 +887,42 @@ img.emoji {
   touch-action: pan-y;
 }
 
+/* ── Animated Message Delivery Ticks ── */
+@keyframes tick-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.tick-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: tick-draw 0.28s ease-out forwards;
+}
+
+.tick-draw-2 {
+  animation-delay: 0.14s;
+}
+
+@keyframes tick-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+.tick-pop {
+  animation: tick-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.tick-read {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 3px rgba(56, 189, 248, 0.55));
+}
+
+.tick-svg {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
 /* App logo rendered as a squircle (superellipse approximation used by iOS icons) */
 .logo-squircle {
   border-radius: 28%;
@@ -913,8 +949,14 @@ img.emoji {
   .animate-typing-dot-2,
   .animate-typing-dot-3,
   .animate-outgoing-glide,
-  .animate-incoming-glide {
+  .animate-incoming-glide,
+  .tick-pop {
     animation: none !important;
+  }
+  .tick-draw,
+  .tick-draw-2 {
+    animation: none !important;
+    stroke-dashoffset: 0;
   }
 }
 

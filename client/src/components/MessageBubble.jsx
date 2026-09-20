@@ -6,6 +6,7 @@ import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
 import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
+import MessageTicks from "./MessageTicks";
 import { isOnlyEmojis, EmojiSpan } from "../lib/emoji";
 import { useChatStore } from "../store/useChatStore";
 
@@ -523,12 +524,12 @@ const MessageBubble = memo(({
                                 message.isOptimistic ? (
                                   <Clock size={11} className="opacity-70 animate-pulse text-white" title="Sending..." />
                                 ) : (
-                                  <span 
+                                  <MessageTicks
+                                    status={isReadByRecipient ? "read" : isDeliveredToRecipient ? "delivered" : "sent"}
                                     title={statusTitle}
-                                    className={`material-symbols-outlined text-[13px] cursor-help ${isReadByRecipient ? "font-bold opacity-100 text-blue-400" : "font-semibold text-white/90"}`}
-                                  >
-                                    {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
-                                  </span>
+                                    size={13}
+                                    className="text-white/90"
+                                  />
                                 )
                               )}
                             </div>
@@ -686,12 +687,12 @@ const MessageBubble = memo(({
                                 message.isOptimistic ? (
                                   <Clock size={11} className={`opacity-70 animate-pulse ${isJustEmoji ? "text-theme-muted drop-shadow-sm" : ""}`} title="Sending..." />
                                 ) : (
-                                  <span 
+                                  <MessageTicks
+                                    status={isReadByRecipient ? "read" : isDeliveredToRecipient ? "delivered" : "sent"}
                                     title={statusTitle}
-                                    className={`material-symbols-outlined text-sm cursor-help ${isJustEmoji ? "text-theme-muted drop-shadow-sm " : ""}${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold opacity-70"}`}
-                                  >
-                                    {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
-                                  </span>
+                                    size={14}
+                                    className={isJustEmoji ? "text-theme-muted drop-shadow-sm" : "opacity-70"}
+                                  />
                                 )
                               )}
                             </div>
@@ -797,12 +798,11 @@ const MessageBubble = memo(({
                             message.isOptimistic ? (
                               <Clock size={11} className="opacity-70 animate-pulse" title="Sending..." />
                             ) : (
-                              <span 
+                              <MessageTicks
+                                status={isReadByRecipient ? "read" : isDeliveredToRecipient ? "delivered" : "sent"}
                                 title={statusTitle}
-                                className={`material-symbols-outlined text-sm cursor-help ${isReadByRecipient ? "font-bold opacity-100 text-blue-500" : "font-semibold"}`}
-                              >
-                                {isReadByRecipient || isDeliveredToRecipient ? "done_all" : "done"}
-                              </span>
+                                size={14}
+                              />
                             )
                           )}
                           {message.isEdited && (

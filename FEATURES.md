@@ -25,7 +25,7 @@ This document serves as the central source of truth for all features currently i
 - **Live Typing Indicators:** Real-time visual feedback when the other person is typing.
 - **Message Formatting:** Rich text formatting.
 - **In-Chat Search:** Search for specific messages inside a conversation.
-- **Global Message Search:** Search across every conversation at once with media-only, sender, and date-range filters, plus jump-to-message navigation.
+- **Global Message Search:** Type in the main search bar to filter chats and find matching messages across every conversation at once, with jump-to-message navigation.
 - **Chat Labels & Folders:** Create color-coded labels (Work, Family, …), assign them to any chat, filter the inbox by label, and see label dots on every conversation.
 - **Interactive Polls:** Create polls with single or multiple answers and see real-time voting results.
 - **Ephemeral Whisper Mode:** Send disappearing messages that vanish permanently after being viewed once by pressing and holding.

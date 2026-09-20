@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { axiosInstance } from "../lib/axios";
+import MessageTicks from "./MessageTicks";
 
 const MessageInfoModal = ({ message, onClose }) => {
   const [receipts, setReceipts] = useState(null);
@@ -104,7 +105,7 @@ const MessageInfoModal = ({ message, onClose }) => {
             <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center shadow-sm">
-                  <span className="material-symbols-outlined text-base font-bold">done_all</span>
+                  <MessageTicks status="read" size={15} animated={false} />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-zinc-900 dark:text-white">Read</div>
@@ -124,7 +125,7 @@ const MessageInfoModal = ({ message, onClose }) => {
             <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-black/5 text-zinc-700 dark:bg-white/10 dark:text-zinc-300 flex items-center justify-center border border-black/10 dark:border-white/10">
-                  <span className="material-symbols-outlined text-base">done_all</span>
+                  <MessageTicks status="delivered" size={15} animated={false} />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-zinc-900 dark:text-white">Delivered</div>
@@ -157,7 +158,7 @@ const MessageInfoModal = ({ message, onClose }) => {
                         <span className="font-semibold text-zinc-900 dark:text-white">{user.username || "Member"}</span>
                       </div>
                       <span className="text-zinc-500 dark:text-zinc-400 text-[11px] flex items-center gap-1 font-mono">
-                        <span className="material-symbols-outlined text-xs text-zinc-900 dark:text-white">done_all</span>
+                        <MessageTicks status="read" size={12} animated={false} />
                         <span>Read</span>
                       </span>
                     </div>

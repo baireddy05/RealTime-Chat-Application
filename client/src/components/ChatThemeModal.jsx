@@ -13,6 +13,7 @@ import {
   Mic,
   Smile,
   Layers,
+  ChevronDown,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import {
@@ -72,8 +73,64 @@ const CUSTOM_BUBBLE_GRADIENTS = [
   { id: "mono", name: "Charcoal Slate", gradient: "linear-gradient(135deg, #27272a, #3f3f46)" },
 ];
 
-const ChatThemeModal = ({ isOpen, onClose }) => {
-  const {
+// Compact live preview for mobile (the full interactive preview is the
+// desktop right column). Renders the same resolved styles, so what you see
+// is what the chat will look like once applied.
+const ChatPreviewMini = ({ styles }) => (
+  <div className="relative overflow-hidden rounded-2xl border border-black/10 dark:border-white/10">
+    {styles.customWallpaperUrl ? (
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{
+          backgroundImage: `url(${styles.customWallpaperUrl})`,
+          opacity: styles.wallpaperOpacity,
+        }}
+      />
+    ) : (
+      <div
+        className="absolute inset-0"
+        style={{ background: styles.wallpaperGradient, opacity: 0.9 }}
+      />
+    )}
+    {styles.hasDoodles && (
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.055] dark:opacity-[0.045]"
+        style={{
+          backgroundImage: `url("${styles.doodleSvg || CHAT_DOODLE_SVG}")`,
+          backgroundSize: "180px 180px",
+        }}
+      />
+    )}
+    <div className="relative z-10 p-3 space-y-2 text-[12px] leading-snug">
+      <div className="flex justify-start">
+        <div
+          className="p-2 rounded-xl rounded-tl-sm shadow-sm max-w-[85%]"
+          style={{
+            background: styles.bubbleIncomingSurface,
+            color: styles.bubbleIncomingText,
+            backdropFilter: "blur(16px)",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          Hey! How does this theme look? ✨
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <div
+          className="p-2 rounded-xl rounded-tr-sm shadow-md max-w-[85%]"
+          style={{
+            background: styles.bubbleOutgoingGradient,
+            color: styles.bubbleOutgoingText,
+          }}
+        >
+          Stunning! Bubbles and background match 🚀
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ChatThemeModal = ({ isOpen, onClose }) => {  const {
     selectedChat,
     chatThemes,
     globalChatTheme,
@@ -103,6 +160,7 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
   const [applyGlobally, setApplyGlobally] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [activeTab, setActiveTab] = useState("presets"); // 'presets' | 'wallpaper' | 'bubbles'
+  const [showMobilePreview, setShowMobilePreview] = useState(true);
 
   const fileInputRef = useRef(null);
 
@@ -270,6 +328,30 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
 
           {/* Tab Contents */}
           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
+            {/* Mobile live preview (mirrors the desktop preview column).
+                Collapsible so it never crowds the controls on small screens. */}
+            <div className="md:hidden">
+              <button
+                type="button"
+                onClick={() => setShowMobilePreview((v) => !v)}
+                className="w-full flex items-center justify-between py-1 text-xs font-bold text-zinc-800 dark:text-zinc-200"
+              >
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Live Preview
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`text-zinc-400 transition-transform ${showMobilePreview ? "rotate-180" : ""}`}
+                />
+              </button>
+              {showMobilePreview && (
+                <div className="pt-1.5 animate-fadeIn">
+                  <ChatPreviewMini styles={styles} />
+                </div>
+              )}
+            </div>
+
             {activeTab === "presets" && (
               <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2.5">
                 {CHAT_THEME_PRESETS.map((preset) => {

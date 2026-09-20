@@ -3,8 +3,8 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import CreateGroupModal from "./CreateGroupModal";
-import GlobalSearchModal from "./GlobalSearchModal";
 import LabelsManagerModal from "./LabelsManagerModal";
+import MessageTicks from "./MessageTicks";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -51,12 +51,36 @@ const getMessageSnippet = (msg) => {
     if (msg.image) return "📷 Photo";
   if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
   if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
-  
+
   const text = msg.decryptedText || msg.text || "";
   if (isEncryptedMessage(text)) {
     return "Message";
   }
   return text;
+};
+
+// Snippet around the match for unified message search results
+const getSearchSnippet = (msg, query) => {
+  const text = msg.decryptedText || (!isEncryptedMessage(msg.text) ? msg.text : "") || "";
+  if (text) {
+    const q = (query || "").trim().toLowerCase();
+    const idx = q ? text.toLowerCase().indexOf(q) : 0;
+    const start = Math.max(0, idx - 30);
+    return (start > 0 ? "…" : "") + text.slice(start, start + 110) + (text.length > start + 110 ? "…" : "");
+  }
+  if (msg.image) return "📷 Photo";
+  if (msg.audio) return "🎤 Voice note";
+  if (msg.file) return `📎 ${msg.file.name || "File"}`;
+  return "Message";
+};
+
+const getResultChatName = (msg, rooms) => {
+  if (msg.roomId) {
+    const rid = (msg.roomId?._id || msg.roomId)?.toString();
+    const room = (rooms || []).find((r) => (r._id || r.id)?.toString() === rid);
+    return room?.name?.replace(/^#/, "") || msg.roomId?.name?.replace(/^#/, "") || "Group";
+  }
+  return msg.senderId?.username || "Direct message";
 };
 
 const Sidebar = ({
@@ -89,6 +113,11 @@ const Sidebar = ({
   const labels = useChatStore((s) => s.labels);
   const chatLabels = useChatStore((s) => s.chatLabels);
   const getLabels = useChatStore((s) => s.getLabels);
+  const globalSearchResults = useChatStore((s) => s.globalSearchResults);
+  const isGlobalSearchLoading = useChatStore((s) => s.isGlobalSearchLoading);
+  const searchMessages = useChatStore((s) => s.searchMessages);
+  const clearGlobalSearch = useChatStore((s) => s.clearGlobalSearch);
+  const jumpToMessage = useChatStore((s) => s.jumpToMessage);
 
   const authUser = useAuthStore((s) => s.authUser);
   const onlineUsers = useAuthStore((s) => s.onlineUsers);
@@ -112,7 +141,6 @@ const Sidebar = ({
   const [isLocalCreateGroupOpen, setIsLocalCreateGroupOpen] = useState(false);
   const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
   const [activeLabelFilter, setActiveLabelFilter] = useState(null);
-  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showLabelsManager, setShowLabelsManager] = useState(false);
   const searchInputRef = useRef(null);
   const optionsDropdownRef = useRef(null);
@@ -139,7 +167,6 @@ const Sidebar = ({
   // Mobile Back Navigation handlers
   useBackHandler(isLocalCreateGroupOpen, () => setIsLocalCreateGroupOpen(false), "sidebar-create-group");
   useBackHandler(showOptionsDropdown, () => setShowOptionsDropdown(false), "sidebar-options-dropdown");
-  useBackHandler(showGlobalSearch, () => setShowGlobalSearch(false), "sidebar-global-search");
   useBackHandler(showLabelsManager, () => setShowLabelsManager(false), "sidebar-labels-manager");
 
   useEffect(() => {
@@ -188,15 +215,24 @@ const Sidebar = ({
     onChatSelect?.();
   };
 
-  // Search filter
+  // Unified search (WhatsApp-style): the main bar filters chats AND searches
+  // message text across every conversation in one debounced pass.
   useEffect(() => {
-    if (searchQuery.trim().length >= 2) {
+    const q = searchQuery.trim();
+    if (q.length >= 2) {
       const timer = setTimeout(() => {
         searchUsers(searchQuery);
-      }, 300);
+        searchMessages({ query: q });
+      }, 400);
       return () => clearTimeout(timer);
     }
-  }, [searchQuery, searchUsers]);
+    clearGlobalSearch();
+  }, [searchQuery, searchUsers, searchMessages, clearGlobalSearch]);
+
+  // Drop stale message results when the sidebar unmounts
+  useEffect(() => {
+    return () => clearGlobalSearch();
+  }, [clearGlobalSearch]);
 
   const pendingCount = incomingRequests?.length || 0;
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
@@ -528,9 +564,11 @@ const Sidebar = ({
               ) : previewText ? (
                 <>
                   {isOutgoing && (
-                    <span className={`material-symbols-outlined text-[13px] shrink-0 ${isRead ? "text-blue-500 font-bold" : isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
-                      {isRead || isDelivered ? "done_all" : "done"}
-                    </span>
+                    <MessageTicks
+                      status={isRead ? "read" : isDelivered ? "delivered" : "sent"}
+                      size={13}
+                      className={isSelected ? "text-white dark:text-black" : "text-zinc-400"}
+                    />
                   )}
                   <span className="truncate">{previewText}</span>
                 </>
@@ -840,17 +878,8 @@ const Sidebar = ({
           </button>
         </div>
 
-        {/* Global search + label folders toolbar */}
+        {/* Label folders toolbar */}
         <div className="flex items-center gap-1.5 pt-1 pb-0.5 select-none">
-          <button
-            onClick={() => setShowGlobalSearch(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium shrink-0 text-accent-primary bg-accent-primary/10 border border-accent-primary/25 hover:bg-accent-primary/20 transition-all"
-            type="button"
-            title="Search all messages"
-          >
-            <span className="material-symbols-outlined text-[14px]">travel_explore</span>
-            <span className="hidden sm:inline">Search</span>
-          </button>
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0">
             {(labels || []).map((label) => {
               const active = activeLabelFilter === label._id;
@@ -1083,6 +1112,47 @@ const Sidebar = ({
         </div>
       )}
 
+      {/* 3b. Matching messages across all chats (unified search) */}
+      {searchQuery.trim().length >= 2 && (isGlobalSearchLoading || globalSearchResults.length > 0) && (
+        <div className="mb-2 p-2 rounded-2xl bg-white/95 dark:bg-[#14131a]/90 border border-black/10 dark:border-white/10 shadow-xl flex flex-col gap-1 shrink-0 max-h-56 overflow-y-auto custom-scrollbar">
+          <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase font-semibold px-1 flex items-center justify-between">
+            <span>Messages</span>
+            {!isGlobalSearchLoading && <span>{globalSearchResults.length}</span>}
+          </div>
+          {isGlobalSearchLoading && globalSearchResults.length === 0 ? (
+            <div className="flex items-center justify-center py-6 gap-2 text-zinc-500 dark:text-zinc-400">
+              <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+              <span className="text-[11px]">Searching messages...</span>
+            </div>
+          ) : (
+            globalSearchResults.map((m) => (
+              <div
+                key={m._id}
+                onClick={() => {
+                  jumpToMessage(m);
+                  setSearchQuery("");
+                }}
+                className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-[11px] font-semibold text-accent-primary truncate">
+                    {getResultChatName(m, rooms)}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 shrink-0">
+                    {m.createdAt
+                      ? new Date(m.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })
+                      : ""}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-700 dark:text-zinc-300 truncate">
+                  {getSearchSnippet(m, searchQuery)}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* 4. Conversation List */}
       <div className="flex-1 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar space-y-1">
         {/* Empty States */}
@@ -1220,7 +1290,6 @@ const Sidebar = ({
       </div>
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
-      {showGlobalSearch && <GlobalSearchModal onClose={() => setShowGlobalSearch(false)} />}
       {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
     </section>
   );
