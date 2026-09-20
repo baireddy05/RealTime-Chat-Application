@@ -1,4 +1,5 @@
-import { memo, useEffect, useState, useRef, useMemo } from "react";
+import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
@@ -113,6 +114,10 @@ const Sidebar = ({
   const labels = useChatStore((s) => s.labels);
   const chatLabels = useChatStore((s) => s.chatLabels);
   const getLabels = useChatStore((s) => s.getLabels);
+  const setChatLabels = useChatStore((s) => s.setChatLabels);
+  const toggleArchiveChat = useChatStore((s) => s.toggleArchiveChat);
+  const markMessagesAsRead = useChatStore((s) => s.markMessagesAsRead);
+  const setIsGroupInfoOpen = useChatStore((s) => s.setIsGroupInfoOpen);
   const globalSearchResults = useChatStore((s) => s.globalSearchResults);
   const isGlobalSearchLoading = useChatStore((s) => s.isGlobalSearchLoading);
   const searchMessages = useChatStore((s) => s.searchMessages);
@@ -144,6 +149,11 @@ const Sidebar = ({
   const [showLabelsManager, setShowLabelsManager] = useState(false);
   const searchInputRef = useRef(null);
   const optionsDropdownRef = useRef(null);
+  const chatMenuRef = useRef(null);
+  const cardLongPressTimerRef = useRef(null);
+  const cardLongPressFiredRef = useRef(false);
+  const [openMenuChat, setOpenMenuChat] = useState(null); // { id, chatType: 'room'|'user', name, room? }
+  const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
 
   // Close options dropdown on outside click / tap, anywhere on screen.
   // Document-level capture listener (not an overlay div): overlay divs get
@@ -163,6 +173,102 @@ const Sidebar = ({
       document.removeEventListener("touchstart", handlePointerDown, true);
     };
   }, [showOptionsDropdown]);
+
+  // ---- Per-chat context menu (⋮ on desktop, long-press / right-click everywhere)
+  const openChatMenu = useCallback((chat, anchor) => {
+    cardLongPressFiredRef.current = false;
+    setOpenMenuChat(chat);
+    setChatMenuAnchor(anchor);
+  }, []);
+
+  const closeChatMenu = useCallback(() => {
+    setOpenMenuChat(null);
+    setChatMenuAnchor(null);
+  }, []);
+
+  useBackHandler(!!openMenuChat, closeChatMenu, "sidebar-chat-menu");
+
+  const getChatMenuStyle = () => {
+    const menuWidth = 248;
+    const menuHeight = 360;
+    const padding = 12;
+    const winWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+    const winHeight = typeof window !== "undefined" ? window.innerHeight : 700;
+    let left = chatMenuAnchor ? chatMenuAnchor.left : winWidth - menuWidth - padding;
+    left = Math.max(padding, Math.min(left, winWidth - menuWidth - padding));
+    let top;
+    if (chatMenuAnchor) {
+      const spaceBelow = winHeight - chatMenuAnchor.bottom;
+      top = spaceBelow >= menuHeight + 12
+        ? chatMenuAnchor.bottom + 6
+        : chatMenuAnchor.top - menuHeight - 6;
+    } else {
+      top = padding;
+    }
+    top = Math.max(padding, Math.min(top, winHeight - menuHeight - padding));
+    return {
+      position: "fixed",
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${menuWidth}px`,
+      zIndex: 99999,
+      maxHeight: `min(${menuHeight}px, calc(100vh - 24px))`,
+      overflowY: "auto",
+    };
+  };
+
+  const startCardLongPress = (e, chat) => {
+    if (e.target.closest("button, a, input, textarea, select")) return;
+    const touch = e.touches[0];
+    const x = touch.clientX;
+    const y = touch.clientY;
+    cardLongPressFiredRef.current = false;
+    if (cardLongPressTimerRef.current) clearTimeout(cardLongPressTimerRef.current);
+    cardLongPressTimerRef.current = setTimeout(() => {
+      cardLongPressFiredRef.current = true;
+      try {
+        window.navigator?.vibrate?.(30);
+      } catch {}
+      openChatMenu(chat, { left: x, right: x, top: y, bottom: y });
+    }, 500);
+  };
+
+  const cancelCardLongPress = () => {
+    if (cardLongPressTimerRef.current) {
+      clearTimeout(cardLongPressTimerRef.current);
+      cardLongPressTimerRef.current = null;
+    }
+  };
+
+  const guardCardClick = (e) => {
+    if (cardLongPressFiredRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      setTimeout(() => {
+        cardLongPressFiredRef.current = false;
+      }, 300);
+    }
+  };
+
+  const openChatMenuAtCursor = (e, chat) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openChatMenu(chat, {
+      left: e.clientX,
+      right: e.clientX,
+      top: e.clientY,
+      bottom: e.clientY,
+    });
+  };
+
+  const toggleMenuLabel = async (labelId) => {
+    if (!openMenuChat) return;
+    const current = chatLabels[openMenuChat.id] || [];
+    const next = current.includes(labelId)
+      ? current.filter((id) => id !== labelId)
+      : [...current, labelId];
+    await setChatLabels(openMenuChat.id, next);
+  };
 
   // Mobile Back Navigation handlers
   useBackHandler(isLocalCreateGroupOpen, () => setIsLocalCreateGroupOpen(false), "sidebar-create-group");
@@ -375,6 +481,8 @@ const Sidebar = ({
     const isTyping = typers.length > 0;
     const draftText = drafts[roomId];
 
+    const menuChat = { id: roomId, chatType: "room", name: room.name?.replace(/^#/, ""), room };
+
     return (
       <div
         key={`room-${roomId}`}
@@ -392,12 +500,30 @@ const Sidebar = ({
             profilePic: room.profilePic,
           })
         }
+        onClickCapture={guardCardClick}
+        onContextMenu={(e) => openChatMenuAtCursor(e, menuChat)}
+        onTouchStart={(e) => startCardLongPress(e, menuChat)}
+        onTouchMove={cancelCardLongPress}
+        onTouchEnd={cancelCardLongPress}
+        onTouchCancel={cancelCardLongPress}
         className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
           isSelected
             ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
             : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
         }`}
       >
+        <button
+          type="button"
+          title="Chat options"
+          onClick={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            openChatMenu(menuChat, { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right });
+          }}
+          className="hidden md:flex absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 items-center justify-center rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity z-10 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
+        >
+          <span className="material-symbols-outlined text-lg">more_vert</span>
+        </button>
         <div
           className={`relative shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-150 ${
             isSelected
@@ -493,6 +619,12 @@ const Sidebar = ({
     const isTyping = typers.length > 0;
     const draftText = drafts[friendId];
 
+    const menuChat = {
+      id: friendId,
+      chatType: "user",
+      name: isSelfChat ? "Saved Messages" : friend.username,
+    };
+
     return (
       <div
         key={`friend-${friendId}`}
@@ -504,12 +636,30 @@ const Sidebar = ({
             profilePic: friend.profilePic,
           })
         }
+        onClickCapture={guardCardClick}
+        onContextMenu={(e) => openChatMenuAtCursor(e, menuChat)}
+        onTouchStart={(e) => startCardLongPress(e, menuChat)}
+        onTouchMove={cancelCardLongPress}
+        onTouchEnd={cancelCardLongPress}
+        onTouchCancel={cancelCardLongPress}
         className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
           isSelected
             ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
             : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
         }`}
       >
+        <button
+          type="button"
+          title="Chat options"
+          onClick={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            openChatMenu(menuChat, { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right });
+          }}
+          className="hidden md:flex absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 items-center justify-center rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity z-10 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
+        >
+          <span className="material-symbols-outlined text-lg">more_vert</span>
+        </button>
         <div className="relative shrink-0 w-10 h-10">
           <img
             className="w-full h-full rounded-full object-cover bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
@@ -1291,6 +1441,127 @@ const Sidebar = ({
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
       {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
+
+      {/* Per-chat context menu (⋮ / right-click / long-press) */}
+      {openMenuChat && typeof document !== "undefined" && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[9998] bg-transparent"
+            onPointerDown={closeChatMenu}
+            onClick={closeChatMenu}
+          />
+          <div
+            ref={chatMenuRef}
+            style={getChatMenuStyle()}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-2xl bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px] max-w-[calc(100vw-24px)]"
+          >
+            <div className="px-3.5 pt-2 pb-1.5">
+              <p className="text-xs font-bold text-theme-main truncate">{openMenuChat.name}</p>
+              <p className="text-[10px] text-theme-muted">
+                {openMenuChat.chatType === "room" ? "Group" : "Direct chat"}
+              </p>
+            </div>
+
+            <div className="px-2 pb-1">
+              <p className="px-2 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-theme-muted">
+                Labels
+              </p>
+              {(labels || []).length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLabelsManager(true);
+                    closeChatMenu();
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-accent-primary hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>New label…</span>
+                </button>
+              ) : (
+                <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                  {labels.map((label) => {
+                    const active = (chatLabels[openMenuChat.id] || []).includes(label._id);
+                    return (
+                      <button
+                        key={label._id}
+                        type="button"
+                        onClick={() => toggleMenuLabel(label._id)}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium rounded-xl transition-colors text-left text-theme-main hover:bg-[var(--glass-hover)]"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: label.color }} />
+                        <span className="truncate flex-1">{label.name}</span>
+                        {active && (
+                          <span className="material-symbols-outlined text-[16px] text-accent-primary">check</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="h-px bg-[var(--glass-border)] my-1" />
+
+            <div className="px-1.5 pb-1 flex flex-col">
+              {(unreadCounts[openMenuChat.id] || 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    markMessagesAsRead(openMenuChat.id, openMenuChat.chatType);
+                    closeChatMenu();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-theme-muted">mark_chat_read</span>
+                  <span>Mark as read</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  await toggleArchiveChat(openMenuChat.id);
+                  closeChatMenu();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-[16px] text-theme-muted">
+                  {archivedChats.includes(openMenuChat.id) ? "unarchive" : "archive"}
+                </span>
+                <span>{archivedChats.includes(openMenuChat.id) ? "Unarchive chat" : "Archive chat"}</span>
+              </button>
+              {openMenuChat.chatType === "room" && openMenuChat.room && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const room = openMenuChat.room;
+                    selectChat({
+                      id: openMenuChat.id,
+                      _id: room._id || openMenuChat.id,
+                      name: room.name,
+                      type: "room",
+                      description: room.description,
+                      members: room.members,
+                      createdBy: room.createdBy,
+                      admins: room.admins,
+                      avatar: room.avatar,
+                      profilePic: room.profilePic,
+                    });
+                    setIsGroupInfoOpen(true);
+                    closeChatMenu();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-theme-muted">info</span>
+                  <span>Group info</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </section>
   );
 };

@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2, Tag, Loader, Check } from "lucide-react";
+import { X, Plus, Trash2, Tag, Loader } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
-import { useFriendStore } from "../store/useFriendStore";
 import { useBackHandler } from "../lib/backNavigation";
 
-const LabelsManagerModal = ({ onClose, focusChatId }) => {
-  const { labels, chatLabels, getLabels, createLabel, deleteLabel, setChatLabels, rooms } = useChatStore();
-  const { friends } = useFriendStore();
+const LabelsManagerModal = ({ onClose }) => {
+  const { labels, getLabels, createLabel, deleteLabel } = useChatStore();
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
-  const [assignChatId, setAssignChatId] = useState(focusChatId || "");
 
   useBackHandler(true, onClose, "labels-manager");
 
@@ -18,10 +15,6 @@ const LabelsManagerModal = ({ onClose, focusChatId }) => {
     getLabels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (focusChatId) setAssignChatId(focusChatId);
-  }, [focusChatId]);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -32,20 +25,6 @@ const LabelsManagerModal = ({ onClose, focusChatId }) => {
     if (res.success) setName("");
     else setError(res.error || "Could not create label");
   };
-
-  const toggleAssign = async (labelId) => {
-    if (!assignChatId) return;
-    const current = chatLabels[assignChatId] || [];
-    const next = current.includes(labelId)
-      ? current.filter((id) => id !== labelId)
-      : [...current, labelId];
-    await setChatLabels(assignChatId, next);
-  };
-
-  const chatOptions = [
-    ...(rooms || []).map((r) => ({ id: (r._id || r.id)?.toString(), name: r.name || "Group", kind: "Group" })),
-    ...(friends || []).map((f) => ({ id: (f._id || f.id)?.toString(), name: f.username || "Chat", kind: "DM" })),
-  ];
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
@@ -108,42 +87,9 @@ const LabelsManagerModal = ({ onClose, focusChatId }) => {
             </div>
           )}
 
-          {labels.length > 0 && (
-            <div className="pt-2 border-t border-[var(--glass-border)]">
-              <p className="text-[10px] font-semibold text-theme-muted uppercase tracking-wider mb-1.5">Assign to chat</p>
-              <select
-                value={assignChatId}
-                onChange={(e) => setAssignChatId(e.target.value)}
-                className="w-full glass-input rounded-xl px-3 py-2 text-xs text-theme-main border border-[var(--glass-border)] mb-2"
-              >
-                <option value="">Select a chat...</option>
-                {chatOptions.map((c) => (
-                  <option key={`${c.kind}-${c.id}`} value={c.id}>
-                    [{c.kind}] {c.name}
-                  </option>
-                ))}
-              </select>
-              {assignChatId && (
-                <div className="flex flex-wrap gap-1.5">
-                  {labels.map((label) => {
-                    const active = (chatLabels[assignChatId] || []).includes(label._id);
-                    return (
-                      <button
-                        key={label._id}
-                        type="button"
-                        onClick={() => toggleAssign(label._id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${active ? "border-accent-primary bg-accent-primary/15 text-accent-primary" : "border-[var(--glass-border)] text-theme-muted"}`}
-                      >
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: label.color }} />
-                        {label.name}
-                        {active && <Check size={11} strokeWidth={3} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          <p className="text-[11px] text-theme-muted text-center pt-1">
+            Tip: tap ⋮ on any chat — or long-press it — to assign labels instantly.
+          </p>
         </div>
       </div>
     </div>
