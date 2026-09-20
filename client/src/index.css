@@ -846,6 +846,15 @@ img.emoji {
 
 /* Mobile-specific touch improvements */
 @media (max-width: 767px) {
+  /* Pin the app shell so the on-screen keyboard resizes the layout instead
+     of panning the visual viewport (which pushed the chat header off-screen).
+     Pairs with interactive-widget=resizes-content in the viewport meta. */
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+
   /* Prevent text selection on interactive elements */
   button, [role="button"] {
     -webkit-touch-callout: none;

@@ -150,6 +150,9 @@ const Sidebar = ({
   const searchInputRef = useRef(null);
   const optionsDropdownRef = useRef(null);
   const chatMenuRef = useRef(null);
+  const tabsRef = useRef(null);
+  const [tabsAtStart, setTabsAtStart] = useState(true);
+  const [tabsAtEnd, setTabsAtEnd] = useState(true);
   const cardLongPressTimerRef = useRef(null);
   const cardLongPressFiredRef = useRef(false);
   const [openMenuChat, setOpenMenuChat] = useState(null); // { id, chatType: 'room'|'user', name, room? }
@@ -268,6 +271,54 @@ const Sidebar = ({
       ? current.filter((id) => id !== labelId)
       : [...current, labelId];
     await setChatLabels(openMenuChat.id, next);
+  };
+
+  // ---- Filter-tabs overflow: arrows + mouse-wheel support for laptop
+  // The tabs strip hides its scrollbar, so without affordances laptop users
+  // can never reach overflowed tabs (e.g. Archived). Track both ends and
+  // translate vertical wheel motion into horizontal scrolling.
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const update = () => {
+      setTabsAtStart(el.scrollLeft <= 4);
+      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(update);
+      ro.observe(el);
+    }
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 0) return;
+      if ((e.deltaY > 0 && el.scrollLeft < max - 1) || (e.deltaY < 0 && el.scrollLeft > 1)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const scrollTabs = (dir) => {
+    const el = tabsRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" });
   };
 
   // Mobile Back Navigation handlers
@@ -932,9 +983,10 @@ const Sidebar = ({
         </div>
 
         {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1 select-none">
-          <button
-            onClick={() => setActiveFilter("all")}
+        <div className="relative select-none">
+          <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1 pr-7">
+            <button
+              onClick={() => setActiveFilter("all")}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               activeFilter === "all"
                 ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
@@ -1026,6 +1078,39 @@ const Sidebar = ({
           >
             <span>Archived</span>
           </button>
+          </div>
+          {!tabsAtStart && (
+            <>
+              <div
+                className="absolute left-0 top-0 bottom-0 w-7 pointer-events-none"
+                style={{ background: "linear-gradient(to right, rgb(var(--bg-sidebar-rgb)), transparent)" }}
+              />
+              <button
+                type="button"
+                onClick={() => scrollTabs(-1)}
+                title="Scroll tabs left"
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white dark:bg-[#1e1d26] border border-black/10 dark:border-white/15 shadow-md hidden md:flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">chevron_left</span>
+              </button>
+            </>
+          )}
+          {!tabsAtEnd && (
+            <>
+              <div
+                className="absolute right-0 top-0 bottom-0 w-7 pointer-events-none"
+                style={{ background: "linear-gradient(to left, rgb(var(--bg-sidebar-rgb)), transparent)" }}
+              />
+              <button
+                type="button"
+                onClick={() => scrollTabs(1)}
+                title="More filters — scroll right"
+                className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white dark:bg-[#1e1d26] border border-black/10 dark:border-white/15 shadow-md hidden md:flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors animate-fadeIn"
+              >
+                <span className="material-symbols-outlined text-base">chevron_right</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Label folders toolbar */}

@@ -438,6 +438,26 @@ const ChatPane = ({ onBack }) => {
     return () => window.removeEventListener("pulse:scroll-to-bottom", handleScrollReq);
   }, [scrollToBottom]);
 
+  // When the mobile keyboard opens/closes the layout resizes: stay pinned to
+  // the latest messages if the user was already at the bottom (WhatsApp-like).
+  // Readers scrolled up in history are left exactly where they were.
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    let raf = 0;
+    const handleResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (isAtBottomRef.current) scrollToBottom("instant");
+      });
+    };
+    vv.addEventListener("resize", handleResize);
+    return () => {
+      vv.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(raf);
+    };
+  }, [scrollToBottom]);
+
   useEffect(() => {
     if (!selectedChat) return;
     if (loadedChatIdRef.current !== selectedChat.id) {
