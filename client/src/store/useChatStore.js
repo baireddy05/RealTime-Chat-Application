@@ -901,6 +901,13 @@ export const useChatStore = create((set, get) => ({
     socket.off("deletedStatus");
     socket.off("messageDelivered");
     socket.off("reminderDue");
+    socket.off("eventCreated");
+    socket.off("eventUpdated");
+    socket.off("eventDeleted");
+    socket.off("eventRsvp");
+    socket.off("taskCreated");
+    socket.off("taskUpdated");
+    socket.off("taskDeleted");
     socket.off("chat:reconnect-resync");
 
     const { selectedChat } = get();
@@ -1188,10 +1195,34 @@ export const useChatStore = create((set, get) => ({
 
     // Real-time room updates (name, avatar, description, members, admins)
     socket.on("roomUpdated", (updatedRoom) => {
+      if (!updatedRoom?._id) return;
       const { rooms, selectedChat } = get();
-      const updatedRooms = rooms.map((r) => (r._id === updatedRoom._id ? { ...r, ...updatedRoom } : r));
-      set({ rooms: updatedRooms });
-      if (selectedChat?.id === updatedRoom._id) {
+      const myId = useAuthStore.getState().authUser?._id?.toString();
+      const stillMember = (updatedRoom.members || []).some(
+        (m) => (m?._id || m)?.toString() === myId
+      );
+      const known = rooms.some((r) => (r._id || r.id)?.toString() === updatedRoom._id?.toString());
+      const isOpen = selectedChat?.id?.toString() === updatedRoom._id?.toString();
+
+      if (!stillMember) {
+        // I was removed (or this was never mine): drop it, and close it if open.
+        if (!known && !isOpen) return;
+        set({
+          rooms: rooms.filter((r) => (r._id || r.id)?.toString() !== updatedRoom._id?.toString()),
+          selectedChat: isOpen ? null : selectedChat,
+        });
+        return;
+      }
+
+      if (!known) {
+        // I was just added: insert the group live and join its socket room.
+        set({ rooms: [updatedRoom, ...rooms] });
+        socket.emit("joinRoom", updatedRoom._id);
+      } else {
+        const updatedRooms = rooms.map((r) => (r._id === updatedRoom._id ? { ...r, ...updatedRoom } : r));
+        set({ rooms: updatedRooms });
+      }
+      if (isOpen) {
         set({
           selectedChat: {
             ...selectedChat,
@@ -1207,19 +1238,19 @@ export const useChatStore = create((set, get) => ({
     });
 
 
-    // Real-time new room creation
+    // Real-time new room creation (server notifies members only; ignore
+    // anything we are not a member of so foreign groups never enter the list)
     socket.on("newRoom", (newRoom) => {
-      const { rooms } = get();
-      if (!rooms.some((r) => r._id === newRoom._id)) {
-        set({ rooms: [newRoom, ...rooms] });
-      }
       const myId = useAuthStore.getState().authUser?._id?.toString();
       const isMember = (newRoom.members || []).some(
         (m) => (m._id || m)?.toString() === myId
       );
-      if (isMember) {
-        socket.emit("joinRoom", newRoom._id);
+      if (!isMember) return;
+      const { rooms } = get();
+      if (!rooms.some((r) => r._id === newRoom._id)) {
+        set({ rooms: [newRoom, ...rooms] });
       }
+      socket.emit("joinRoom", newRoom._id);
     });
 
     // Real-time reactions
@@ -1378,6 +1409,56 @@ export const useChatStore = create((set, get) => ({
       );
       set({ messages: updated });
     });
+
+    // Real-time group events
+    const upsertEvent = (event) => {
+      set((state) => {
+        const exists = state.events.some((e) => e._id === event._id);
+        const next = exists
+          ? state.events.map((e) => (e._id === event._id ? event : e))
+          : [...state.events, event];
+        return {
+          events: next.sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)),
+        };
+      });
+    };
+    socket.on("eventCreated", ({ event }) => {
+      if (!event) return;
+      upsertEvent(event);
+      soundManager.playReceiveSound();
+    });
+    socket.on("eventUpdated", ({ event }) => {
+      if (!event) return;
+      upsertEvent(event);
+    });
+    socket.on("eventRsvp", ({ event }) => {
+      if (!event) return;
+      upsertEvent(event);
+    });
+    socket.on("eventDeleted", ({ eventId }) => {
+      set((state) => ({ events: state.events.filter((e) => e._id !== eventId) }));
+    });
+
+    // Real-time tasks
+    socket.on("taskCreated", ({ task }) => {
+      if (!task?._id) return;
+      set((state) => {
+        if (state.tasks.some((t) => t._id === task._id)) return state;
+        return { tasks: [task, ...state.tasks] };
+      });
+      soundManager.playReceiveSound();
+    });
+    socket.on("taskUpdated", ({ task }) => {
+      if (!task?._id) return;
+      set((state) => ({
+        tasks: state.tasks.map((t) => (t._id === task._id ? task : t)),
+      }));
+    });
+    socket.on("taskDeleted", ({ task }) => {
+      const deletedId = task?._id;
+      if (!deletedId) return;
+      set((state) => ({ tasks: state.tasks.filter((t) => t._id !== deletedId) }));
+    });
   },
 
   unsubscribeFromMessages: () => {
@@ -1407,6 +1488,13 @@ export const useChatStore = create((set, get) => ({
     socket.off("deletedStatus");
     socket.off("messageDelivered");
     socket.off("reminderDue");
+    socket.off("eventCreated");
+    socket.off("eventUpdated");
+    socket.off("eventDeleted");
+    socket.off("eventRsvp");
+    socket.off("taskCreated");
+    socket.off("taskUpdated");
+    socket.off("taskDeleted");
   },
 
   deleteMessage: async (messageId) => {
@@ -1475,7 +1563,7 @@ export const useChatStore = create((set, get) => ({
         id: roomId,
         _id: roomId,
         type: "room",
-        name: room?.name || "Channel",
+        name: room?.name || "Group",
         description: room?.description || "",
         members: room?.members || [],
         createdBy: room?.createdBy,
@@ -1629,6 +1717,22 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  addGroupMembers: async (roomId, memberIds) => {
+    try {
+      const res = await axiosInstance.post(`/chat/rooms/${roomId}/members`, { memberIds });
+      const updatedRoom = res.data.room;
+      const { rooms, selectedChat } = get();
+      set({
+        rooms: rooms.map((r) => (r._id === roomId ? updatedRoom : r)),
+        selectedChat: selectedChat?.id === roomId ? { ...selectedChat, ...updatedRoom } : selectedChat,
+      });
+      return { success: true, room: updatedRoom };
+    } catch (error) {
+      console.error("Error adding group members:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
   toggleGroupAdmin: async (roomId, userId) => {
     try {
       const res = await axiosInstance.post(`/chat/rooms/${roomId}/admins`, { userId });
@@ -1715,4 +1819,234 @@ export const useChatStore = create((set, get) => ({
       totalCount: ordered.length,
     };
   },
+
+  // ---- Group Announcements ----
+  announcements: [],
+  showAnnouncementsOnly: false,
+  setShowAnnouncementsOnly: (val) => set({ showAnnouncementsOnly: val }),
+  getAnnouncements: async (roomId) => {
+    if (!roomId) return [];
+    try {
+      const res = await axiosInstance.get(`/chat/rooms/${roomId}/announcements`);
+      const authUser = useAuthStore.getState().authUser;
+      const key = getConversationKey(get().selectedChat, authUser?._id);
+      const decrypted = await Promise.all(
+        (res.data || []).map(async (m) => {
+          if (m.isEncrypted || isEncryptedMessage(m.text)) {
+            try {
+              const dec = await decryptMessage(m.text, key);
+              return { ...m, decryptedText: dec };
+            } catch {}
+          }
+          return m;
+        })
+      );
+      set({ announcements: decrypted });
+      return decrypted;
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+      return [];
+    }
+  },
+
+  // ---- Group Events ----
+  events: [],
+  isEventsOpen: false,
+  setIsEventsOpen: (val) => set({ isEventsOpen: val }),
+  getEvents: async (roomId, includePast = false) => {
+    if (!roomId) return [];
+    try {
+      const res = await axiosInstance.get(
+        `/chat/rooms/${roomId}/events${includePast ? "?includePast=true" : ""}`
+      );
+      set({ events: res.data || [] });
+      return res.data || [];
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      return [];
+    }
+  },
+  createEvent: async (payload) => {
+    try {
+      const res = await axiosInstance.post("/chat/events", payload);
+      set((state) => ({
+        events: [...state.events, res.data].sort(
+          (a, b) => new Date(a.startsAt) - new Date(b.startsAt)
+        ),
+      }));
+      soundManager.playSendSound();
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error creating event:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+  updateEvent: async (eventId, payload) => {
+    try {
+      const res = await axiosInstance.put(`/chat/events/${eventId}`, payload);
+      set((state) => ({
+        events: state.events.map((e) => (e._id === eventId ? res.data : e)),
+      }));
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error updating event:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+  cancelEvent: async (eventId) => {
+    try {
+      await axiosInstance.delete(`/chat/events/${eventId}`);
+      set((state) => ({ events: state.events.filter((e) => e._id !== eventId) }));
+      return { success: true };
+    } catch (error) {
+      console.error("Error cancelling event:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+  rsvpEvent: async (eventId, status) => {
+    try {
+      const res = await axiosInstance.post(`/chat/events/${eventId}/rsvp`, { status });
+      set((state) => ({
+        events: state.events.map((e) => (e._id === eventId ? res.data : e)),
+      }));
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error RSVPing to event:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Tasks ----
+  tasks: [],
+  isTasksOpen: false,
+  tasksScope: "chat", // 'chat' | 'mine'
+  setIsTasksOpen: (val) => set({ isTasksOpen: val }),
+  setTasksScope: (val) => set({ tasksScope: val }),
+  getTasks: async (params = {}) => {
+    try {
+      const search = new URLSearchParams();
+      if (params.roomId) search.set("roomId", params.roomId);
+      if (params.peerId) search.set("peerId", params.peerId);
+      if (params.scope) search.set("scope", params.scope);
+      if (params.showDone) search.set("showDone", "true");
+      const res = await axiosInstance.get(`/chat/tasks?${search.toString()}`);
+      set({ tasks: res.data || [] });
+      return res.data || [];
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      return [];
+    }
+  },
+  createTask: async (payload) => {
+    try {
+      const res = await axiosInstance.post("/chat/tasks", payload);
+      set((state) => ({ tasks: [res.data, ...state.tasks] }));
+      soundManager.playSendSound();
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error creating task:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+  toggleTask: async (taskId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/tasks/${taskId}/toggle`);
+      set((state) => ({
+        tasks: state.tasks.map((t) => (t._id === taskId ? res.data : t)),
+      }));
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error toggling task:", error);
+      return { success: false };
+    }
+  },
+  deleteTask: async (taskId) => {
+    try {
+      await axiosInstance.delete(`/chat/tasks/${taskId}`);
+      set((state) => ({ tasks: state.tasks.filter((t) => t._id !== taskId) }));
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      return { success: false };
+    }
+  },
+
+  // ---- Chat Labels ----
+  labels: [],
+  chatLabels: {},
+  getLabels: async () => {
+    try {
+      const res = await axiosInstance.get("/chat/labels");
+      set({ labels: res.data?.labels || [], chatLabels: res.data?.chatLabels || {} });
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching labels:", error);
+      return { labels: [], chatLabels: {} };
+    }
+  },
+  createLabel: async ({ name, color }) => {
+    try {
+      const res = await axiosInstance.post("/chat/labels", { name, color });
+      set((state) => ({ labels: [...state.labels, res.data] }));
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error("Error creating label:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+  deleteLabel: async (labelId) => {
+    try {
+      await axiosInstance.delete(`/chat/labels/${labelId}`);
+      set((state) => {
+        const chatLabels = { ...state.chatLabels };
+        Object.keys(chatLabels).forEach((chatId) => {
+          chatLabels[chatId] = (chatLabels[chatId] || []).filter((id) => id !== labelId);
+          if (chatLabels[chatId].length === 0) delete chatLabels[chatId];
+        });
+        return { labels: state.labels.filter((l) => l._id !== labelId), chatLabels };
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting label:", error);
+      return { success: false };
+    }
+  },
+  setChatLabels: async (chatId, labelIds) => {
+    try {
+      const res = await axiosInstance.put(`/chat/labels/chat/${chatId}`, { labelIds });
+      set((state) => ({
+        chatLabels: { ...state.chatLabels, [chatId]: res.data?.labelIds || [] },
+      }));
+      return { success: true };
+    } catch (error) {
+      console.error("Error setting chat labels:", error);
+      return { success: false };
+    }
+  },
+
+  // ---- Global Search ----
+  globalSearchResults: [],
+  isGlobalSearchLoading: false,
+  searchMessages: async (filters = {}) => {
+    set({ isGlobalSearchLoading: true });
+    try {
+      const search = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") search.set(k, String(v));
+      });
+      const res = await axiosInstance.get(`/chat/search?${search.toString()}`);
+      const authUser = useAuthStore.getState().authUser;
+      const decrypted = await Promise.all(
+        (res.data || []).map((m) => decryptMessageDoc(m, authUser?._id))
+      );
+      set({ globalSearchResults: decrypted });
+      return decrypted;
+    } catch (error) {
+      console.error("Error searching messages:", error);
+      return [];
+    } finally {
+      set({ isGlobalSearchLoading: false });
+    }
+  },
+  clearGlobalSearch: () => set({ globalSearchResults: [] }),
 }));

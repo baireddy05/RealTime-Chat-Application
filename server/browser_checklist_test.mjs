@@ -214,7 +214,7 @@ async function runTest() {
 
   try {
     // 2.4 Select '#general' or 'General'
-    console.log("2.4 Selecting '#general' channel...");
+    console.log("2.4 Selecting '#general' group...");
     const generalChannel = await page.waitForSelector("#channel-general, [data-testid='channel-general']");
     await generalChannel.click();
     await sleep(1500);
@@ -222,11 +222,11 @@ async function runTest() {
     const isChatPaneOpen = await page.evaluate(() => {
       return document.querySelector("textarea, input[placeholder*='message']") !== null;
     });
-    results["2.4 Select #general channel"] = isChatPaneOpen;
-    console.log(isChatPaneOpen ? "✓ 2.4 Selected #general channel" : "✗ 2.4 #general channel selection failed");
+    results["2.4 Select #general group"] = isChatPaneOpen;
+    console.log(isChatPaneOpen ? "✓ 2.4 Selected #general group" : "✗ 2.4 #general group selection failed");
     await page.screenshot({ path: path.join(screenshotDir, "06_general_chat_opened.png") });
   } catch (e) {
-    results["2.4 Select #general channel"] = false;
+    results["2.4 Select #general group"] = false;
     console.error("2.4 failed:", e.message);
   }
 

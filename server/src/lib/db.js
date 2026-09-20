@@ -55,6 +55,9 @@ export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
+      minPoolSize: 2,
+      socketTimeoutMS: 30000,
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     await seedInitialData();

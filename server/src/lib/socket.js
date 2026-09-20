@@ -24,6 +24,11 @@ const io = new Server(server, {
 
 // Store user socket mappings for multi-device support, private messaging, and online status
 const userSocketMap = {}; // { userId: Set<socketId> }
+// Per-socket last-forwarded timestamps to throttle typing fan-out.
+// Clients can emit `typing` on every keystroke; without throttling a fast
+// typist fans out dozens of broadcasts/sec to every room member.
+const lastTypingForwardedAt = new Map(); // `${userId}:${targetId}` -> epoch ms
+const TYPING_THROTTLE_MS = 900;
 const hiddenUsers = new Set(); // { userId }
 const groupCalls = {}; // { roomId: Set<userId> }
 
@@ -121,10 +126,14 @@ io.on("connection", (socket) => {
     console.log(`User ${userId} left room ${roomId}`);
   });
 
-  // Typing indicators
+  // Typing indicators (throttled server-side: at most 1 forward per target per 900ms)
   socket.on("typing", ({ targetId, targetType, username }) => {
     if (!targetId) return;
     try {
+      const key = `${userId}:${targetId}`;
+      const now = Date.now();
+      if (now - (lastTypingForwardedAt.get(key) || 0) < TYPING_THROTTLE_MS) return;
+      lastTypingForwardedAt.set(key, now);
       if (targetType === "room") {
         socket.to(targetId.toString()).emit("userTyping", { userId, username, targetId, targetType });
       } else {
@@ -269,6 +278,11 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("A user disconnected:", socket.id);
+    if (userId) {
+      for (const key of lastTypingForwardedAt.keys()) {
+        if (key.startsWith(`${userId}:`)) lastTypingForwardedAt.delete(key);
+      }
+    }
     if (userId && userSocketMap[userId]) {
       userSocketMap[userId].delete(socket.id);
       if (userSocketMap[userId].size === 0) {

@@ -1,10 +1,30 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { memo, useEffect, useState, useRef, useMemo } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import CreateGroupModal from "./CreateGroupModal";
+import GlobalSearchModal from "./GlobalSearchModal";
+import LabelsManagerModal from "./LabelsManagerModal";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
+
+const ChatLabelDots = memo(({ chatId }) => {
+  const labels = useChatStore((s) => s.labels);
+  const chatLabels = useChatStore((s) => s.chatLabels);
+  const ids = chatLabels[chatId] || [];
+  if (ids.length === 0) return null;
+  return (
+    <span className="flex items-center gap-0.5 shrink-0">
+      {ids.slice(0, 3).map((id) => {
+        const label = (labels || []).find((l) => l._id === id);
+        if (!label) return null;
+        return (
+          <span key={id} title={label.name} className="w-2 h-2 rounded-full" style={{ background: label.color }} />
+        );
+      })}
+    </span>
+  );
+});
 
 const formatTimeRelative = (dateStr) => {
   if (!dateStr) return "";
@@ -53,41 +73,47 @@ const Sidebar = ({
   handleInstallPWA,
   logout,
 }) => {
-  const {
-    rooms,
-    users,
-    getRooms,
-    selectedChat,
-    setSelectedChat,
-    unreadCounts,
-    lastMessages,
-    setIsSettingsOpen,
-    typingUsers,
-    drafts,
-    archivedChats,
-  } = useChatStore();
+  // Selective subscriptions: this list never reads `messages`, so it must not
+  // re-render on every incoming message. Whole-store subscription did that.
+  const rooms = useChatStore((s) => s.rooms);
+  const users = useChatStore((s) => s.users);
+  const getRooms = useChatStore((s) => s.getRooms);
+  const selectedChat = useChatStore((s) => s.selectedChat);
+  const setSelectedChat = useChatStore((s) => s.setSelectedChat);
+  const unreadCounts = useChatStore((s) => s.unreadCounts);
+  const lastMessages = useChatStore((s) => s.lastMessages);
+  const setIsSettingsOpen = useChatStore((s) => s.setIsSettingsOpen);
+  const typingUsers = useChatStore((s) => s.typingUsers);
+  const drafts = useChatStore((s) => s.drafts);
+  const archivedChats = useChatStore((s) => s.archivedChats);
+  const labels = useChatStore((s) => s.labels);
+  const chatLabels = useChatStore((s) => s.chatLabels);
+  const getLabels = useChatStore((s) => s.getLabels);
 
-  const { authUser, onlineUsers, socket } = useAuthStore();
-  const {
-    friends,
-    incomingRequests,
-    outgoingRequests,
-    searchResults,
-    getFriends,
-    getFriendRequests,
-    searchUsers,
-    sendFriendRequest,
-    acceptFriendRequest,
-    rejectFriendRequest,
-    subscribeToFriendEvents,
-    unsubscribeFromFriendEvents,
-  } = useFriendStore();
+  const authUser = useAuthStore((s) => s.authUser);
+  const onlineUsers = useAuthStore((s) => s.onlineUsers);
+  const socket = useAuthStore((s) => s.socket);
+  const friends = useFriendStore((s) => s.friends);
+  const incomingRequests = useFriendStore((s) => s.incomingRequests);
+  const outgoingRequests = useFriendStore((s) => s.outgoingRequests);
+  const searchResults = useFriendStore((s) => s.searchResults);
+  const getFriends = useFriendStore((s) => s.getFriends);
+  const getFriendRequests = useFriendStore((s) => s.getFriendRequests);
+  const searchUsers = useFriendStore((s) => s.searchUsers);
+  const sendFriendRequest = useFriendStore((s) => s.sendFriendRequest);
+  const acceptFriendRequest = useFriendStore((s) => s.acceptFriendRequest);
+  const rejectFriendRequest = useFriendStore((s) => s.rejectFriendRequest);
+  const subscribeToFriendEvents = useFriendStore((s) => s.subscribeToFriendEvents);
+  const unsubscribeFromFriendEvents = useFriendStore((s) => s.unsubscribeFromFriendEvents);
 
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isLocalCreateGroupOpen, setIsLocalCreateGroupOpen] = useState(false);
   const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
+  const [activeLabelFilter, setActiveLabelFilter] = useState(null);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showLabelsManager, setShowLabelsManager] = useState(false);
   const searchInputRef = useRef(null);
   const optionsDropdownRef = useRef(null);
 
@@ -113,16 +139,19 @@ const Sidebar = ({
   // Mobile Back Navigation handlers
   useBackHandler(isLocalCreateGroupOpen, () => setIsLocalCreateGroupOpen(false), "sidebar-create-group");
   useBackHandler(showOptionsDropdown, () => setShowOptionsDropdown(false), "sidebar-options-dropdown");
+  useBackHandler(showGlobalSearch, () => setShowGlobalSearch(false), "sidebar-global-search");
+  useBackHandler(showLabelsManager, () => setShowLabelsManager(false), "sidebar-labels-manager");
 
   useEffect(() => {
     getRooms();
     getFriends();
     getFriendRequests();
+    getLabels();
     subscribeToFriendEvents();
     return () => {
       unsubscribeFromFriendEvents();
     };
-  }, [getRooms, getFriends, getFriendRequests, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
+  }, [getRooms, getFriends, getFriendRequests, getLabels, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
 
   // Keyboard shortcut: Command+K or Ctrl+K focuses the search input
   useEffect(() => {
@@ -172,7 +201,7 @@ const Sidebar = ({
   const pendingCount = incomingRequests?.length || 0;
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
 
-  // Clean groups: exclude Discord seed channels
+  // Clean groups: exclude Discord seed groups
   const filteredRooms = useMemo(() => {
     const nonDiscord = (rooms || []).filter((r) => {
       const name = (r.name || "").toLowerCase().trim();
@@ -265,12 +294,20 @@ const Sidebar = ({
     return allChats.filter(c => {
       const chatId = (c._id || c.id)?.toString();
       const isArchived = archivedChats.includes(chatId);
-      if (activeFilter === "archived") return isArchived;
+      if (activeFilter === "archived") {
+        if (isArchived && activeLabelFilter) {
+          return (chatLabels[chatId] || []).includes(activeLabelFilter);
+        }
+        return isArchived;
+      }
       // Archived chats are hidden from all other views
       if (isArchived) return false;
+      if (activeLabelFilter) {
+        return (chatLabels[chatId] || []).includes(activeLabelFilter);
+      }
       return true;
     });
-  }, [allChats, archivedChats, activeFilter]);
+  }, [allChats, archivedChats, activeFilter, activeLabelFilter, chatLabels]);
 
   const totalUnreadCount = unreadChats.length;
   const roomsCount = filteredRooms.length;
@@ -337,13 +374,16 @@ const Sidebar = ({
 
         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
           <div className="flex-1 min-w-0 flex flex-col">
-            <span
-              className={`text-xs font-semibold truncate ${
-                isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
-              }`}
-            >
-              {room.name.replace(/^#/, "")}
-            </span>
+            <div className="flex items-center gap-1 min-w-0">
+              <span
+                className={`text-xs font-semibold truncate ${
+                  isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
+                }`}
+              >
+                {room.name.replace(/^#/, "")}
+              </span>
+              <ChatLabelDots chatId={roomId} />
+            </div>
 
             <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
               {isTyping ? (
@@ -455,17 +495,20 @@ const Sidebar = ({
 
         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
           <div className="flex-1 min-w-0 flex flex-col">
-            <span
-              className={`text-xs font-semibold truncate ${
-                isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
-              }`}
-            >
-              {isSelfChat ? (
-                <div className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">bookmark</span>Saved Messages (You)</div>
-              ) : (
-                friend.username
-              )}
-            </span>
+            <div className="flex items-center gap-1 min-w-0">
+              <span
+                className={`text-xs font-semibold truncate ${
+                  isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
+                }`}
+              >
+                {isSelfChat ? (
+                  <div className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">bookmark</span>Saved Messages (You)</div>
+                ) : (
+                  friend.username
+                )}
+              </span>
+              <ChatLabelDots chatId={friendId} />
+            </div>
 
             <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
               {isTyping ? (
@@ -796,6 +839,58 @@ const Sidebar = ({
             <span>Archived</span>
           </button>
         </div>
+
+        {/* Global search + label folders toolbar */}
+        <div className="flex items-center gap-1.5 pt-1 pb-0.5 select-none">
+          <button
+            onClick={() => setShowGlobalSearch(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium shrink-0 text-accent-primary bg-accent-primary/10 border border-accent-primary/25 hover:bg-accent-primary/20 transition-all"
+            type="button"
+            title="Search all messages"
+          >
+            <span className="material-symbols-outlined text-[14px]">travel_explore</span>
+            <span className="hidden sm:inline">Search</span>
+          </button>
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0">
+            {(labels || []).map((label) => {
+              const active = activeLabelFilter === label._id;
+              return (
+                <button
+                  key={label._id}
+                  onClick={() => setActiveLabelFilter(active ? null : label._id)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold shrink-0 border transition-all ${
+                    active
+                      ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
+                      : "border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 hover:text-theme-main"
+                  }`}
+                  type="button"
+                  title={`Show chats labeled ${label.name}`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ background: label.color }} />
+                  <span className="max-w-[80px] truncate">{label.name}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setShowLabelsManager(true)}
+            className="p-1.5 rounded-full text-zinc-500 hover:text-theme-main hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 transition-colors shrink-0"
+            type="button"
+            title="Manage labels"
+          >
+            <span className="material-symbols-outlined text-[16px]">label</span>
+          </button>
+        </div>
+        {activeLabelFilter && (
+          <div className="flex items-center justify-between px-1 pt-0.5 text-[11px] text-theme-muted">
+            <span className="truncate">
+              Filtered by {(labels || []).find((l) => l._id === activeLabelFilter)?.name || "label"}
+            </span>
+            <button type="button" onClick={() => setActiveLabelFilter(null)} className="text-accent-primary font-semibold shrink-0 ml-2">
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. Pending Friend Requests Banner List */}
@@ -1125,6 +1220,8 @@ const Sidebar = ({
       </div>
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
+      {showGlobalSearch && <GlobalSearchModal onClose={() => setShowGlobalSearch(false)} />}
+      {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
     </section>
   );
 };

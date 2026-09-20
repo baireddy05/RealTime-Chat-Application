@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, Fragment } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, Fragment, lazy, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -9,8 +9,11 @@ import ImageModal from "./ImageModal";
 import AudioMessagePlayer from "./AudioMessagePlayer";
 import ForwardModal from "./ForwardModal";
 import StarredDrawer from "./StarredDrawer";
+import TasksDrawer from "./TasksDrawer";
 import GroupInfoModal from "./GroupInfoModal";
-import EmojiPicker, { Theme } from "emoji-picker-react";
+// Reaction picker is code-split: emoji-picker-react is ~200KB and only needed
+// when the user opens "More reactions".
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
 import { 
@@ -94,6 +97,9 @@ const formatFileSize = (bytes) => {
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
+// Message list page size for windowing (see visibleMessages below).
+const MESSAGE_PAGE_SIZE = 60;
+
 const SENDER_COLORS = [
   "text-[var(--sender-1)]", "text-[var(--sender-2)]", "text-[var(--sender-3)]",
   "text-[var(--sender-4)]", "text-[var(--sender-5)]", "text-[var(--sender-6)]",
@@ -122,21 +128,54 @@ const ChatHeader = memo(() => (
 ));
 
 const ChatPane = ({ onBack }) => {
-  const { theme, uiThemeId: activeUiThemeId } = useThemeStore();
-  const {
-    messages, getMessages, isMessagesLoading, selectedChat, setSelectedChat,
-    subscribeToMessages, unsubscribeFromMessages, reactToMessage, deleteMessage,
-    togglePinMessage, toggleStarMessage, setReplyingTo, setEditingMessage,
-    forwardingMessage, setForwardingMessage, isStarredOpen, setIsStarredOpen,
-    isGroupInfoOpen, setIsGroupInfoOpen, typingUsers, soundMuted, toggleSound,
-    isChatThemeOpen, setIsChatThemeOpen, getEffectiveChatTheme,
-    isScheduledOpen, setIsScheduledOpen,
-    scheduledMessages, getScheduledMessages,
-    archivedChats, toggleArchiveChat,
-    isThreadOpen, closeThread,
-  } = useChatStore();
-  const { authUser, onlineUsers } = useAuthStore();
-  const { startCall } = useCallStore();
+  const theme = useThemeStore((s) => s.theme);
+  const activeUiThemeId = useThemeStore((s) => s.uiThemeId);
+  // Selective subscriptions: each selector re-renders only when its own slice
+  // changes. The previous whole-store subscription re-rendered this entire
+  // pane (header, list, input) on every unrelated store write (tasks, events,
+  // statuses, ...).
+  const messages = useChatStore((s) => s.messages);
+  const getMessages = useChatStore((s) => s.getMessages);
+  const isMessagesLoading = useChatStore((s) => s.isMessagesLoading);
+  const selectedChat = useChatStore((s) => s.selectedChat);
+  const setSelectedChat = useChatStore((s) => s.setSelectedChat);
+  const subscribeToMessages = useChatStore((s) => s.subscribeToMessages);
+  const unsubscribeFromMessages = useChatStore((s) => s.unsubscribeFromMessages);
+  const reactToMessage = useChatStore((s) => s.reactToMessage);
+  const deleteMessage = useChatStore((s) => s.deleteMessage);
+  const togglePinMessage = useChatStore((s) => s.togglePinMessage);
+  const toggleStarMessage = useChatStore((s) => s.toggleStarMessage);
+  const setReplyingTo = useChatStore((s) => s.setReplyingTo);
+  const setEditingMessage = useChatStore((s) => s.setEditingMessage);
+  const forwardingMessage = useChatStore((s) => s.forwardingMessage);
+  const setForwardingMessage = useChatStore((s) => s.setForwardingMessage);
+  const isStarredOpen = useChatStore((s) => s.isStarredOpen);
+  const setIsStarredOpen = useChatStore((s) => s.setIsStarredOpen);
+  const isGroupInfoOpen = useChatStore((s) => s.isGroupInfoOpen);
+  const setIsGroupInfoOpen = useChatStore((s) => s.setIsGroupInfoOpen);
+  const typingUsers = useChatStore((s) => s.typingUsers);
+  const soundMuted = useChatStore((s) => s.soundMuted);
+  const toggleSound = useChatStore((s) => s.toggleSound);
+  const isChatThemeOpen = useChatStore((s) => s.isChatThemeOpen);
+  const setIsChatThemeOpen = useChatStore((s) => s.setIsChatThemeOpen);
+  const getEffectiveChatTheme = useChatStore((s) => s.getEffectiveChatTheme);
+  const isScheduledOpen = useChatStore((s) => s.isScheduledOpen);
+  const setIsScheduledOpen = useChatStore((s) => s.setIsScheduledOpen);
+  const scheduledMessages = useChatStore((s) => s.scheduledMessages);
+  const getScheduledMessages = useChatStore((s) => s.getScheduledMessages);
+  const archivedChats = useChatStore((s) => s.archivedChats);
+  const toggleArchiveChat = useChatStore((s) => s.toggleArchiveChat);
+  const isThreadOpen = useChatStore((s) => s.isThreadOpen);
+  const closeThread = useChatStore((s) => s.closeThread);
+  const isTasksOpen = useChatStore((s) => s.isTasksOpen);
+  const setIsTasksOpen = useChatStore((s) => s.setIsTasksOpen);
+  const announcements = useChatStore((s) => s.announcements);
+  const getAnnouncements = useChatStore((s) => s.getAnnouncements);
+  const showAnnouncementsOnly = useChatStore((s) => s.showAnnouncementsOnly);
+  const setShowAnnouncementsOnly = useChatStore((s) => s.setShowAnnouncementsOnly);
+  const authUser = useAuthStore((s) => s.authUser);
+  const onlineUsers = useAuthStore((s) => s.onlineUsers);
+  const startCall = useCallStore((s) => s.startCall);
   const [activeImage, setActiveImage] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -151,6 +190,7 @@ const ChatPane = ({ onBack }) => {
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [infoModalMessage, setInfoModalMessage] = useState(null);
   const [remindMessage, setRemindMessage] = useState(null);
+  const [taskPrefill, setTaskPrefill] = useState(null);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(
     notificationManager.hasPermission()
@@ -198,6 +238,7 @@ const ChatPane = ({ onBack }) => {
   useBackHandler(isThreadOpen, () => closeThread(), "chat-drawer-thread");
   useBackHandler(!!infoModalMessage, () => setInfoModalMessage(null), "chat-modal-message-info");
   useBackHandler(!!remindMessage, () => setRemindMessage(null), "chat-modal-remind");
+  useBackHandler(isTasksOpen, () => setIsTasksOpen(false), "chat-drawer-tasks");
   useBackHandler(isSearchOpen, () => setIsSearchOpen(false), "chat-search-bar");
   useBackHandler(showChatOptions, () => setShowChatOptions(false), "chat-dropdown-options");
   useBackHandler(!!openMenuMessageId, () => { setOpenMenuMessageId(null); setMenuAnchor(null); }, "chat-message-options");
@@ -405,14 +446,19 @@ const ChatPane = ({ onBack }) => {
       prevMessagesCountRef.current = 0;
       getMessages(selectedChat.id, selectedChat.type);
       getScheduledMessages(selectedChat.id, selectedChat.type);
+      if (selectedChat.type === "room") {
+        getAnnouncements(selectedChat.id);
+      }
+      setShowAnnouncementsOnly(false);
     }
-  }, [selectedChat, getMessages, getScheduledMessages]);
+  }, [selectedChat, getMessages, getScheduledMessages, getAnnouncements, setShowAnnouncementsOnly]);
 
   useEffect(() => {
     if (prevSelectedChatIdRef.current !== selectedChat?.id) {
       prevSelectedChatIdRef.current = selectedChat?.id;
       isInitialChatLoadRef.current = true;
       prevMessagesCountRef.current = 0;
+      setVisibleCount(MESSAGE_PAGE_SIZE);
       setIsSearchOpen(false);
       setSearchQuery("");
       setSearchMatchIndex(0);
@@ -492,8 +538,23 @@ const ChatPane = ({ onBack }) => {
   };
 
   const displayedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  }, [messages]);
+    const sorted = [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    if (showAnnouncementsOnly) return sorted.filter((m) => m.isAnnouncement && !m.isDeleted);
+    return sorted;
+  }, [messages, showAnnouncementsOnly]);
+
+  // Message windowing: only the most recent page of bubbles is mounted.
+  // Rendering thousands of markdown bubbles at once used to lock the main
+  // thread on chat open; earlier history mounts on demand instead.
+  const [visibleCount, setVisibleCount] = useState(MESSAGE_PAGE_SIZE);
+  const visibleMessages = useMemo(() => {
+    if (searchQuery.trim()) return searchMatches;
+    if (displayedMessages.length <= visibleCount) return displayedMessages;
+    return displayedMessages.slice(-visibleCount);
+  }, [searchQuery, searchMatches, displayedMessages, visibleCount]);
+  const hiddenEarlierCount = searchQuery.trim()
+    ? 0
+    : Math.max(0, displayedMessages.length - visibleCount);
 
   const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned && !m.isDeleted), [messages]);
   const currentPinned = pinnedMessages.length > 0 ? pinnedMessages[pinnedIndex % pinnedMessages.length] : null;
@@ -744,7 +805,7 @@ const ChatPane = ({ onBack }) => {
     const lines = [
       divider,
       "PULSE MESSENGER - CONVERSATION TRANSCRIPT",
-      `Chat: ${selectedChat.name.replace(/^#/, "")} (${selectedChat.type === "room" ? "Channel / Group" : "Direct Message"})`,
+      `Chat: ${selectedChat.name.replace(/^#/, "")} (${selectedChat.type === "room" ? "Group" : "Direct Message"})`,
       `Exported: ${new Date().toLocaleString()}`,
       `Total Messages: ${messages.length}`,
       divider,
@@ -1038,6 +1099,14 @@ const ChatPane = ({ onBack }) => {
               >
                 <StickyNote size={17} className="text-amber-500" />
               </button>
+              <button
+                onClick={() => setIsTasksOpen(true)}
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                title="Tasks for this chat"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">task_alt</span>
+              </button>
 
           <div className="relative" ref={chatOptionsRef}>
             <button
@@ -1061,7 +1130,7 @@ const ChatPane = ({ onBack }) => {
                       }}
                       className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors"
                     >
-                      <Info size={14} className="text-accent-primary" /> Channel Info
+                      <Info size={14} className="text-accent-primary" /> Group Info
                     </button>
                   )}
                   <button
@@ -1281,6 +1350,26 @@ const ChatPane = ({ onBack }) => {
         </div>
       )}
 
+      {/* Announcements Banner (group admin broadcasts) */}
+      {selectedChat?.type === "room" && announcements.length > 0 && (
+        <div className="flex items-center justify-between px-4 xl:px-6 py-2 bg-amber-500/10 backdrop-blur-md border-b border-amber-500/25 z-20">
+          <button
+            type="button"
+            onClick={() => setShowAnnouncementsOnly((v) => !v)}
+            className="flex items-center gap-2 min-w-0 flex-1 text-left"
+            title={showAnnouncementsOnly ? "Show all messages" : "Show announcements only"}
+          >
+            <span className="material-symbols-outlined text-base text-amber-500 shrink-0">campaign</span>
+            <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-500 font-label-mono text-[10px] uppercase font-bold shrink-0">
+              {showAnnouncementsOnly ? "Showing" : "Announcements"}
+            </span>
+            <span className="font-body-md text-xs text-on-surface-variant truncate">
+              {announcements.length} announcement{announcements.length === 1 ? "" : "s"} — tap to {showAnnouncementsOnly ? "see everything" : "filter"}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Sticky Pinned Message Banner (Stitch Specification) */}
       {currentPinned && (
         <div className="flex items-center justify-between px-4 xl:px-6 py-2 bg-surface-container-high/70 backdrop-blur-md border-b border-outline-variant/15 shadow-sm z-20">
@@ -1356,8 +1445,19 @@ const ChatPane = ({ onBack }) => {
           >
             <div ref={messagesContainerRef} className="mt-auto flex flex-col w-full">
               <ChatHeader />
+              {hiddenEarlierCount > 0 && (
+                <div className="flex items-center justify-center py-2">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + MESSAGE_PAGE_SIZE)}
+                    className="px-3.5 py-1.5 rounded-full bg-black/[0.04] dark:bg-[var(--glass-heavy)] border border-black/10 dark:border-[var(--glass-border)] text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 hover:text-accent-primary hover:border-accent-primary/40 transition-colors shadow-sm"
+                  >
+                    Show earlier messages ({hiddenEarlierCount} more)
+                  </button>
+                </div>
+              )}
               <div className="flex flex-col min-h-0 w-full pb-3">
-              {(searchQuery.trim() ? searchMatches : displayedMessages).map((message, index, currentList) => (
+              {visibleMessages.map((message, index, currentList) => (
                 <MessageBubble
                   key={message._id}
                   message={message}
@@ -1379,6 +1479,7 @@ const ChatPane = ({ onBack }) => {
                   deleteMessage={handleDelete}
                   forwardMessage={setForwardingMessage}
                   setRemindMessage={setRemindMessage}
+                  onCreateTask={(message) => { setTaskPrefill(message); setIsTasksOpen(true); }}
                   togglePinMessage={togglePinMessage}
                   openMessageInfo={setInfoModalMessage}
                   setActiveImage={setActiveImage}
@@ -1528,6 +1629,13 @@ const ChatPane = ({ onBack }) => {
       {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
       {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
       {remindMessage && <RemindModal message={remindMessage} onClose={() => setRemindMessage(null)} />}
+      {isTasksOpen && (
+        <TasksDrawer
+          onClose={() => { setIsTasksOpen(false); setTaskPrefill(null); }}
+          prefill={taskPrefill}
+          onClearPrefill={() => setTaskPrefill(null)}
+        />
+      )}
 
       {/* Full Reaction Emoji Picker Modal */}
       {fullReactionPickerMsgId && (
@@ -1550,21 +1658,23 @@ const ChatPane = ({ onBack }) => {
               </button>
             </div>
             <div className="emoji-picker-container w-full overflow-hidden">
-              <EmojiPicker
-                theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
-                onEmojiClick={(emojiData) => {
-                  reactToMessage(fullReactionPickerMsgId, emojiData.emoji);
-                  setFullReactionPickerMsgId(null);
-                  setActivePickerId(null);
-                }}
-                autoFocusSearch={false}
-                searchPlaceHolder="Search all emojis..."
-                width="100%"
-                height={320}
-                lazyLoadEmojis={true}
-                previewConfig={{ showPreview: false }}
-                skinTonesDisabled={false}
-              />
+              <Suspense fallback={<div className="flex items-center justify-center h-[320px]"><Loader className="size-6 animate-spin text-theme-muted" /></div>}>
+                <EmojiPicker
+                  theme={theme === "dark" ? "dark" : "light"}
+                  onEmojiClick={(emojiData) => {
+                    reactToMessage(fullReactionPickerMsgId, emojiData.emoji);
+                    setFullReactionPickerMsgId(null);
+                    setActivePickerId(null);
+                  }}
+                  autoFocusSearch={false}
+                  searchPlaceHolder="Search all emojis..."
+                  width="100%"
+                  height={320}
+                  lazyLoadEmojis={true}
+                  previewConfig={{ showPreview: false }}
+                  skinTonesDisabled={false}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

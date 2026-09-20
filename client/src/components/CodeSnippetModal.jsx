@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { X, Code2, Send, Terminal, FileCode, Check } from "lucide-react";
 import { soundManager } from "../lib/sound";
 
@@ -22,6 +22,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
   const [language, setLanguage] = useState("javascript");
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
+  const lineNumbersRef = useRef(null);
 
   if (!isOpen) return null;
 
@@ -58,10 +59,10 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
+      <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
         {/* Header Bar */}
-        <div className="px-5 py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center">
               <Code2 size={16} />
@@ -80,7 +81,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
             title="Close"
           >
             <X size={18} />
@@ -88,7 +89,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
         </div>
 
         {/* Options Bar: Language & Optional Filename */}
-        <div className="p-3.5 border-b border-[var(--glass-border)] bg-slate-800/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3 sm:p-3.5 border-b border-[var(--glass-border)] bg-slate-800/20 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 shrink-0">
           {/* Language Selector */}
           <div>
             <label className="block text-[11px] font-semibold text-zinc-300 mb-1 flex items-center gap-1">
@@ -124,10 +125,13 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
           </div>
         </div>
 
-        {/* Code Input Area with line numbers */}
-        <div className="relative flex bg-[#0d1117] h-[340px] sm:h-[380px] overflow-hidden font-mono text-[12px] leading-relaxed select-text border-b border-[var(--glass-border)]">
-          {/* Line Numbers column */}
-          <div className="w-12 py-3 bg-slate-950/80 text-zinc-600 text-right pr-3 select-none flex-shrink-0 font-mono text-[11px] border-r border-white/5 overflow-hidden">
+        {/* Code Input Area with synchronized line numbers */}
+        <div className="relative flex bg-[#0d1117] flex-1 min-h-[180px] max-h-[380px] overflow-hidden font-mono text-[12px] leading-relaxed select-text border-b border-[var(--glass-border)]">
+          {/* Line Numbers column (Synced scrolling) */}
+          <div
+            ref={lineNumbersRef}
+            className="w-12 py-3 bg-slate-950/80 text-zinc-600 text-right pr-3 select-none flex-shrink-0 font-mono text-[12px] leading-relaxed border-r border-white/5 overflow-hidden"
+          >
             {Array.from({ length: Math.min(lineCount, 500) }).map((_, i) => (
               <div key={i}>{i + 1}</div>
             ))}
@@ -138,11 +142,16 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={handleKeyDown}
+            onScroll={(e) => {
+              if (lineNumbersRef.current) {
+                lineNumbersRef.current.scrollTop = e.target.scrollTop;
+              }
+            }}
             placeholder="// Paste or write your code here...&#10;function helloWorld() {&#10;  console.log('Hello Pulse!');&#10;}"
             spellCheck={false}
             autoCapitalize="off"
             autoComplete="off"
-            className="flex-1 p-3 bg-transparent text-zinc-200 placeholder-zinc-600 resize-none focus:outline-none font-mono text-[12px] leading-relaxed no-scrollbar"
+            className="flex-1 py-3 px-3.5 bg-transparent text-zinc-200 placeholder-zinc-600 resize-none focus:outline-none font-mono text-[12px] leading-relaxed overflow-y-auto custom-scrollbar"
           />
         </div>
 

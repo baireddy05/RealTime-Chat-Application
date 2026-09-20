@@ -4,13 +4,13 @@ A fully functional, highly secure, production-ready Real-Time Instant Messaging 
 
 ## Features
 - **Secure Authentication:** Zero-LocalStorage authentication using `HttpOnly`, `Secure`, and `SameSite=Strict` JWT cookies. Passwords hashed with `bcryptjs`.
-- **Real-Time Communication:** Websockets authenticated via secure cookies. 1-to-1 Direct Messages and Group Channels.
+- **Real-Time Communication:** Websockets authenticated via secure cookies. 1-to-1 Direct Messages and Groups.
 - **Quoted Message Replies (Threading):** Quote and reply directly to any message with clickable jump-to navigation and highlight pulse.
 - **Message Editing:** Edit sent messages with live socket broadcast and `(edited)` timestamp badges.
-- **Custom Group & Channel Creation:** Create custom channels with name, description, and member invitations. Inspect group member directories in real time.
+- **Custom Group Creation:** Create custom groups with name, description, and member invitations. Inspect group member directories in real time. Group admins can add or remove members.
 - **Document & File Sharing:** Share documents, PDFs, zip archives, and code files with rich interactive file cards and download links.
 - **Starred / Bookmarked Messages:** Bookmark important messages and manage them in the slide-over Starred Messages drawer.
-- **Message Forwarding:** Search and forward any message to contacts or channels with 1 click.
+- **Message Forwarding:** Search and forward any message to contacts or groups with 1 click.
 - **Synthesized UI Audio:** Pure Web Audio API synthesized chimes for message sending and receiving.
 - **Online/Offline Status:** Live indicators driven by active socket connections.
 - **Modern UI:** Responsive, dynamic Cyber Dark Mode layout using React, Vite, and Tailwind CSS.

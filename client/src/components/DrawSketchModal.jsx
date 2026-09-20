@@ -71,6 +71,47 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
     }
   }, [isOpen, setupCanvas]);
 
+  // Window-level mouseup/touchend safety when drawing leaves canvas
+  useEffect(() => {
+    if (!isDrawing) return;
+    const handleGlobalUp = () => {
+      setIsDrawing(false);
+      saveHistorySnapshot();
+    };
+    window.addEventListener("mouseup", handleGlobalUp);
+    window.addEventListener("touchend", handleGlobalUp);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalUp);
+      window.removeEventListener("touchend", handleGlobalUp);
+    };
+  }, [isDrawing]);
+
+  // Handle window/device rotation resize without losing sketch
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const snapshot = canvas.toDataURL();
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      };
+      img.src = snapshot;
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isOpen]);
+
   const saveHistorySnapshot = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -188,10 +229,10 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
+      <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
         {/* Header Bar */}
-        <div className="px-5 py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center">
               <PenTool size={16} />
@@ -211,7 +252,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={handleDownload}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
               title="Download Sketch"
             >
               <Download size={16} />
@@ -219,7 +260,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
               title="Close"
             >
               <X size={18} />
@@ -228,13 +269,13 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
         </div>
 
         {/* Toolbar Controls */}
-        <div className="p-3.5 border-b border-[var(--glass-border)] bg-slate-800/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="p-2.5 sm:p-3.5 border-b border-[var(--glass-border)] bg-slate-800/20 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
           {/* Tool selector */}
-          <div className="flex items-center gap-1 bg-slate-950/60 p-1 rounded-2xl border border-white/5">
+          <div className="flex items-center gap-0.5 bg-slate-950/60 p-0.5 sm:p-1 rounded-2xl border border-white/5">
             <button
               type="button"
               onClick={() => setTool("pen")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
                 tool === "pen"
                   ? "bg-accent-primary text-white shadow-md font-semibold"
                   : "text-zinc-400 hover:text-white"
@@ -246,7 +287,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={() => setTool("highlighter")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
                 tool === "highlighter"
                   ? "bg-accent-primary text-white shadow-md font-semibold"
                   : "text-zinc-400 hover:text-white"
@@ -258,7 +299,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={() => setTool("eraser")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
                 tool === "eraser"
                   ? "bg-accent-primary text-white shadow-md font-semibold"
                   : "text-zinc-400 hover:text-white"
@@ -270,14 +311,14 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
           </div>
 
           {/* Stroke Size Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-950/60 px-2 py-1.5 rounded-2xl border border-white/5">
-            <span className="text-[10.5px] text-zinc-400 mr-1">Size:</span>
+          <div className="flex items-center gap-1 bg-slate-950/60 px-2 py-1 rounded-2xl border border-white/5">
+            <span className="text-[10px] text-zinc-400 mr-0.5 hidden xs:inline">Size:</span>
             {STROKE_SIZES.map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => setStrokeSize(s.size)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
                   strokeSize === s.size
                     ? "bg-white/20 text-white font-bold"
                     : "text-zinc-400 hover:text-white"
@@ -290,14 +331,14 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
 
           {/* Color Palette */}
           {tool !== "eraser" && (
-            <div className="flex items-center gap-1.5 bg-slate-950/60 px-2 py-1.5 rounded-2xl border border-white/5">
+            <div className="flex items-center gap-1.5 bg-slate-950/60 px-2 py-1.5 rounded-2xl border border-white/5 overflow-x-auto max-w-[190px] sm:max-w-none no-scrollbar">
               {COLOR_PALETTE.map((c) => (
                 <button
                   key={c.value}
                   type="button"
                   onClick={() => setColor(c.value)}
                   style={{ backgroundColor: c.value }}
-                  className={`w-5 h-5 rounded-full transition-transform active:scale-95 flex items-center justify-center ${
+                  className={`w-5 h-5 rounded-full transition-transform active:scale-95 shrink-0 flex items-center justify-center cursor-pointer ${
                     color === c.value ? "scale-125 ring-2 ring-white shadow-glow" : "opacity-80 hover:opacity-100"
                   }`}
                   title={c.name}
@@ -316,7 +357,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
               type="button"
               onClick={undo}
               disabled={history.length <= 1}
-              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all"
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
               title="Undo"
             >
               <RotateCcw size={15} />
@@ -325,7 +366,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
               type="button"
               onClick={clearCanvas}
               disabled={!isCanvasDirty}
-              className="p-1.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all"
+              className="p-1.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
               title="Clear Canvas"
             >
               <Trash2 size={15} />
@@ -334,7 +375,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
         </div>
 
         {/* Canvas Area */}
-        <div className="relative w-full h-[360px] sm:h-[420px] bg-[#0f172a] overflow-hidden cursor-crosshair">
+        <div className="relative w-full flex-1 min-h-[220px] max-h-[420px] bg-[#0f172a] overflow-hidden cursor-crosshair">
           <canvas
             ref={canvasRef}
             onMouseDown={startDrawing}
@@ -344,6 +385,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             onTouchStart={startDrawing}
             onTouchMove={draw}
             onTouchEnd={stopDrawing}
+            onTouchCancel={stopDrawing}
             className="w-full h-full block touch-none"
           />
 

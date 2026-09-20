@@ -156,7 +156,7 @@ export function getConversationKey(chatTarget, currentUserId) {
   if (!chatTarget) return "pulse-default-vault";
   const targetId = chatTarget.id || chatTarget._id;
   if (chatTarget.type === "room" || (chatTarget.name && chatTarget.name.startsWith("#"))) {
-    // Room channel
+    // Group chat (room)
     return `pulse-room-key-${targetId}`;
   }
   // 1:1 direct message: sort both user IDs alphabetically so both users arrive at identical key

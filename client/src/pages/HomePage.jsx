@@ -1,17 +1,19 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatPane from "../components/ChatPane";
 import ErrorBoundary from "../components/ErrorBoundary";
-import ProfileModal from "../components/ProfileModal";
-import CallModal from "../components/CallModal";
-import IncomingCallModal from "../components/IncomingCallModal";
-import SetStatusModal from "../components/SetStatusModal";
-import ChatThemeModal from "../components/ChatThemeModal";
-import AddFriendModal from "../components/AddFriendModal";
-import StatusModal from "../components/StatusModal";
-import StarredDrawer from "../components/StarredDrawer";
-import CreateGroupModal from "../components/CreateGroupModal";
-import SettingsModal from "../components/SettingsModal";
+// Secondary modals/drawers are code-split: they load on first open instead of
+// inflating the initial HomePage bundle. Sidebar + ChatPane stay eager.
+const ProfileModal = lazy(() => import("../components/ProfileModal"));
+const CallModal = lazy(() => import("../components/CallModal"));
+const IncomingCallModal = lazy(() => import("../components/IncomingCallModal"));
+const SetStatusModal = lazy(() => import("../components/SetStatusModal"));
+const ChatThemeModal = lazy(() => import("../components/ChatThemeModal"));
+const AddFriendModal = lazy(() => import("../components/AddFriendModal"));
+const StatusModal = lazy(() => import("../components/StatusModal"));
+const StarredDrawer = lazy(() => import("../components/StarredDrawer"));
+const CreateGroupModal = lazy(() => import("../components/CreateGroupModal"));
+const SettingsModal = lazy(() => import("../components/SettingsModal"));
 import PulseLogo from "../components/PulseLogo";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -22,26 +24,30 @@ import TypingPulseBackground from "../components/TypingPulseBackground";
 import { useBackHandler, backManager } from "../lib/backNavigation";
 
 const HomePage = () => {
-  const {
-    selectedChat,
-    setSelectedChat,
-    rooms,
-    getRooms,
-    isChatThemeOpen,
-    setIsChatThemeOpen,
-    unreadCounts,
-    isStarredOpen,
-    setIsStarredOpen,
-    subscribeToMessages,
-    networkStatuses,
-    isSettingsOpen,
-    setIsSettingsOpen,
-    backgroundAnimationsEnabled,
-    typingShockwavesEnabled,
-  } = useChatStore();
-  const { socket, authUser, logout } = useAuthStore();
-  const { initSocketListeners } = useCallStore();
-  const { friends, incomingRequests, getFriends, getFriendRequests } = useFriendStore();
+  // Selective subscriptions so header/rail don't re-render on every message.
+  const selectedChat = useChatStore((s) => s.selectedChat);
+  const setSelectedChat = useChatStore((s) => s.setSelectedChat);
+  const rooms = useChatStore((s) => s.rooms);
+  const getRooms = useChatStore((s) => s.getRooms);
+  const isChatThemeOpen = useChatStore((s) => s.isChatThemeOpen);
+  const setIsChatThemeOpen = useChatStore((s) => s.setIsChatThemeOpen);
+  const unreadCounts = useChatStore((s) => s.unreadCounts);
+  const isStarredOpen = useChatStore((s) => s.isStarredOpen);
+  const setIsStarredOpen = useChatStore((s) => s.setIsStarredOpen);
+  const subscribeToMessages = useChatStore((s) => s.subscribeToMessages);
+  const networkStatuses = useChatStore((s) => s.networkStatuses);
+  const isSettingsOpen = useChatStore((s) => s.isSettingsOpen);
+  const setIsSettingsOpen = useChatStore((s) => s.setIsSettingsOpen);
+  const backgroundAnimationsEnabled = useChatStore((s) => s.backgroundAnimationsEnabled);
+  const typingShockwavesEnabled = useChatStore((s) => s.typingShockwavesEnabled);
+  const socket = useAuthStore((s) => s.socket);
+  const authUser = useAuthStore((s) => s.authUser);
+  const logout = useAuthStore((s) => s.logout);
+  const initSocketListeners = useCallStore((s) => s.initSocketListeners);
+  const friends = useFriendStore((s) => s.friends);
+  const incomingRequests = useFriendStore((s) => s.incomingRequests);
+  const getFriends = useFriendStore((s) => s.getFriends);
+  const getFriendRequests = useFriendStore((s) => s.getFriendRequests);
   const { isInstallable, promptInstall } = usePWAInstall();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -507,9 +513,6 @@ const HomePage = () => {
       {/* 2. Zone 2: Conversation Sidebar */}
       <div
         ref={sidebarContainerRef}
-        style={{
-          width: typeof window !== "undefined" && window.innerWidth >= 768 ? `${sidebarWidth}px` : undefined,
-        }}
         className={`w-full md:w-[var(--sidebar-width)] h-full z-30 shrink-0 flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass overflow-hidden ${
           isResizing ? "transition-none select-none pointer-events-none" : "transition-[width] duration-75 ease-out"
         } ${selectedChat ? "hidden md:flex" : "flex"}`}
@@ -659,25 +662,27 @@ const HomePage = () => {
     </div>
 
     {/* Modals & Overlays - Rendered outside the flex row layout */}
-    {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
-    {isSetStatusOpen && <SetStatusModal onClose={() => setIsSetStatusOpen(false)} />}
-    {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
-    {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
-    {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
-    {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
-    {(isAddFriendOpen || isContactsModalOpen) && (
-      <AddFriendModal
-        onClose={() => {
-          setIsAddFriendOpen(false);
-          setIsContactsModalOpen(false);
-        }}
-      />
-    )}
-    {isSettingsOpen && <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />}
+    <Suspense fallback={null}>
+      {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
+      {isSetStatusOpen && <SetStatusModal onClose={() => setIsSetStatusOpen(false)} />}
+      {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
+      {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
+      {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
+      {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
+      {(isAddFriendOpen || isContactsModalOpen) && (
+        <AddFriendModal
+          onClose={() => {
+            setIsAddFriendOpen(false);
+            setIsContactsModalOpen(false);
+          }}
+        />
+      )}
+      {isSettingsOpen && <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />}
 
-    {/* WebRTC Video & Audio Call Overlays */}
-    <CallModal />
-    <IncomingCallModal />
+      {/* WebRTC Video & Audio Call Overlays */}
+      <CallModal />
+      <IncomingCallModal />
+    </Suspense>
 
     {/* Global Drag Overlay during split pane resizing */}
     {isResizing && (

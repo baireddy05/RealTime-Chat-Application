@@ -16,6 +16,8 @@ const PORT = process.env.PORT || 5000;
 import { corsOptions } from "./lib/corsConfig.js";
 
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+app.set("etag", "strong");
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(cors(corsOptions));

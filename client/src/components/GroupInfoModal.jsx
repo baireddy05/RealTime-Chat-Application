@@ -1,15 +1,34 @@
-import { useState } from "react";
-import { X, Users, Hash, Shield, ShieldCheck, UserMinus, Edit2, Check, Loader } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Users, Hash, Shield, ShieldCheck, UserMinus, UserPlus, Search, Edit2, Check, Loader, CalendarPlus, CalendarClock, MapPin, Plus } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import { useFriendStore } from "../store/useFriendStore";
+
+const RSVP_OPTIONS = [
+  { id: "going", label: "Going" },
+  { id: "maybe", label: "Maybe" },
+  { id: "declined", label: "Can't go" },
+];
+
+const formatEventTime = (d) => {
+  try {
+    return new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+};
 
 const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const { authUser, onlineUsers } = useAuthStore();
-  const { updateGroupInfo, kickGroupMember, toggleGroupAdmin } = useChatStore();
+  const {
+    updateGroupInfo, kickGroupMember, toggleGroupAdmin, addGroupMembers,
+    events, getEvents, createEvent, cancelEvent, rsvpEvent,
+  } = useChatStore();
+  const { friends, getFriends } = useFriendStore();
 
   const groupId = group._id || group.id;
   const members = group.members || [];
-  const displayName = (group.name || "Channel").replace(/^#/, "");
+  const displayName = (group.name || "Group").replace(/^#/, "");
   const myId = authUser?._id?.toString();
 
   const createdById = group.createdBy?._id || group.createdBy;
@@ -22,6 +41,87 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const [editedDesc, setEditedDesc] = useState(group.description || "");
   const [isSaving, setIsSaving] = useState(false);
   const [loadingMemberId, setLoadingMemberId] = useState(null);
+  const [activeTab, setActiveTab] = useState("members");
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [evTitle, setEvTitle] = useState("");
+  const [evDesc, setEvDesc] = useState("");
+  const [evStartsAt, setEvStartsAt] = useState("");
+  const [evEndsAt, setEvEndsAt] = useState("");
+  const [evLocation, setEvLocation] = useState("");
+  const [evSaving, setEvSaving] = useState(false);
+  const [evError, setEvError] = useState("");
+  const [showAddMembers, setShowAddMembers] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [addError, setAddError] = useState("");
+
+  const memberIdSet = new Set(members.map((m) => (m._id || m)?.toString()));
+  const addCandidates = (friends || []).filter((f) => {
+    if (!f?._id || memberIdSet.has(f._id.toString())) return false;
+    if (addSearch.trim() && !f.username?.toLowerCase().includes(addSearch.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  const openAddMembers = () => {
+    setAddSearch("");
+    setSelectedNewMembers([]);
+    setAddError("");
+    setShowAddMembers(true);
+    getFriends?.();
+  };
+
+  const toggleNewMember = (friendId) => {
+    setSelectedNewMembers((prev) =>
+      prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
+    );
+  };
+
+  const handleAddMembers = async () => {
+    if (selectedNewMembers.length === 0 || isAddingMembers) return;
+    setIsAddingMembers(true);
+    setAddError("");
+    const res = await addGroupMembers(groupId, selectedNewMembers);
+    setIsAddingMembers(false);
+    if (res.success) {
+      setSelectedNewMembers([]);
+      setAddSearch("");
+      setShowAddMembers(false);
+    } else {
+      setAddError(res.error || "Could not add members");
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "events" && groupId) {
+      getEvents(groupId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, groupId]);
+
+  const handleCreateEvent = async () => {
+    if (!evTitle.trim() || !evStartsAt) {
+      setEvError("Title and start time are required");
+      return;
+    }
+    setEvSaving(true);
+    setEvError("");
+    const res = await createEvent({
+      roomId: groupId,
+      title: evTitle.trim(),
+      description: evDesc.trim(),
+      startsAt: new Date(evStartsAt).toISOString(),
+      endsAt: evEndsAt ? new Date(evEndsAt).toISOString() : undefined,
+      location: evLocation.trim(),
+    });
+    setEvSaving(false);
+    if (res.success) {
+      setEvTitle(""); setEvDesc(""); setEvStartsAt(""); setEvEndsAt(""); setEvLocation("");
+      setShowEventForm(false);
+    } else {
+      setEvError(res.error || "Could not create event");
+    }
+  };
 
   const handleSaveInfo = async () => {
     if (!editedName.trim()) return;
@@ -35,7 +135,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   };
 
   const handleKickMember = async (memberId) => {
-    if (window.confirm("Are you sure you want to remove this member from the channel?")) {
+    if (window.confirm("Are you sure you want to remove this member from the group?")) {
       setLoadingMemberId(memberId);
       await kickGroupMember(groupId, memberId);
       setLoadingMemberId(null);
@@ -76,13 +176,13 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
                 type="text"
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
-                placeholder="Channel Name"
+                placeholder="Group Name"
                 className="w-full glass-input rounded-xl px-3 py-1.5 text-center font-semibold text-[14px] text-theme-main border border-[var(--glass-border)]"
               />
               <textarea
                 value={editedDesc}
                 onChange={(e) => setEditedDesc(e.target.value)}
-                placeholder="Channel Description"
+                placeholder="Group Description"
                 rows={2}
                 className="w-full glass-input rounded-xl px-3 py-1 text-center text-xs text-theme-muted border border-[var(--glass-border)] resize-none"
               />
@@ -114,7 +214,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
                   <button
                     onClick={() => setIsEditing(true)}
                     className="p-1 text-theme-muted hover:text-accent-primary rounded-md transition-colors"
-                    title="Edit Channel Details"
+                    title="Edit Group Details"
                   >
                     <Edit2 size={13} />
                   </button>
@@ -122,7 +222,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
               </div>
 
               <p className="text-xs text-theme-muted mt-1 max-w-xs">
-                {group.description || "Community Channel"}
+                {group.description || "Community Group"}
               </p>
             </>
           )}
@@ -133,16 +233,240 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
           </div>
         </div>
 
-        {/* Member list */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider block px-1">
-            Members & Roles ({members.length})
-          </span>
+        {/* Tabs */}
+        <div className="flex items-center gap-1 px-4 pt-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("members")}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${activeTab === "members" ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30" : "text-theme-muted border border-transparent"}`}
+          >
+            Members ({members.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("events")}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${activeTab === "events" ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30" : "text-theme-muted border border-transparent"}`}
+          >
+            Events ({events.length})
+          </button>
+        </div>
+
+        {activeTab === "events" ? (
+          <div className="flex-1 overflow-y-auto p-4 space-y-2.5 min-h-0">
+            {!showEventForm ? (
+              <button
+                type="button"
+                onClick={() => setShowEventForm(true)}
+                className="w-full py-2.5 rounded-2xl border-2 border-dashed border-[var(--glass-border)] text-theme-muted hover:text-accent-primary hover:border-accent-primary/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Plus size={14} /> Plan an event
+              </button>
+            ) : (
+              <div className="bg-[var(--glass-surface)] rounded-2xl p-3.5 border border-accent-primary/30 space-y-2">
+                <input
+                  type="text"
+                  value={evTitle}
+                  onChange={(e) => setEvTitle(e.target.value)}
+                  placeholder="Event title..."
+                  className="w-full glass-input rounded-xl px-3 py-2 text-[13px] text-theme-main border border-[var(--glass-border)]"
+                />
+                <textarea
+                  value={evDesc}
+                  onChange={(e) => setEvDesc(e.target.value)}
+                  placeholder="Details (optional)..."
+                  rows={2}
+                  className="w-full glass-input rounded-xl px-3 py-2 text-xs text-theme-main border border-[var(--glass-border)] resize-none"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[10px] text-theme-muted">Starts</span>
+                    <input type="datetime-local" value={evStartsAt} onChange={(e) => setEvStartsAt(e.target.value)} className="w-full glass-input rounded-xl px-2 py-1.5 text-[11px] text-theme-main border border-[var(--glass-border)]" />
+                  </label>
+                  <label className="block">
+                    <span className="text-[10px] text-theme-muted">Ends</span>
+                    <input type="datetime-local" value={evEndsAt} onChange={(e) => setEvEndsAt(e.target.value)} className="w-full glass-input rounded-xl px-2 py-1.5 text-[11px] text-theme-main border border-[var(--glass-border)]" />
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  value={evLocation}
+                  onChange={(e) => setEvLocation(e.target.value)}
+                  placeholder="Location (optional)..."
+                  className="w-full glass-input rounded-xl px-3 py-2 text-xs text-theme-main border border-[var(--glass-border)]"
+                />
+                {evError && <p className="text-[11px] text-red-400">{evError}</p>}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setShowEventForm(false); setEvError(""); }} className="flex-1 py-2 rounded-xl text-xs font-medium text-theme-muted hover:bg-[var(--glass-hover)] transition-colors">Cancel</button>
+                  <button type="button" onClick={handleCreateEvent} disabled={evSaving} className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-accent-primary hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+                    {evSaving ? <Loader size={13} className="animate-spin" /> : <CalendarPlus size={13} />} Create
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {events.length === 0 && !showEventForm ? (
+              <div className="text-center py-10 text-theme-muted">
+                <CalendarClock size={28} className="mx-auto mb-2 opacity-40" />
+                <p className="text-xs font-medium text-theme-main">No upcoming events</p>
+                <p className="text-[11px] mt-0.5">Plan meetups, deadlines and hangouts for this group.</p>
+              </div>
+            ) : (
+              events.map((ev) => {
+                const myRsvp = (ev.rsvps || []).find((r) => (r.userId?._id || r.userId)?.toString() === myId)?.status;
+                const counts = { going: 0, maybe: 0, declined: 0 };
+                (ev.rsvps || []).forEach((r) => { if (counts[r.status] !== undefined) counts[r.status]++; });
+                const canManage = ev.createdBy?._id?.toString() === myId || ev.createdBy?.toString() === myId || amIAdmin;
+                return (
+                  <div key={ev._id} className="bg-[var(--glass-surface)] rounded-2xl p-3.5 border border-[var(--glass-border)]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-theme-main leading-snug">{ev.title}</p>
+                        <p className="text-[11px] text-accent-primary font-medium mt-0.5 flex items-center gap-1">
+                          <CalendarClock size={11} /> {formatEventTime(ev.startsAt)}
+                          {ev.endsAt && <span className="text-theme-muted">→ {formatEventTime(ev.endsAt)}</span>}
+                        </p>
+                        {ev.location && <p className="text-[11px] text-theme-muted mt-0.5 flex items-center gap-1"><MapPin size={10} /> {ev.location}</p>}
+                        {ev.description && <p className="text-[11px] text-theme-muted mt-1 line-clamp-2">{ev.description}</p>}
+                      </div>
+                      {canManage && (
+                        <button type="button" onClick={() => cancelEvent(ev._id)} className="p-1.5 rounded-lg text-theme-muted/60 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0" title="Cancel event">
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2.5">
+                      {RSVP_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => rsvpEvent(ev._id, opt.id)}
+                          className={`flex-1 py-1.5 rounded-xl text-[11px] font-semibold border transition-all ${myRsvp === opt.id ? "border-accent-primary bg-accent-primary/15 text-accent-primary" : "border-[var(--glass-border)] text-theme-muted hover:text-theme-main"}`}
+                        >
+                          {opt.label} · {counts[opt.id] || 0}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ) : (
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider block">
+              Members & Roles ({members.length})
+            </span>
+            {amIAdmin && !showAddMembers && (
+              <button
+                type="button"
+                onClick={openAddMembers}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-accent-primary bg-accent-primary/10 border border-accent-primary/25 hover:bg-accent-primary/20 transition-all"
+              >
+                <UserPlus size={12} /> Add
+              </button>
+            )}
+          </div>
+
+          {showAddMembers && amIAdmin && (
+            <div className="rounded-2xl border border-accent-primary/30 bg-[var(--glass-surface)] p-3 space-y-2 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-theme-main">
+                  Add Members ({selectedNewMembers.length} selected)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddMembers(false)}
+                  className="p-1 rounded-full text-theme-muted hover:text-theme-main transition-colors"
+                  title="Close"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-2.5 text-theme-muted/60" />
+                <input
+                  type="text"
+                  value={addSearch}
+                  onChange={(e) => setAddSearch(e.target.value)}
+                  placeholder="Search contacts..."
+                  className="w-full glass-input rounded-xl pl-9 pr-3 py-1.5 text-xs text-theme-main border border-[var(--glass-border)]"
+                />
+              </div>
+              <div className="max-h-44 overflow-y-auto space-y-1 custom-scrollbar">
+                {addCandidates.length === 0 ? (
+                  <p className="py-4 text-center text-[11px] text-theme-muted">
+                    {(friends || []).length === 0
+                      ? "No contacts to add. Add contacts first."
+                      : "Everyone you know is already in this group."}
+                  </p>
+                ) : (
+                  addCandidates.map((friend) => {
+                    const isChecked = selectedNewMembers.includes(friend._id);
+                    return (
+                      <div
+                        key={friend._id}
+                        onClick={() => toggleNewMember(friend._id)}
+                        className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-colors border ${
+                          isChecked
+                            ? "bg-accent-primary/10 border-accent-primary/30"
+                            : "border-transparent hover:bg-[var(--glass-hover)]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={
+                              friend.profilePic ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username || "User")}&background=27272a&color=ffffff`
+                            }
+                            alt={friend.username}
+                            className="w-8 h-8 rounded-full object-cover border border-[var(--glass-border)]"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-theme-main truncate">{friend.username}</p>
+                            <p className="text-[10px] text-theme-muted truncate">{friend.status || "Available"}</p>
+                          </div>
+                        </div>
+                        <div
+                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+                            isChecked
+                              ? "bg-accent-primary border-accent-primary text-white"
+                              : "border-[var(--glass-border)]"
+                          }`}
+                        >
+                          {isChecked && <Check size={12} strokeWidth={3} />}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {addError && <p className="text-[11px] text-red-400">{addError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMembers(false)}
+                  className="flex-1 py-2 rounded-xl text-xs font-medium text-theme-muted hover:bg-[var(--glass-hover)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddMembers}
+                  disabled={selectedNewMembers.length === 0 || isAddingMembers}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-accent-primary hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+                >
+                  {isAddingMembers ? <Loader size={13} className="animate-spin" /> : <UserPlus size={13} />}
+                  Add ({selectedNewMembers.length})
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1">
             {members.length === 0 ? (
               <div className="py-6 text-center text-xs text-theme-muted">
-                All team members have access to this channel.
+                All team members have access to this group.
               </div>
             ) : (
               members.map((member) => {
@@ -204,7 +528,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
                                   ? "text-amber-400 hover:bg-amber-400/15"
                                   : "text-theme-muted hover:text-amber-400 hover:bg-[var(--glass-hover)]"
                               }`}
-                              title={isThisMemberAdmin ? "Revoke Admin Role" : "Make Channel Admin"}
+                              title={isThisMemberAdmin ? "Revoke Admin Role" : "Make Group Admin"}
                             >
                               <ShieldCheck size={14} />
                             </button>
@@ -213,7 +537,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
                             onClick={() => handleKickMember(memberId)}
                             disabled={isLoading}
                             className="p-1.5 rounded-lg text-theme-muted hover:text-red-400 hover:bg-red-500/15 transition-colors"
-                            title="Remove from Channel"
+                            title="Remove from Group"
                           >
                             <UserMinus size={14} />
                           </button>
@@ -239,6 +563,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
             )}
           </div>
         </div>
+        )}
 
         {/* Footer */}
         <div className="p-3.5 border-t border-[var(--glass-border)] bg-[var(--glass-hover)] flex justify-end">

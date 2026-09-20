@@ -95,7 +95,7 @@ const ForwardModal = ({ message, messages, onClose }) => {
             <Search size={14} className="absolute left-3 text-theme-muted/50" />
             <input
               type="text"
-              placeholder="Search contacts or channels..."
+              placeholder="Search contacts or groups..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
@@ -115,11 +115,11 @@ const ForwardModal = ({ message, messages, onClose }) => {
             </div>
           ) : (
             <>
-              {/* Channels section */}
+              {/* Groups section */}
               {filteredRooms.length > 0 && (
                 <div>
                   <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider block mb-1.5">
-                    Channels ({filteredRooms.length})
+                    Groups ({filteredRooms.length})
                   </span>
                   <div className="space-y-1">
                     {filteredRooms.map((room) => {
@@ -221,7 +221,7 @@ const ForwardModal = ({ message, messages, onClose }) => {
 
               {filteredRooms.length === 0 && filteredFriends.length === 0 && (
                 <div className="py-12 text-center text-xs text-theme-muted">
-                  No contacts or channels found matching "{search}"
+                  No contacts or groups found matching "{search}"
                 </div>
               )}
             </>

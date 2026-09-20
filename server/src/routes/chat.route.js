@@ -18,6 +18,7 @@ import {
   cancelScheduledMessage,
   updateRoom,
   kickRoomMember,
+  addRoomMembers,
   toggleRoomAdmin,
   getThreadReplies,
   getMessageReceipts,
@@ -29,6 +30,21 @@ import {
   getReminders,
   cancelReminder,
   translateMessage,
+  getAnnouncements,
+  createEvent,
+  getEvents,
+  updateEvent,
+  cancelEvent,
+  rsvpEvent,
+  createTask,
+  getTasks,
+  toggleTask,
+  deleteTask,
+  getLabels,
+  createLabel,
+  deleteLabel,
+  setChatLabels,
+  searchMessages,
 } from "../controllers/chat.controller.js";
 
 const router = express.Router();
@@ -38,6 +54,7 @@ router.get("/rooms", protectRoute, getRooms);
 router.post("/rooms", protectRoute, createRoom);
 router.put("/rooms/:roomId", protectRoute, updateRoom);
 router.delete("/rooms/:roomId/members/:userId", protectRoute, kickRoomMember);
+router.post("/rooms/:roomId/members", protectRoute, addRoomMembers);
 router.post("/rooms/:roomId/admins", protectRoute, toggleRoomAdmin);
 
 router.get("/preview-link", protectRoute, previewLink);
@@ -50,6 +67,26 @@ router.delete("/reminders/:id", protectRoute, cancelReminder);
 
 router.get("/starred/:id", protectRoute, getStarredMessages);
 router.get("/thread/:messageId", protectRoute, getThreadReplies);
+router.get("/search", protectRoute, searchMessages);
+
+router.get("/rooms/:roomId/announcements", protectRoute, getAnnouncements);
+
+router.post("/events", protectRoute, createEvent);
+router.get("/rooms/:roomId/events", protectRoute, getEvents);
+router.put("/events/:eventId", protectRoute, updateEvent);
+router.delete("/events/:eventId", protectRoute, cancelEvent);
+router.post("/events/:eventId/rsvp", protectRoute, rsvpEvent);
+
+router.post("/tasks", protectRoute, createTask);
+router.get("/tasks", protectRoute, getTasks);
+router.post("/tasks/:taskId/toggle", protectRoute, toggleTask);
+router.delete("/tasks/:taskId", protectRoute, deleteTask);
+
+router.get("/labels", protectRoute, getLabels);
+router.post("/labels", protectRoute, createLabel);
+router.delete("/labels/:labelId", protectRoute, deleteLabel);
+router.put("/labels/chat/:chatId", protectRoute, setChatLabels);
+
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send", protectRoute, sendMessage);

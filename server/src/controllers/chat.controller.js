@@ -2,8 +2,39 @@ import Message from "../models/Message.model.js";
 import User from "../models/User.model.js";
 import Room from "../models/Room.model.js";
 import Reminder from "../models/Reminder.model.js";
+import Event from "../models/Event.model.js";
+import Task from "../models/Task.model.js";
 import mongoose from "mongoose";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+
+// Shared helper: room membership + admin checks for collaboration endpoints
+const getRoomRole = async (roomId, userId) => {
+  const room = await Room.findById(roomId).select("members admins createdBy").lean();
+  if (!room) return { room: null, isMember: false, isAdmin: false, isCreator: false };
+  const uid = userId.toString();
+  const isMember = (room.members || []).some((m) => m.toString() === uid);
+  const isCreator = room.createdBy?.toString() === uid;
+  const isAdmin =
+    isCreator || (room.admins || []).some((a) => a.toString() === uid);
+  return { room, isMember, isAdmin, isCreator };
+};
+
+// Scoped group fan-out: room events go to the socket.io room plus every
+// affected user's personal room — never a global broadcast. A global io.emit
+// leaked group names/descriptions to all online users and made clients render
+// groups they were never added to.
+const emitRoomUpdated = (room, extraUserIds = []) => {
+  const roomId = (room?._id || room)?.toString();
+  if (!roomId) return;
+  io.to(roomId).emit("roomUpdated", room);
+  const ids = new Set([
+    ...((room.members || []).map((m) => (m?._id || m)?.toString())),
+    ...(extraUserIds || []).map((id) => id?.toString()),
+  ]);
+  ids.forEach((id) => {
+    if (id) io.to(id).emit("roomUpdated", room);
+  });
+};
 
 // Helper to prevent Server-Side Request Forgery (SSRF)
 export const isSafeUrl = (rawUrl) => {
@@ -61,36 +92,76 @@ export const isSafeUrl = (rawUrl) => {
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
+      .select("-password")
+      .lean();
+    if (filteredUsers.length === 0) return res.status(200).json([]);
 
-    const usersWithMeta = await Promise.all(
-      filteredUsers.map(async (u) => {
-        const userObj = u.toObject();
-        const lastMsg = await Message.findOne({
+    const userIds = filteredUsers.map((u) => u._id);
+
+    // Single aggregation for the latest DM per conversation (replaces N findOne queries)
+    const lastMsgs = await Message.aggregate([
+      {
+        $match: {
           $or: [
-            { senderId: loggedInUserId, receiverId: u._id },
-            { senderId: u._id, receiverId: loggedInUserId },
+            { senderId: loggedInUserId, receiverId: { $in: userIds } },
+            { senderId: { $in: userIds }, receiverId: loggedInUserId },
           ],
           isScheduled: { $ne: true },
-        })
-          .sort({ createdAt: -1 })
-          .select("text image file audio createdAt senderId isDeleted");
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: {
+            $cond: [{ $eq: ["$senderId", loggedInUserId] }, "$receiverId", "$senderId"],
+          },
+          text: { $first: "$text" },
+          image: { $first: "$image" },
+          file: { $first: "$file" },
+          audio: { $first: "$audio" },
+          createdAt: { $first: "$createdAt" },
+          senderId: { $first: "$senderId" },
+          isDeleted: { $first: "$isDeleted" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          otherId: "$_id",
+          text: 1,
+          image: 1,
+          file: 1,
+          audio: 1,
+          createdAt: 1,
+          senderId: 1,
+          isDeleted: 1,
+        },
+      },
+    ]);
 
-        const unreadCount = await Message.countDocuments({
-          senderId: u._id,
+    // Single aggregation for all unread counts (replaces N countDocuments queries)
+    const unreadAgg = await Message.aggregate([
+      {
+        $match: {
+          senderId: { $in: userIds },
           receiverId: loggedInUserId,
           readBy: { $ne: loggedInUserId },
           isDeleted: false,
           isScheduled: { $ne: true },
-        });
+        },
+      },
+      { $group: { _id: "$senderId", count: { $sum: 1 } } },
+    ]);
 
-        return {
-          ...userObj,
-          lastMessage: lastMsg || null,
-          unreadCount,
-        };
-      })
-    );
+    const lastByUser = new Map(lastMsgs.map((m) => [m.otherId.toString(), m]));
+    const unreadByUser = new Map(unreadAgg.map((u) => [u._id.toString(), u.count]));
+
+    const usersWithMeta = filteredUsers.map((u) => ({
+      ...u,
+      lastMessage: lastByUser.get(u._id.toString()) || null,
+      unreadCount: unreadByUser.get(u._id.toString()) || 0,
+    }));
 
     res.status(200).json(usersWithMeta);
   } catch (error) {
@@ -107,33 +178,75 @@ export const getRooms = async (req, res) => {
       .populate("createdBy", "username profilePic")
       .populate("admins", "username profilePic")
       .lean();
+    if (rooms.length === 0) return res.status(200).json([]);
 
-    const roomsWithMeta = await Promise.all(
-      rooms.map(async (roomObj) => {
-        const lastMsg = await Message.findOne({
-          roomId: roomObj._id,
-          isScheduled: { $ne: true },
-        })
-          .sort({ createdAt: -1 })
-          .populate("senderId", "username")
-          .select("text image file audio createdAt senderId isDeleted")
-          .lean();
+    const roomIds = rooms.map((r) => r._id);
 
-        const unreadCount = await Message.countDocuments({
-          roomId: roomObj._id,
+    // Single aggregation for the latest message per room (replaces N findOne queries)
+    const lastMsgs = await Message.aggregate([
+      { $match: { roomId: { $in: roomIds }, isScheduled: { $ne: true } } },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$roomId",
+          text: { $first: "$text" },
+          image: { $first: "$image" },
+          file: { $first: "$file" },
+          audio: { $first: "$audio" },
+          createdAt: { $first: "$createdAt" },
+          senderId: { $first: "$senderId" },
+          isDeleted: { $first: "$isDeleted" },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "senderId",
+          foreignField: "_id",
+          as: "sender",
+        },
+      },
+      { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          roomId: "$_id",
+          text: 1,
+          image: 1,
+          file: 1,
+          audio: 1,
+          createdAt: 1,
+          isDeleted: 1,
+          senderId: {
+            _id: "$sender._id",
+            username: "$sender.username",
+          },
+        },
+      },
+    ]);
+
+    // Single aggregation for all room unread counts (replaces N countDocuments queries)
+    const unreadAgg = await Message.aggregate([
+      {
+        $match: {
+          roomId: { $in: roomIds },
           senderId: { $ne: loggedInUserId },
           readBy: { $ne: loggedInUserId },
           isDeleted: false,
           isScheduled: { $ne: true },
-        });
+        },
+      },
+      { $group: { _id: "$roomId", count: { $sum: 1 } } },
+    ]);
 
-        return {
-          ...roomObj,
-          lastMessage: lastMsg || null,
-          unreadCount,
-        };
-      })
-    );
+    const lastByRoom = new Map(lastMsgs.map((m) => [m.roomId.toString(), m]));
+    const unreadByRoom = new Map(unreadAgg.map((u) => [u._id.toString(), u.count]));
+
+    const roomsWithMeta = rooms.map((roomObj) => ({
+      ...roomObj,
+      lastMessage: lastByRoom.get(roomObj._id.toString()) || null,
+      unreadCount: unreadByRoom.get(roomObj._id.toString()) || 0,
+    }));
 
     res.status(200).json(roomsWithMeta);
   } catch (error) {
@@ -172,12 +285,12 @@ export const createRoom = async (req, res) => {
     await newRoom.populate("createdBy", "username profilePic");
     await newRoom.populate("admins", "username profilePic");
 
-    // Broadcast new room to all connected sockets
-    io.emit("newRoom", newRoom);
-
+    // Notify members only: each member's personal room receives the new group
+    // so it appears in their sidebar. Non-members never hear about it.
     // Auto-join all members currently connected to the new room
     members.forEach((memberId) => {
       io.in(memberId.toString()).socketsJoin(newRoom._id.toString());
+      io.to(memberId.toString()).emit("newRoom", newRoom);
     });
 
     res.status(201).json(newRoom);
@@ -193,6 +306,16 @@ export const getMessages = async (req, res) => {
     const { type } = req.query; // 'user' or 'room'
     const myId = req.user._id;
     const now = new Date();
+
+    // Paginated history: `limit` caps payload (default 100, max 200),
+    // `before` (ISO date) pages backwards for "load earlier" flows.
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
+    let beforeDate = null;
+    if (req.query.before) {
+      const parsed = new Date(req.query.before);
+      if (!isNaN(parsed.getTime())) beforeDate = parsed;
+    }
+    const beforeFilter = beforeDate ? { createdAt: { $lt: beforeDate } } : {};
 
     const notExpired = { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] };
     const notThreadReply = { parentMessageId: null };
@@ -210,10 +333,12 @@ export const getMessages = async (req, res) => {
         return res.status(403).json({ error: "You are not a member of this room" });
       }
 
-      const messages = await Message.find({ roomId: id, ...notScheduled, ...notThreadReply, ...notExpired })
+      const messages = await Message.find({ roomId: id, ...notScheduled, ...notThreadReply, ...notExpired, ...beforeFilter })
         .populate("senderId", "username profilePic")
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .limit(limit)
         .lean();
+      messages.reverse();
 
       // Mark un-delivered messages as delivered
       await Message.updateMany(
@@ -229,6 +354,7 @@ export const getMessages = async (req, res) => {
       const messages = await Message.find({
         ...notScheduled,
         ...notThreadReply,
+        ...beforeFilter,
         $and: [
           { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
           {
@@ -240,8 +366,10 @@ export const getMessages = async (req, res) => {
         ],
       })
         .populate("senderId", "username profilePic")
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .limit(limit)
         .lean();
+      messages.reverse();
 
       await Message.updateMany(
         { senderId: id, receiverId: myId, "deliveries.userId": { $ne: myId } },
@@ -276,6 +404,7 @@ export const sendMessage = async (req, res) => {
       isSticker,
       poll,
       isWhisper,
+      isAnnouncement,
       videoMessage,
       videoNote,
       location,
@@ -330,49 +459,15 @@ export const sendMessage = async (req, res) => {
       }
     }
 
-    // Link preview auto-detection if not provided
-    let resolvedPreview = linkPreview || null;
-    if (!resolvedPreview && text) {
-      const urlMatch = text.match(/https?:\/\/[^\s]+/i);
-      if (urlMatch && isSafeUrl(urlMatch[0])) {
-        try {
-          const targetUrl = urlMatch[0];
-          const response = await fetch(targetUrl, {
-            headers: { "User-Agent": "PulseMessenger/1.0" },
-            signal: AbortSignal.timeout(2000),
-          });
-          const html = await response.text();
-          const title =
-            html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-            html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ||
-            new URL(targetUrl).hostname;
-          const description =
-            html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-            html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-            "";
-          const image =
-            html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-            null;
-          const siteName =
-            html.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-            new URL(targetUrl).hostname;
-
-          resolvedPreview = {
-            url: targetUrl,
-            title: title.trim(),
-            description: description.trim(),
-            image,
-            siteName,
-          };
-        } catch {
-          // Ignore preview extraction failure
-        }
-      }
-    }
+    // Link previews are resolved on demand via GET /chat/preview-link when a
+    // message becomes visible (see LinkPreview.jsx). Fetching the target URL
+    // inline here used to block every send by up to 2s, so we only accept a
+    // client-provided preview and never fetch synchronously on the send path.
+    const resolvedPreview = linkPreview || null;
 
     let newMessage;
     if (roomId) {
-      const room = await Room.findById(roomId).select("members").lean();
+      const room = await Room.findById(roomId).select("members admins createdBy").lean();
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
       }
@@ -381,6 +476,19 @@ export const sendMessage = async (req, res) => {
       );
       if (!isMember) {
         return res.status(403).json({ error: "You are not a member of this room" });
+      }
+
+      // Announcements are admin-only broadcasts
+      let resolvedAnnouncement = false;
+      if (isAnnouncement) {
+        const uid = senderId.toString();
+        const isAdmin =
+          room.createdBy?.toString() === uid ||
+          (room.admins || []).some((a) => a.toString() === uid);
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only group admins can post announcements" });
+        }
+        resolvedAnnouncement = true;
       }
 
       // Room message
@@ -403,6 +511,7 @@ export const sendMessage = async (req, res) => {
         isSticker: Boolean(isSticker),
         poll: poll || null,
         isWhisper: Boolean(isWhisper),
+        isAnnouncement: resolvedAnnouncement,
         videoNote: resolvedVideoNote,
         location: resolvedLocation,
       });
@@ -414,6 +523,9 @@ export const sendMessage = async (req, res) => {
         io.to(roomId.toString()).emit("newMessage", newMessage);
       }
     } else {
+      if (isAnnouncement) {
+        return res.status(400).json({ error: "Announcements are only available in groups" });
+      }
       // Direct message
       newMessage = new Message({
         senderId,
@@ -1043,8 +1155,7 @@ export const updateRoom = async (req, res) => {
     await room.populate("createdBy", "username profilePic");
     await room.populate("admins", "username profilePic");
 
-    io.to(roomId).emit("roomUpdated", room);
-    io.emit("roomUpdated", room);
+    emitRoomUpdated(room);
 
     res.status(200).json(room);
   } catch (error) {
@@ -1080,12 +1191,75 @@ export const kickRoomMember = async (req, res) => {
     await room.populate("createdBy", "username profilePic");
     await room.populate("admins", "username profilePic");
 
-    io.to(roomId).emit("roomUpdated", room);
-    io.emit("roomUpdated", room);
+    // The removed member is passed explicitly so their other tabs/devices
+    // drop the group too (they are no longer in room.members).
+    emitRoomUpdated(room, [userId]);
 
     res.status(200).json({ success: true, room });
   } catch (error) {
     console.error("Error in kickRoomMember:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const addRoomMembers = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { memberIds } = req.body;
+    const myId = req.user._id;
+
+    if (!Array.isArray(memberIds) || memberIds.length === 0) {
+      return res.status(400).json({ error: "memberIds must be a non-empty array" });
+    }
+
+    const room = await Room.findById(roomId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+
+    const isCreator = room.createdBy?.toString() === myId.toString();
+    const isAdmin =
+      isCreator || (room.admins || []).some((a) => a.toString() === myId.toString());
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Only group admins can add members" });
+    }
+
+    const uniqueIds = [...new Set(memberIds.map((id) => id?.toString()).filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({ error: "No valid member ids provided" });
+    }
+    if (!uniqueIds.every((id) => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ error: "Invalid member id" });
+    }
+    if (uniqueIds.length > 50) {
+      return res.status(400).json({ error: "Cannot add more than 50 members at once" });
+    }
+
+    const existingUsers = await User.find({ _id: { $in: uniqueIds } })
+      .select("_id")
+      .lean();
+    if (existingUsers.length !== uniqueIds.length) {
+      return res.status(404).json({ error: "One or more users not found" });
+    }
+
+    await Room.updateOne(
+      { _id: roomId },
+      { $addToSet: { members: { $each: uniqueIds } } }
+    );
+
+    const updated = await Room.findById(roomId);
+    await updated.populate("members", "username profilePic status");
+    await updated.populate("createdBy", "username profilePic");
+    await updated.populate("admins", "username profilePic");
+
+    // New members receive live updates immediately: join their sockets to the room
+    uniqueIds.forEach((memberId) => {
+      io.in(memberId.toString()).socketsJoin(roomId.toString());
+    });
+    emitRoomUpdated(updated);
+
+    res.status(200).json({ success: true, room: updated });
+  } catch (error) {
+    console.error("Error in addRoomMembers:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1118,8 +1292,7 @@ export const toggleRoomAdmin = async (req, res) => {
     await room.populate("createdBy", "username profilePic");
     await room.populate("admins", "username profilePic");
 
-    io.to(roomId).emit("roomUpdated", room);
-    io.emit("roomUpdated", room);
+    emitRoomUpdated(room);
 
     res.status(200).json({ success: true, room });
   } catch (error) {
@@ -1384,20 +1557,673 @@ export const cancelReminder = async (req, res) => {
 export const translateMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { targetLanguage } = req.body;
-    const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(404).json({ error: "Message not found" });
-    }
-    const textToTranslate = message.decryptedText || message.text;
+    const { targetLanguage = "en", text: clientText } = req.body;
+
+    let textToTranslate = typeof clientText === "string" && clientText.trim() ? clientText.trim() : null;
+
     if (!textToTranslate) {
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      textToTranslate = message.decryptedText || message.text;
+    }
+
+    if (!textToTranslate || typeof textToTranslate !== "string" || !textToTranslate.trim()) {
       return res.status(400).json({ error: "No text to translate" });
     }
-    const { translate } = await import('@vitalets/google-translate-api');
-    const { text } = await translate(textToTranslate, { to: targetLanguage || 'en' });
-    res.status(200).json({ translatedText: text, originalText: textToTranslate });
+
+    // Check if text is raw encrypted JSON payload that was not decrypted on client
+    if (textToTranslate.startsWith('{"iv":') || textToTranslate.startsWith('{"ciphertext":')) {
+      return res.status(400).json({ error: "Encrypted message requires client decrypted text" });
+    }
+
+    const targetLang = (targetLanguage || "en").toLowerCase();
+    let translatedText = "";
+    let sourceLanguage = "auto";
+
+    // Attempt primary Google Translate
+    try {
+      const { translate } = await import('@vitalets/google-translate-api');
+      const result = await translate(textToTranslate, { to: targetLang });
+      translatedText = result.text;
+      sourceLanguage = result.raw?.src || "auto";
+    } catch (googleErr) {
+      console.warn("Primary Google Translate failed, trying MyMemory fallback:", googleErr.message);
+      // Fallback to free MyMemory API
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=Autodetect|${encodeURIComponent(targetLang)}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data?.responseData?.translatedText) {
+        translatedText = data.responseData.translatedText;
+        sourceLanguage = data.responseData.detectedLanguage || "auto";
+      } else {
+        throw new Error("All translation services temporarily unavailable");
+      }
+    }
+
+    res.status(200).json({
+      translatedText,
+      originalText: textToTranslate,
+      targetLanguage: targetLang,
+      sourceLanguage
+    });
   } catch (error) {
     console.error("Error in translateMessage: ", error.message);
+    res.status(500).json({ error: "Translation failed. Please try again." });
+  }
+};
+
+// ---- Group Announcements ----
+
+export const getAnnouncements = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    if (!mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({ error: "Invalid room id" });
+    }
+    const { room, isMember } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+
+    const announcements = await Message.find({
+      roomId,
+      isAnnouncement: true,
+      isDeleted: false,
+    })
+      .populate("senderId", "username profilePic")
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.status(200).json(announcements);
+  } catch (error) {
+    console.error("Error in getAnnouncements: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Group Events ----
+
+const populateEvent = (query) =>
+  query
+    .populate("createdBy", "username profilePic")
+    .populate("rsvps.userId", "username profilePic");
+
+export const createEvent = async (req, res) => {
+  try {
+    const { roomId, title, description, startsAt, endsAt, location } = req.body;
+    const myId = req.user._id;
+    if (!roomId || !mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({ error: "Valid roomId is required" });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "Event title is required" });
+    }
+    const start = new Date(startsAt);
+    if (isNaN(start.getTime())) {
+      return res.status(400).json({ error: "Valid start date is required" });
+    }
+    let end = null;
+    if (endsAt) {
+      end = new Date(endsAt);
+      if (isNaN(end.getTime()) || end <= start) {
+        return res.status(400).json({ error: "End date must be after start date" });
+      }
+    }
+    const { room, isMember } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+
+    const event = await Event.create({
+      roomId,
+      title: title.trim().slice(0, 120),
+      description: (description || "").slice(0, 1000),
+      startsAt: start,
+      endsAt: end,
+      location: (location || "").slice(0, 200),
+      createdBy: myId,
+      rsvps: [{ userId: myId, status: "going" }],
+    });
+    const populated = await populateEvent(Event.findById(event._id)).lean();
+    io.to(roomId.toString()).emit("eventCreated", { event: populated });
+    res.status(201).json(populated);
+  } catch (error) {
+    console.error("Error in createEvent: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getEvents = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const includePast = req.query.includePast === "true";
+    if (!mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({ error: "Invalid room id" });
+    }
+    const { room, isMember } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+
+    const filter = { roomId, isCancelled: false };
+    if (!includePast) filter.startsAt = { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
+    const events = await populateEvent(Event.find(filter).sort({ startsAt: 1 }).limit(100)).lean();
+    res.status(200).json(events);
+  } catch (error) {
+    console.error("Error in getEvents: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const updateEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { title, description, startsAt, endsAt, location } = req.body;
+    const myId = req.user._id;
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+    const event = await Event.findById(eventId);
+    if (!event || event.isCancelled) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    const { room, isMember, isAdmin } = await getRoomRole(event.roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+    const isOwner = event.createdBy.toString() === myId.toString();
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: "Only the organizer or admins can edit this event" });
+    }
+    if (title !== undefined) {
+      if (!title.trim()) return res.status(400).json({ error: "Event title cannot be empty" });
+      event.title = title.trim().slice(0, 120);
+    }
+    if (description !== undefined) event.description = String(description).slice(0, 1000);
+    if (startsAt !== undefined) {
+      const start = new Date(startsAt);
+      if (isNaN(start.getTime())) return res.status(400).json({ error: "Invalid start date" });
+      event.startsAt = start;
+    }
+    if (endsAt !== undefined) {
+      if (!endsAt) {
+        event.endsAt = null;
+      } else {
+        const end = new Date(endsAt);
+        if (isNaN(end.getTime()) || end <= event.startsAt) {
+          return res.status(400).json({ error: "End date must be after start date" });
+        }
+        event.endsAt = end;
+      }
+    }
+    if (location !== undefined) event.location = String(location).slice(0, 200);
+    await event.save();
+    const populated = await populateEvent(Event.findById(event._id)).lean();
+    io.to(event.roomId.toString()).emit("eventUpdated", { event: populated });
+    res.status(200).json(populated);
+  } catch (error) {
+    console.error("Error in updateEvent: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const cancelEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const myId = req.user._id;
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+    const event = await Event.findById(eventId);
+    if (!event || event.isCancelled) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    const { room, isMember, isAdmin } = await getRoomRole(event.roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+    const isOwner = event.createdBy.toString() === myId.toString();
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: "Only the organizer or admins can cancel this event" });
+    }
+    event.isCancelled = true;
+    await event.save();
+    io.to(event.roomId.toString()).emit("eventDeleted", { eventId: event._id, roomId: event.roomId });
+    res.status(200).json({ success: true, eventId: event._id });
+  } catch (error) {
+    console.error("Error in cancelEvent: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const rsvpEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { status } = req.body;
+    const myId = req.user._id;
+    if (!["going", "maybe", "declined"].includes(status)) {
+      return res.status(400).json({ error: "Status must be going, maybe, or declined" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+    const event = await Event.findById(eventId);
+    if (!event || event.isCancelled) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    const { room, isMember } = await getRoomRole(event.roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+
+    const existing = event.rsvps.find((r) => r.userId.toString() === myId.toString());
+    if (existing) {
+      existing.status = status;
+      existing.at = new Date();
+    } else {
+      event.rsvps.push({ userId: myId, status });
+    }
+    await event.save();
+    const populated = await populateEvent(Event.findById(event._id)).lean();
+    io.to(event.roomId.toString()).emit("eventRsvp", { event: populated });
+    res.status(200).json(populated);
+  } catch (error) {
+    console.error("Error in rsvpEvent: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Tasks ----
+
+const taskScopeFilter = (myId, { roomId, peerId }) => {
+  if (roomId) return { roomId };
+  if (peerId) {
+    return {
+      roomId: null,
+      $or: [
+        { createdBy: myId, receiverId: peerId },
+        { createdBy: peerId, receiverId: myId },
+      ],
+    };
+  }
+  return null;
+};
+
+const canAccessTask = async (task, myId) => {
+  if (!task) return false;
+  const uid = myId.toString();
+  if (task.createdBy?.toString() === uid) return true;
+  if ((task.assignees || []).some((a) => a.toString() === uid)) return true;
+  if (task.roomId) {
+    const { isMember } = await getRoomRole(task.roomId, myId);
+    return isMember;
+  }
+  if (task.receiverId) {
+    return [task.receiverId?.toString(), task.createdBy?.toString()].includes(uid);
+  }
+  return false;
+};
+
+const emitTask = (task, event) => {
+  const payload = { task };
+  if (task.roomId) {
+    io.to(task.roomId.toString()).emit(event, payload);
+  } else {
+    const ids = [task.createdBy?.toString(), task.receiverId?.toString(), ...(task.assignees || []).map((a) => a.toString())].filter(Boolean);
+    Array.from(new Set(ids)).forEach((id) => io.to(id).emit(event, payload));
+  }
+};
+
+export const createTask = async (req, res) => {
+  try {
+    const { title, description, roomId, peerId, assignees, dueAt, priority, sourceMessageId } = req.body;
+    const myId = req.user._id;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "Task title is required" });
+    }
+    if (!roomId && !peerId) {
+      return res.status(400).json({ error: "roomId or peerId is required" });
+    }
+    let resolvedRoom = null;
+    let resolvedPeer = null;
+    if (roomId) {
+      if (!mongoose.Types.ObjectId.isValid(roomId)) {
+        return res.status(400).json({ error: "Invalid room id" });
+      }
+      const { room, isMember } = await getRoomRole(roomId, myId);
+      if (!room) return res.status(404).json({ error: "Room not found" });
+      if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+      resolvedRoom = roomId;
+    } else {
+      if (!mongoose.Types.ObjectId.isValid(peerId)) {
+        return res.status(400).json({ error: "Invalid peer id" });
+      }
+      const peer = await User.findById(peerId).select("_id").lean();
+      if (!peer) return res.status(404).json({ error: "User not found" });
+      resolvedPeer = peerId;
+    }
+    // Validate assignees are room members (room tasks) — DM tasks allow the pair
+    let resolvedAssignees = [];
+    if (Array.isArray(assignees) && assignees.length > 0) {
+      const unique = Array.from(new Set(assignees.map(String))).slice(0, 20);
+      for (const a of unique) {
+        if (!mongoose.Types.ObjectId.isValid(a)) {
+          return res.status(400).json({ error: "Invalid assignee id" });
+        }
+      }
+      if (resolvedRoom) {
+        const room = await Room.findById(resolvedRoom).select("members").lean();
+        const memberSet = new Set((room.members || []).map((m) => m.toString()));
+        for (const a of unique) {
+          if (!memberSet.has(a)) {
+            return res.status(400).json({ error: "Assignees must be room members" });
+          }
+        }
+      } else {
+        const allowed = new Set([myId.toString(), resolvedPeer.toString()]);
+        for (const a of unique) {
+          if (!allowed.has(a)) {
+            return res.status(400).json({ error: "Assignees must be chat participants" });
+          }
+        }
+      }
+      resolvedAssignees = unique;
+    }
+    let due = null;
+    if (dueAt) {
+      due = new Date(dueAt);
+      if (isNaN(due.getTime())) return res.status(400).json({ error: "Invalid due date" });
+    }
+    const prio = ["low", "medium", "high"].includes(priority) ? priority : "medium";
+    const task = await Task.create({
+      title: title.trim().slice(0, 300),
+      description: (description || "").slice(0, 2000),
+      roomId: resolvedRoom,
+      receiverId: resolvedPeer,
+      createdBy: myId,
+      assignees: resolvedAssignees,
+      dueAt: due,
+      priority: prio,
+      sourceMessageId: sourceMessageId && mongoose.Types.ObjectId.isValid(sourceMessageId) ? sourceMessageId : null,
+    });
+    const populated = await Task.findById(task._id)
+      .populate("createdBy", "username profilePic")
+      .populate("assignees", "username profilePic")
+      .lean();
+    emitTask(populated, "taskCreated");
+    res.status(201).json(populated);
+  } catch (error) {
+    console.error("Error in createTask: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getTasks = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const { roomId, peerId, scope, showDone } = req.query;
+    const includeDone = showDone === "true" || showDone === "all";
+    let filter = {};
+    if (scope === "mine") {
+      filter = {
+        $or: [{ createdBy: myId }, { assignees: myId }],
+      };
+    } else if (roomId) {
+      if (!mongoose.Types.ObjectId.isValid(roomId)) {
+        return res.status(400).json({ error: "Invalid room id" });
+      }
+      const { room, isMember } = await getRoomRole(roomId, myId);
+      if (!room) return res.status(404).json({ error: "Room not found" });
+      if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+      filter = { roomId };
+    } else if (peerId) {
+      if (!mongoose.Types.ObjectId.isValid(peerId)) {
+        return res.status(400).json({ error: "Invalid peer id" });
+      }
+      filter = taskScopeFilter(myId, { peerId });
+    } else {
+      return res.status(400).json({ error: "scope=mine, roomId, or peerId is required" });
+    }
+    if (!includeDone) filter.isDone = false;
+    const tasks = await Task.find(filter)
+      .populate("createdBy", "username profilePic")
+      .populate("assignees", "username profilePic")
+      .sort({ isDone: 1, dueAt: 1, createdAt: -1 })
+      .limit(200)
+      .lean();
+    res.status(200).json(tasks);
+  } catch (error) {
+    console.error("Error in getTasks: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const toggleTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const myId = req.user._id;
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ error: "Invalid task id" });
+    }
+    const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (!(await canAccessTask(task, myId))) {
+      return res.status(403).json({ error: "You cannot access this task" });
+    }
+    task.isDone = !task.isDone;
+    task.doneAt = task.isDone ? new Date() : null;
+    await task.save();
+    const populated = await Task.findById(task._id)
+      .populate("createdBy", "username profilePic")
+      .populate("assignees", "username profilePic")
+      .lean();
+    emitTask(populated, "taskUpdated");
+    res.status(200).json(populated);
+  } catch (error) {
+    console.error("Error in toggleTask: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const deleteTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const myId = req.user._id;
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ error: "Invalid task id" });
+    }
+    const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    const isOwner = task.createdBy.toString() === myId.toString();
+    let isRoomAdmin = false;
+    if (task.roomId) {
+      const { isAdmin } = await getRoomRole(task.roomId, myId);
+      isRoomAdmin = isAdmin;
+    }
+    if (!isOwner && !isRoomAdmin) {
+      return res.status(403).json({ error: "Only the creator or admins can delete this task" });
+    }
+    await task.deleteOne();
+    emitTask({ _id: task._id, roomId: task.roomId, receiverId: task.receiverId }, "taskDeleted");
+    res.status(200).json({ success: true, taskId: task._id });
+  } catch (error) {
+    console.error("Error in deleteTask: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Chat Labels ----
+
+const LABEL_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
+
+export const getLabels = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("labels chatLabels").lean();
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const chatLabels = {};
+    if (user.chatLabels) {
+      for (const [k, v] of Object.entries(user.chatLabels instanceof Map ? Object.fromEntries(user.chatLabels) : user.chatLabels)) {
+        chatLabels[k] = v;
+      }
+    }
+    res.status(200).json({ labels: user.labels || [], chatLabels });
+  } catch (error) {
+    console.error("Error in getLabels: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const createLabel = async (req, res) => {
+  try {
+    const { name, color } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Label name is required" });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if ((user.labels || []).length >= 20) {
+      return res.status(400).json({ error: "Maximum 20 labels allowed" });
+    }
+    const cleanName = name.trim().slice(0, 30);
+    if ((user.labels || []).some((l) => l.name.toLowerCase() === cleanName.toLowerCase())) {
+      return res.status(400).json({ error: "A label with this name already exists" });
+    }
+    const cleanColor = LABEL_COLORS.includes(color) ? color : LABEL_COLORS[(user.labels || []).length % LABEL_COLORS.length];
+    user.labels.push({ name: cleanName, color: cleanColor });
+    await user.save();
+    res.status(201).json(user.labels[user.labels.length - 1]);
+  } catch (error) {
+    console.error("Error in createLabel: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const deleteLabel = async (req, res) => {
+  try {
+    const { labelId } = req.params;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const exists = (user.labels || []).some((l) => l._id.toString() === labelId);
+    if (!exists) return res.status(404).json({ error: "Label not found" });
+    user.labels = user.labels.filter((l) => l._id.toString() !== labelId);
+    // Remove from all chat assignments
+    if (user.chatLabels) {
+      for (const [chatId, ids] of user.chatLabels.entries()) {
+        const next = (ids || []).filter((id) => id !== labelId);
+        if (next.length === 0) user.chatLabels.delete(chatId);
+        else user.chatLabels.set(chatId, next);
+      }
+    }
+    await user.save();
+    res.status(200).json({ success: true, labelId });
+  } catch (error) {
+    console.error("Error in deleteLabel: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const setChatLabels = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { labelIds } = req.body;
+    if (!chatId) return res.status(400).json({ error: "chatId is required" });
+    if (!Array.isArray(labelIds) || labelIds.length > 5) {
+      return res.status(400).json({ error: "Provide up to 5 label ids" });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const validIds = new Set((user.labels || []).map((l) => l._id.toString()));
+    for (const id of labelIds) {
+      if (!validIds.has(String(id))) {
+        return res.status(400).json({ error: "Unknown label id" });
+      }
+    }
+    if (!user.chatLabels) user.chatLabels = new Map();
+    if (labelIds.length === 0) user.chatLabels.delete(chatId);
+    else user.chatLabels.set(chatId, labelIds.map(String));
+    await user.save();
+    res.status(200).json({ chatId, labelIds: labelIds.map(String) });
+  } catch (error) {
+    console.error("Error in setChatLabels: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Global Message Search ----
+
+export const searchMessages = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const {
+      query = "",
+      chatId,
+      chatType,
+      senderId,
+      hasMedia,
+      from,
+      to,
+      limit = "30",
+    } = req.query;
+
+    const q = String(query).slice(0, 100).trim();
+    if (!q && !hasMedia && !senderId && !from && !to) {
+      return res.status(400).json({ error: "Provide a search query or filter" });
+    }
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 30, 1), 50);
+
+    // Scope: only conversations the user participates in
+    const myRooms = await Room.find({ members: myId }).select("_id").lean();
+    const myRoomIds = myRooms.map((r) => r._id);
+    const scopeOr = [
+      { roomId: { $in: myRoomIds } },
+      { senderId: myId },
+      { receiverId: myId },
+    ];
+
+    const and = [{ $or: scopeOr }, { isDeleted: false }, { isScheduled: { $ne: true } }];
+    if (q) {
+      // E2EE ciphertext is opaque — match plaintext fields only
+      and.push({ text: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } });
+    }
+    if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
+      if (chatType === "room") {
+        if (!myRoomIds.some((id) => id.toString() === chatId)) {
+          return res.status(403).json({ error: "You are not a member of this room" });
+        }
+        and.push({ roomId: new mongoose.Types.ObjectId(chatId) });
+      } else {
+        and.push({
+          $or: [
+            { senderId: myId, receiverId: new mongoose.Types.ObjectId(chatId) },
+            { senderId: new mongoose.Types.ObjectId(chatId), receiverId: myId },
+          ],
+        });
+      }
+    }
+    if (senderId && mongoose.Types.ObjectId.isValid(senderId)) {
+      and.push({ senderId: new mongoose.Types.ObjectId(senderId) });
+    }
+    if (hasMedia === "true" || hasMedia === true) {
+      and.push({ $or: [{ image: { $ne: null } }, { audio: { $ne: null } }, { file: { $ne: null } }] });
+    }
+    const dateRange = {};
+    if (from) {
+      const f = new Date(from);
+      if (!isNaN(f.getTime())) dateRange.$gte = f;
+    }
+    if (to) {
+      const t = new Date(to);
+      if (!isNaN(t.getTime())) dateRange.$lte = t;
+    }
+    if (Object.keys(dateRange).length > 0) and.push({ createdAt: dateRange });
+
+    const results = await Message.find({ $and: and })
+      .populate("senderId", "username profilePic")
+      .populate("roomId", "name")
+      .sort({ createdAt: -1 })
+      .limit(lim)
+      .lean();
+    res.status(200).json(results);
+  } catch (error) {
+    console.error("Error in searchMessages: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

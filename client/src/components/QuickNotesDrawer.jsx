@@ -115,9 +115,12 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn cursor-pointer"
+    >
       <div 
-        className="w-full max-w-md h-full bg-slate-900/95 border-l border-[var(--glass-border)] shadow-2xl flex flex-col overflow-hidden animate-slideInRight"
+        className="w-full max-w-md h-full bg-slate-900/95 border-l border-[var(--glass-border)] shadow-2xl flex flex-col overflow-hidden animate-slideInRight cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}

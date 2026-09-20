@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { signupUser } from './helpers';
 
-test.describe('Groups & Channels', () => {
+test.describe('Groups', () => {
   test.beforeEach(async ({ page }) => {
     await signupUser(page);
   });

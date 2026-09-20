@@ -48,6 +48,17 @@ const userSchema = new mongoose.Schema(
       }, { _id: false }),
       default: {},
     },
+    labels: [
+      {
+        name: { type: String, required: true, trim: true, maxlength: 30 },
+        color: { type: String, default: "#6366f1", maxlength: 20 },
+      },
+    ],
+    chatLabels: {
+      type: Map,
+      of: [String],
+      default: {},
+    },
   },
   { timestamps: true }
 );

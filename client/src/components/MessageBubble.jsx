@@ -1,6 +1,6 @@
 import { memo, Fragment, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -8,6 +8,22 @@ import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import { isOnlyEmojis, EmojiSpan } from "../lib/emoji";
 import { useChatStore } from "../store/useChatStore";
+
+const SUPPORTED_TRANSLATION_LANGUAGES = [
+  { code: "en", name: "English", flag: "🇺🇸" },
+  { code: "es", name: "Spanish", flag: "🇪🇸" },
+  { code: "fr", name: "French", flag: "🇫🇷" },
+  { code: "de", name: "German", flag: "🇩🇪" },
+  { code: "hi", name: "Hindi", flag: "🇮🇳" },
+  { code: "te", name: "Telugu", flag: "🇮🇳" },
+  { code: "zh", name: "Chinese", flag: "🇨🇳" },
+  { code: "ja", name: "Japanese", flag: "🇯🇵" },
+  { code: "ar", name: "Arabic", flag: "🇸🇦" },
+  { code: "pt", name: "Portuguese", flag: "🇧🇷" },
+  { code: "ru", name: "Russian", flag: "🇷🇺" },
+  { code: "it", name: "Italian", flag: "🇮🇹" },
+  { code: "ko", name: "Korean", flag: "🇰🇷" },
+];
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
@@ -86,6 +102,7 @@ const MessageBubble = memo(({
   forwardMessage,
   togglePinMessage,
   setRemindMessage,
+  onCreateTask,
   openMessageInfo,
   setActiveImage,
   setDownloadingFileId,
@@ -99,20 +116,36 @@ const MessageBubble = memo(({
 }) => {
   const [isViewingWhisper, setIsViewingWhisper] = useState(false);
   const [whisperContent, setWhisperContent] = useState(null);
-  const [translatedText, setTranslatedText] = useState(null);
+  const [translatedData, setTranslatedData] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [showTranslatePicker, setShowTranslatePicker] = useState(false);
 
-  const handleTranslate = async () => {
+  const handleTranslate = async (targetLang = "en") => {
     setIsTranslating(true);
     setOpenMenuMessageId(null);
     setMenuAnchor(null);
+    setShowTranslatePicker(false);
+    const textToTranslate = message.decryptedText || message.text;
+    if (!textToTranslate || typeof textToTranslate !== "string" || !textToTranslate.trim()) {
+      setIsTranslating(false);
+      return;
+    }
     try {
       const { axiosInstance } = await import("../lib/axios");
-      const targetLanguage = navigator.language.split('-')[0] || 'en';
-      const res = await axiosInstance.post(`/chat/message/${message._id}/translate`, { targetLanguage });
-      setTranslatedText(res.data.translatedText);
+      const res = await axiosInstance.post(`/chat/message/${message._id}/translate`, {
+        targetLanguage: targetLang,
+        text: textToTranslate,
+      });
+      if (res.data?.translatedText) {
+        setTranslatedData({
+          text: res.data.translatedText,
+          targetLang: res.data.targetLanguage || targetLang,
+          sourceLang: res.data.sourceLanguage || "auto",
+        });
+      }
     } catch (err) {
       console.error("Translation failed:", err);
+      alert("Translation failed. Please try again.");
     } finally {
       setIsTranslating(false);
     }
@@ -291,7 +324,7 @@ const MessageBubble = memo(({
           id={`msg-${message._id}`}
           onMouseEnter={() => setHoveredMessageId(message._id)}
           onMouseLeave={() => setHoveredMessageId(null)}
-          className={`flex max-w-full relative transition-all px-4 sm:px-6 md:px-8 ${
+          className={`msg-row flex max-w-full relative transition-all px-4 sm:px-6 md:px-8 ${
             isSameSenderAsPrev ? "mt-1" : "mt-3.5"
           } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
         >
@@ -398,6 +431,11 @@ const MessageBubble = memo(({
                   {message.isPinned && !message.isDeleted && (
                     <div className="flex items-center gap-1 text-[9px] font-medium mb-1 pb-1 border-b border-current/15 opacity-75">
                       <Pin size={9} /> Pinned
+                    </div>
+                  )}
+                  {message.isAnnouncement && !message.isDeleted && (
+                    <div className="flex items-center gap-1 text-[9px] font-bold mb-1 pb-1 border-b border-current/15 text-amber-500">
+                      <span className="material-symbols-outlined text-[11px]">campaign</span> Announcement
                     </div>
                   )}
                   {message.isForwarded && !message.isDeleted && (
@@ -673,17 +711,72 @@ const MessageBubble = memo(({
                             </div>
                           )}
                           {isTranslating && (
-                            <div className="text-[10px] italic opacity-70 flex items-center gap-1 mt-1 font-semibold">
-                              <Loader size={10} className="animate-spin" /> Translating...
+                            <div className="mt-2 pt-2 border-t border-current/15 flex items-center gap-2 text-xs opacity-80 animate-pulse select-none">
+                              <Loader size={12} className="animate-spin text-accent-primary" />
+                              <span>Translating message...</span>
                             </div>
                           )}
-                          {translatedText && (
-                            <div className="mt-1.5 pt-1.5 border-t border-current/10 text-[14px]">
-                              <div className="flex items-center gap-1 opacity-70 mb-1 text-accent-primary">
-                                <Languages size={12} />
-                                <span className="text-[10px] uppercase font-bold tracking-wider">Translated</span>
+                          {translatedData && (
+                            <div className="mt-2.5 pt-2 border-t border-current/20 text-left animate-fadeIn select-text">
+                              <div className="flex items-center justify-between gap-1 text-[11px] opacity-90 mb-1 select-none font-medium">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Languages size={13} className="text-accent-primary shrink-0" />
+                                  <span className="font-semibold text-accent-primary truncate">
+                                    Translated ({SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === translatedData.targetLang)?.name || translatedData.targetLang.toUpperCase()})
+                                  </span>
+                                  {translatedData.sourceLang && translatedData.sourceLang !== "auto" && (
+                                    <span className="opacity-60 text-[9.5px]">from {translatedData.sourceLang.toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowTranslatePicker(true)}
+                                    className="px-1.5 py-0.5 rounded-md hover:bg-current/10 text-[10px] font-semibold text-accent-primary transition-colors cursor-pointer"
+                                    title="Change language"
+                                  >
+                                    Change
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (navigator.clipboard?.writeText) {
+                                        navigator.clipboard.writeText(translatedData.text);
+                                      }
+                                    }}
+                                    className="p-1 rounded-md hover:bg-current/10 transition-colors cursor-pointer"
+                                    title="Copy translation"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if ('speechSynthesis' in window) {
+                                        window.speechSynthesis.cancel();
+                                        const u = new SpeechSynthesisUtterance(translatedData.text);
+                                        u.lang = translatedData.targetLang;
+                                        window.speechSynthesis.speak(u);
+                                      }
+                                    }}
+                                    className="p-1 rounded-md hover:bg-current/10 transition-colors cursor-pointer"
+                                    title="Listen to translation"
+                                  >
+                                    <Volume2 size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTranslatedData(null)}
+                                    className="p-1 rounded-md hover:bg-current/10 transition-colors cursor-pointer opacity-70 hover:opacity-100"
+                                    title="Hide translation"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
                               </div>
-                              <FormattedMessageText text={translatedText} isMine={isMine} />
+                              <div className="text-[14px] leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap font-normal">
+                                <FormattedMessageText text={translatedData.text} isMine={isMine} />
+                              </div>
                             </div>
                           )}
                         </div>
@@ -874,11 +967,15 @@ const MessageBubble = memo(({
                             {(message.decryptedText || message.text) && (
                               <button
                                 type="button"
-                                onClick={handleTranslate}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                                onClick={() => {
+                                  setOpenMenuMessageId(null);
+                                  setMenuAnchor(null);
+                                  setShowTranslatePicker(true);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left cursor-pointer"
                               >
                                 <Languages size={14} className="text-theme-muted" />
-                                <span>Translate</span>
+                                <span>Translate Message</span>
                               </button>
                             )}
 
@@ -964,6 +1061,21 @@ const MessageBubble = memo(({
                               <span>Forward</span>
                             </button>
 
+                            {typeof onCreateTask === 'function' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onCreateTask(message);
+                                  setOpenMenuMessageId(null);
+                                  setMenuAnchor(null);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                              >
+                                <span className="material-symbols-outlined text-[15px] text-theme-muted">task_alt</span>
+                                <span>Create Task</span>
+                              </button>
+                            )}
+
                             {typeof toggleSelection === 'function' && (
                               <button
                                 type="button"
@@ -996,6 +1108,52 @@ const MessageBubble = memo(({
                           </div>
                         </div>
                       </>,
+                  document.body
+                )}
+
+                {/* Language Selection Modal for Translation */}
+                {showTranslatePicker && typeof document !== "undefined" && createPortal(
+                  <div
+                    onClick={() => setShowTranslatePicker(false)}
+                    className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-slate-900 border border-[var(--glass-border)] rounded-3xl w-full max-w-sm shadow-2xl p-4 flex flex-col gap-3 animate-scaleIn text-theme-main"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-accent-primary/20 text-accent-primary flex items-center justify-center">
+                            <Languages size={15} />
+                          </div>
+                          <h3 className="font-semibold text-sm text-white">Translate Message</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTranslatePicker(false)}
+                          className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      <p className="text-xs text-zinc-400">Select target language:</p>
+
+                      <div className="grid grid-cols-2 gap-1.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                        {SUPPORTED_TRANSLATION_LANGUAGES.map((lang) => (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => handleTranslate(lang.code)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-accent-primary/20 hover:text-white text-zinc-200 text-xs font-medium transition-all text-left border border-white/5 hover:border-accent-primary/30 cursor-pointer active:scale-95"
+                          >
+                            <span className="text-base select-none">{lang.flag}</span>
+                            <span className="truncate">{lang.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>,
                   document.body
                 )}
               </div>

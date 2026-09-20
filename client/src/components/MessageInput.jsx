@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -25,15 +25,16 @@ import {
   Code2,
   Mic,
 } from "lucide-react";
-import DrawSketchModal from "./DrawSketchModal";
-import CodeSnippetModal from "./CodeSnippetModal";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
 const GifPicker = lazy(() => import("./GifPicker"));
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
-import ContactModal from "./ContactModal";
-import CreatePollModal from "./CreatePollModal";
-import { getSmartReplies } from "../lib/smartReplies";
+// Heavy composer modals are code-split: their chunks load only on first open,
+// keeping the main chat bundle (and first paint) lean.
+const DrawSketchModal = lazy(() => import("./DrawSketchModal"));
+const CodeSnippetModal = lazy(() => import("./CodeSnippetModal"));
+const ContactModal = lazy(() => import("./ContactModal"));
+const CreatePollModal = lazy(() => import("./CreatePollModal"));
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -71,6 +72,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isTypingPulse, setIsTypingPulse] = useState(false);
   const [isWhisperMode, setIsWhisperMode] = useState(false);
+  const [isAnnouncementMode, setIsAnnouncementMode] = useState(false);
   const [isHD, setIsHD] = useState(false);
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
@@ -116,6 +118,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const fileInputRef = useRef(null);
   const documentInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const lastTypingEmitRef = useRef(0);
+  const TYPING_EMIT_THROTTLE_MS = 1500;
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -148,24 +152,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     messages,
   } = useChatStore();
   const { authUser, socket } = useAuthStore();
-
-  // On-device smart quick replies from the latest incoming message
-  const smartReplies = (() => {
-    if (!selectedChat || editingMessage || replyingTo || text.trim() || imagePreview || documentFile || isRecording) {
-      return [];
-    }
-    const myId = authUser?._id?.toString();
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (m.isDeleted) continue;
-      const senderId = (m.senderId?._id || m.senderId)?.toString();
-      if (!senderId || senderId === myId) continue;
-      const incomingText = m.decryptedText || m.text;
-      if (!incomingText || m.image || m.audio || m.file || m.contact || m.poll) continue;
-      return getSmartReplies(incomingText);
-    }
-    return [];
-  })();
 
   // Populate text when editing a message
   useEffect(() => {
@@ -307,11 +293,18 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     try {
       if (!socket || !selectedChat) return;
 
-      socket.emit("typing", {
-        targetId: selectedChat.id,
-        targetType: selectedChat.type,
-        username: authUser?.username || "User",
-      });
+      // Throttle `typing` emits: at most one per 1.5s while typing.
+      // Previously every keystroke emitted, flooding the socket server and
+      // re-rendering every client on each keypress.
+      const now = Date.now();
+      if (now - lastTypingEmitRef.current >= TYPING_EMIT_THROTTLE_MS) {
+        lastTypingEmitRef.current = now;
+        socket.emit("typing", {
+          targetId: selectedChat.id,
+          targetType: selectedChat.type,
+          username: authUser?.username || "User",
+        });
+      }
 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
@@ -322,7 +315,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             username: authUser?.username || "User",
           });
         } catch {}
-      }, 2000);
+      }, 1500);
     } catch {}
   };
 
@@ -779,10 +772,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         file: currentReply.file || null,
       } : undefined,
       isWhisper: isWhisperMode,
+      isAnnouncement: isAnnouncementMode,
     });
-    
+
     // Reset whisper mode
     if (isWhisperMode) setIsWhisperMode(false);
+    // Reset announcement mode
+    if (isAnnouncementMode) setIsAnnouncementMode(false);
 
     // Fire after React state updates the DOM
     setTimeout(() => {
@@ -842,6 +838,28 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               setEditingMessage(null);
               setText("");
             }}
+            className="p-1 rounded-full text-theme-muted/50 hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Announcement Banner */}
+      {isAnnouncementMode && (
+        <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-amber-500/10 border-l-2 border-amber-500 border border-[var(--glass-border)] animate-fadeIn">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-1 rounded-full bg-amber-500/20 text-amber-500 flex-shrink-0">
+              <span className="material-symbols-outlined text-[14px]">campaign</span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-amber-500 block">Announcement — visible to the whole group</span>
+              <p className="text-xs text-theme-muted truncate">Only admins can post announcements</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsAnnouncementMode(false)}
             className="p-1 rounded-full text-theme-muted/50 hover:text-theme-main hover:bg-[var(--glass-hover)] transition-colors"
           >
             <X size={14} />
@@ -1149,6 +1167,30 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <span>{isWhisperMode ? "Whisper Mode (ON)" : "Send as Whisper"}</span>
           </button>
+          {(() => {
+            const myId = authUser?._id?.toString();
+            const admins = selectedChat?.admins || [];
+            const creatorId = (selectedChat?.createdBy?._id || selectedChat?.createdBy)?.toString();
+            const amIAdmin = selectedChat?.type === "room" && (
+              creatorId === myId || admins.some((a) => (a?._id || a)?.toString() === myId)
+            );
+            if (!amIAdmin) return null;
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAnnouncementMode(!isAnnouncementMode);
+                  setShowAttachMenu(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+              >
+                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${isAnnouncementMode ? 'bg-amber-500/25 text-amber-500' : 'bg-amber-500/15 text-amber-400'}`}>
+                  <span className="material-symbols-outlined text-[15px]">campaign</span>
+                </div>
+                <span>{isAnnouncementMode ? "Announcement (ON)" : "Post as Announcement"}</span>
+              </button>
+            );
+          })()}
           <button
             type="button"
             onClick={() => {
@@ -1326,27 +1368,31 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       )}
 
       {showContactModal && (
-        <ContactModal
-          isOpen={showContactModal}
-          onClose={() => setShowContactModal(false)}
-          onSendContact={async (contact) => {
-            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-            await sendMessage({ contact, text: "" });
-            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-          }}
-        />
+        <Suspense fallback={null}>
+          <ContactModal
+            isOpen={showContactModal}
+            onClose={() => setShowContactModal(false)}
+            onSendContact={async (contact) => {
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              await sendMessage({ contact, text: "" });
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            }}
+          />
+        </Suspense>
       )}
 
       {showPollModal && (
-        <CreatePollModal
-          isOpen={showPollModal}
-          onClose={() => setShowPollModal(false)}
-          onSubmit={async (pollData) => {
-            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-            await sendMessage({ text: "", poll: pollData });
-            window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-          }}
-        />
+        <Suspense fallback={null}>
+          <CreatePollModal
+            isOpen={showPollModal}
+            onClose={() => setShowPollModal(false)}
+            onSubmit={async (pollData) => {
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              await sendMessage({ text: "", poll: pollData });
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Voice Recording Bar UI */}
@@ -1382,25 +1428,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </div>
       ) : (
         <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
-          {/* Smart quick replies (on-device suggestions from latest incoming message) */}
-          {smartReplies.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5 animate-fadeIn">
-              <span className="text-[10px] font-semibold text-accent-primary uppercase tracking-wider shrink-0 pl-1">
-                ✨
-              </span>
-              {smartReplies.map((reply) => (
-                <button
-                  key={reply}
-                  type="button"
-                  disabled={isSending}
-                  onClick={() => handleSendMessage(null, reply)}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium text-accent-primary bg-accent-primary/10 border border-accent-primary/30 hover:bg-accent-primary/20 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {reply}
-                </button>
-              ))}
-            </div>
-          )}
           <div className={`flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass capsule-typing-pulse ${
             isTypingPulse ? "active" : ""
           }`}>
@@ -1566,11 +1593,11 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <button
                 type="button"
                 onClick={toggleDictation}
-                className={`p-1.5 sm:p-2 rounded-full transition-all shrink-0 ${
+                className={`p-1.5 sm:p-2 rounded-full transition-all shrink-0 cursor-pointer ${
                   isDictating
                     ? "bg-red-500 text-white animate-pulse shadow-glow ring-2 ring-red-400"
                     : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
-                }`}
+                } ${hasContent && !isDictating ? "hidden sm:flex" : "flex"}`}
                 title={isDictating ? "Listening... Click to stop" : "Voice Typing (Speech-to-Text)"}
               >
                 <Mic size={18} className={isDictating ? "animate-bounce" : ""} />
@@ -1612,19 +1639,27 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         </form>
       )}
 
-      {/* Interactive Whiteboard / Drawing Modal */}
-      <DrawSketchModal
-        isOpen={showDrawModal}
-        onClose={() => setShowDrawModal(false)}
-        onSendSketch={handleSendSketch}
-      />
+      {/* Interactive Whiteboard / Drawing Modal (lazy chunk, mounts only when opened) */}
+      {showDrawModal && (
+        <Suspense fallback={null}>
+          <DrawSketchModal
+            isOpen={showDrawModal}
+            onClose={() => setShowDrawModal(false)}
+            onSendSketch={handleSendSketch}
+          />
+        </Suspense>
+      )}
 
-      {/* Syntax-Highlighted Code Snippet Composer Modal */}
-      <CodeSnippetModal
-        isOpen={showCodeModal}
-        onClose={() => setShowCodeModal(false)}
-        onSendSnippet={handleSendCodeSnippet}
-      />
+      {/* Syntax-Highlighted Code Snippet Composer Modal (lazy chunk, mounts only when opened) */}
+      {showCodeModal && (
+        <Suspense fallback={null}>
+          <CodeSnippetModal
+            isOpen={showCodeModal}
+            onClose={() => setShowCodeModal(false)}
+            onSendSnippet={handleSendCodeSnippet}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

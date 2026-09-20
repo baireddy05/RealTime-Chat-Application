@@ -867,11 +867,16 @@ img.emoji {
   }
 }
 
-/* Call modal mobile safe area */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .call-safe-bottom {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-  }
+/* Device safe area inset utilities for notched phones and mobile displays */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+.call-safe-bottom {
+  margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
 }
 
 
@@ -885,5 +890,31 @@ img.emoji {
 /* App logo rendered as a squircle (superellipse approximation used by iOS icons) */
 .logo-squircle {
   border-radius: 28%;
+}
+
+/* ── Render-performance helpers ── */
+/* Skip layout/paint for off-screen chat bubbles; the browser renders them
+   lazily as they approach the viewport. intrinsic-size reserves space so the
+   scrollbar doesn't jump while rows are skipped. */
+.msg-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 84px;
+}
+
+/* Respect reduced-motion: kill the ambient pulse waves, typing dots and
+   bubble glide animations that otherwise keep the compositor busy. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-home-logo-wave-1,
+  .animate-home-logo-wave-2,
+  .animate-home-logo-wave-3,
+  .animate-home-logo-breath,
+  .animate-single-typing-wave,
+  .animate-typing-dot-1,
+  .animate-typing-dot-2,
+  .animate-typing-dot-3,
+  .animate-outgoing-glide,
+  .animate-incoming-glide {
+    animation: none !important;
+  }
 }
 

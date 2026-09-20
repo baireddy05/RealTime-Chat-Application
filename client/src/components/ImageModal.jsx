@@ -289,7 +289,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
                 <Search size={14} className="absolute left-3 top-2.5 text-theme-muted/50" />
                 <input
                   type="text"
-                  placeholder="Search channels or contacts..."
+                  placeholder="Search groups or contacts..."
                   value={forwardSearch}
                   onChange={(e) => setForwardSearch(e.target.value)}
                   className="w-full glass-input border border-[var(--glass-border)] rounded-xl pl-9 pr-3 py-1.5 text-xs text-theme-main placeholder-theme-muted/40 focus:outline-none focus:border-accent-primary"
@@ -301,7 +301,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
               {filteredRooms.length > 0 && (
                 <div>
                   <h4 className="text-[10px] font-semibold text-theme-muted uppercase tracking-wider px-2 mb-1.5">
-                    Channels
+                    Groups
                   </h4>
                   <div className="space-y-1">
                     {filteredRooms.map((room) => {

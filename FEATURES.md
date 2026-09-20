@@ -15,7 +15,7 @@ This document serves as the central source of truth for all features currently i
 
 ## 2. Core Messaging & Real-Time Communication
 - **Direct Messaging (1-to-1):** Real-time private conversations with friends.
-- **Group Channels:** Create custom channels, invite members, and view group information (`CreateGroupModal.jsx`).
+- **Groups:** Create custom groups, invite members, and view group information (`CreateGroupModal.jsx`). Group admins can add or remove members at any time from the group info panel.
 - **Real-Time WebSockets:** Live instant messaging powered by Socket.io.
 - **Message Editing:** Edit previously sent messages with `(edited)` badges.
 - **Message Deletion:** Delete messages for everyone (Tombstone soft-deletion strategy).
@@ -25,6 +25,8 @@ This document serves as the central source of truth for all features currently i
 - **Live Typing Indicators:** Real-time visual feedback when the other person is typing.
 - **Message Formatting:** Rich text formatting.
 - **In-Chat Search:** Search for specific messages inside a conversation.
+- **Global Message Search:** Search across every conversation at once with media-only, sender, and date-range filters, plus jump-to-message navigation.
+- **Chat Labels & Folders:** Create color-coded labels (Work, Family, …), assign them to any chat, filter the inbox by label, and see label dots on every conversation.
 - **Interactive Polls:** Create polls with single or multiple answers and see real-time voting results.
 - **Ephemeral Whisper Mode:** Send disappearing messages that vanish permanently after being viewed once by pressing and holding.
 
@@ -35,9 +37,12 @@ This document serves as the central source of truth for all features currently i
 - **Quick Message Reactions:** Add emoji reactions instantly to messages using a quick-access tooltip panel.
 - **Quick Emoji Bar:** Frequently used emojis displayed directly above the message input field.
 - **Pinned Messages:** Pin important messages to the top of the chat.
+- **Group Announcements:** Admins can broadcast announcement messages (`isAnnouncement`) that render with a highlighted badge and can be filtered via a dedicated banner.
+- **Group Events & RSVP:** Plan events inside any group (title, description, start/end, location) with Going / Maybe / Can't-go RSVPs, live-synced to all members over WebSockets.
+- **Tasks & To-Dos:** Turn any message into a trackable task, assign it to members, set due dates and priorities, and manage per-chat or personal task lists in the Tasks drawer with real-time updates.
 - **Typing Shockwave:** Visual ripple animation effects triggered when typing in the input field.
 - **Draft Indicators:** Unsent text is automatically saved as a draft with a visible indicator in the sidebar.
-- **Saved Messages (Self-Chat):** A dedicated channel to send files, notes, and links to yourself.
+- **Saved Messages (Self-Chat):** A dedicated chat to send files, notes, and links to yourself.
 - **Archive Chats:** Hide inactive chats from the main inbox into a dedicated "Archived" view.
 - **HD Media Quality Toggle:** Choose whether to send images compressed (for speed) or in High Definition.
 

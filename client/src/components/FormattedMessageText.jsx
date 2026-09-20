@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Check, Copy, Terminal } from "lucide-react";
 import { parseEmojiToHtml } from "../lib/emoji";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-export const CodeSnippetBlock = ({ code, language }) => {
+export const CodeSnippetBlock = memo(({ code, language }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -50,9 +50,9 @@ export const CodeSnippetBlock = ({ code, language }) => {
       </pre>
     </div>
   );
-};
+});
 
-export const SpoilerSpan = ({ children }) => {
+export const SpoilerSpan = memo(({ children }) => {
   const [revealed, setRevealed] = useState(false);
   return (
     <span
@@ -70,7 +70,7 @@ export const SpoilerSpan = ({ children }) => {
       {children}
     </span>
   );
-};
+});
 
 // Helper to recursively parse text nodes for Spoiler, Emoji, URLs, and Search Highlights
 const processText = (textStr, searchQuery) => {
@@ -143,8 +143,30 @@ const processText = (textStr, searchQuery) => {
   });
 };
 
-export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
+// Plain-text fast path: most chat messages contain no markdown. Running the
+// full remark-gfm parser on every bubble on every render is the single
+// biggest main-thread cost in long conversations, so plain messages skip
+// ReactMarkdown entirely and render through the lightweight processText.
+const MARKDOWN_HINT = /(\*\*|__|~~|`|#{1,6}\s|^\s*[-+*]\s|^\s*\d+\.\s|\[.+?\]\(.+?\)|^>\s|\|.+\||!\[)/m;
+
+export const FormattedMessageText = memo(({ text, isMine, searchQuery }) => {
+  const plain = useMemo(() => {
+    if (typeof text !== "string") return false;
+    if (text.includes("||")) return false; // spoiler syntax needs parser path
+    return !MARKDOWN_HINT.test(text);
+  }, [text]);
+
   if (!text) return null;
+
+  if (plain) {
+    return (
+      <div className={`space-y-1 select-text break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full prose prose-sm ${isMine ? 'prose-invert' : ''} dark:prose-invert prose-p:my-1 prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0`}>
+        <div className="whitespace-pre-wrap leading-relaxed my-1">
+          {processText(text, searchQuery)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-1 select-text break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full prose prose-sm ${isMine ? 'prose-invert' : ''} dark:prose-invert prose-p:my-1 prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0`}>
@@ -212,6 +234,6 @@ export const FormattedMessageText = ({ text, isMine, searchQuery }) => {
       </ReactMarkdown>
     </div>
   );
-};
+});
 
 export default FormattedMessageText;
