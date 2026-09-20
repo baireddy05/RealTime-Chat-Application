@@ -21,7 +21,12 @@ import {
   Sparkles,
   MapPin,
   MonitorPlay,
+  PenTool,
+  Code2,
+  Mic,
 } from "lucide-react";
+import DrawSketchModal from "./DrawSketchModal";
+import CodeSnippetModal from "./CodeSnippetModal";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
 const GifPicker = lazy(() => import("./GifPicker"));
@@ -67,6 +72,10 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [isTypingPulse, setIsTypingPulse] = useState(false);
   const [isWhisperMode, setIsWhisperMode] = useState(false);
   const [isHD, setIsHD] = useState(false);
+  const [showDrawModal, setShowDrawModal] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
+  const speechRecognitionRef = useRef(null);
   const pulseTimeoutRef = useRef(null);
 
   // Mobile Back Navigation handlers for input popups and previews
@@ -74,6 +83,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   useBackHandler(showAttachMenu, () => setShowAttachMenu(false), "input-attach-menu");
   useBackHandler(showTimerMenu, () => setShowTimerMenu(false), "input-timer-menu");
   useBackHandler(showScheduleMenu, () => setShowScheduleMenu(false), "input-schedule-menu");
+  useBackHandler(showDrawModal, () => setShowDrawModal(false), "input-draw-modal");
+  useBackHandler(showCodeModal, () => setShowCodeModal(false), "input-code-modal");
   useBackHandler(!!previewModalImage, () => setPreviewModalImage(null), "input-preview-modal");
   useBackHandler(!!imagePreview, () => setImagePreview(null), "input-image-preview");
   useBackHandler(!!documentFile, () => setDocumentFile(null), "input-doc-preview");
@@ -567,6 +578,69 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         alert("Unable to retrieve your location: " + error.message);
       }
     );
+  };
+
+  const handleSendSketch = async (dataUrl) => {
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    await sendMessage({ text: "", image: dataUrl });
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+  };
+
+  const handleSendCodeSnippet = async (formattedCode) => {
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    await sendMessage({ text: formattedCode });
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+  };
+
+  const toggleDictation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice typing is not supported in this browser. Please try Chrome or Edge.");
+      return;
+    }
+    if (isDictating) {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+      }
+      setIsDictating(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = navigator.language || "en-US";
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setText((prev) => {
+            const separator = prev && !prev.endsWith(" ") ? " " : "";
+            return prev + separator + transcript.trim();
+          });
+        }
+      };
+
+      recognition.onerror = (err) => {
+        console.warn("Speech recognition error:", err);
+        setIsDictating(false);
+      };
+
+      recognition.onend = () => {
+        setIsDictating(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+      setIsDictating(true);
+    } catch (err) {
+      console.error("Failed to start voice dictation:", err);
+      setIsDictating(false);
+    }
   };
 
   const stopAndSendRecording = () => {
@@ -1088,6 +1162,32 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <span>Poll</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowDrawModal(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <PenTool size={14} />
+            </div>
+            <span>Draw & Sketch</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCodeModal(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+              <Code2 size={14} />
+            </div>
+            <span>Code Snippet</span>
+          </button>
         </div>
       )}
 
@@ -1462,6 +1562,20 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 <span className="material-symbols-outlined text-xl">mic</span>
               </button>
 
+              {/* Voice Typing / Dictation Button */}
+              <button
+                type="button"
+                onClick={toggleDictation}
+                className={`p-1.5 sm:p-2 rounded-full transition-all shrink-0 ${
+                  isDictating
+                    ? "bg-red-500 text-white animate-pulse shadow-glow ring-2 ring-red-400"
+                    : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
+                }`}
+                title={isDictating ? "Listening... Click to stop" : "Voice Typing (Speech-to-Text)"}
+              >
+                <Mic size={18} className={isDictating ? "animate-bounce" : ""} />
+              </button>
+
               {/* Send Button: visible on mobile when text/media has content */}
               <button
                 ref={sendBtnRef}
@@ -1497,6 +1611,20 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           </div>
         </form>
       )}
+
+      {/* Interactive Whiteboard / Drawing Modal */}
+      <DrawSketchModal
+        isOpen={showDrawModal}
+        onClose={() => setShowDrawModal(false)}
+        onSendSketch={handleSendSketch}
+      />
+
+      {/* Syntax-Highlighted Code Snippet Composer Modal */}
+      <CodeSnippetModal
+        isOpen={showCodeModal}
+        onClose={() => setShowCodeModal(false)}
+        onSendSnippet={handleSendCodeSnippet}
+      />
     </div>
   );
 };

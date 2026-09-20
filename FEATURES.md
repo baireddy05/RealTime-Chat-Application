@@ -72,7 +72,7 @@ This document serves as the central source of truth for all features currently i
 - **Friends System:** Send, accept, or reject friend requests to build a contacts list.
 - **Auto-generated Sender Colors:** Automatically hashes usernames to assign unique visual colors to users in group chats.
 - **Starred Messages:** Bookmark important messages and manage them in a dedicated drawer.
-- **Chat Themes:** Customize the visual theme of specific chats, including background doodles and color palettes.
+- **Chat Themes & WhatsApp-Style Background Doodles:** Customize the visual theme of specific chats. Features ultra-fine WhatsApp-sized miniature doodle tiling (180px repeat tile, 1.6px stroke width) with minimal noticeability (4.5%-5.5% subtle watermark opacity) and custom color palettes.
 - **Dynamic Theme Semantic Design:** Advanced Tailwind configuration implementing a dynamic Material-You inspired semantic color system (surface variants, container colors).
 - **Dynamic Date Dividers:** Automatically group messages under sticky date dividers (e.g., "Today", "Yesterday").
 - **Virtualized Lists:** Efficient rendering of thousands of messages using `react-virtuoso` for smooth scrolling performance.
@@ -87,4 +87,14 @@ This document serves as the central source of truth for all features currently i
 - **PWA Support:** Install the application as a Progressive Web App directly to the user's home screen.
 - **App Settings:** Configure general application preferences.
 - **API Health Monitoring:** Dedicated endpoints for uptime monitoring and cron-job keep-alives.
-Enhanced Communication & Media
+## 7. Productivity, Accessibility & Advanced Expression
+- **Interactive Doodle & Drawing Canvas:** Full whiteboard drawing modal (`DrawSketchModal.jsx`) allowing users to sketch diagrams, handwritten notes, and doodles using Pen, Highlighter, and Eraser with 8 vibrant color palettes and stroke sizes. Supports direct one-click sending into chat and local PNG downloads.
+- **Code Snippet Composer:** Dedicated code composer modal (`CodeSnippetModal.jsx`) supporting 13+ programming languages (JavaScript, Python, TypeScript, HTML/CSS, SQL, JSON, Rust, Go, C++, Java, Bash) with line numbers and character count. Sends syntax-highlighted code blocks with custom copy actions.
+- **Speech-to-Text / Voice Typing:** Hands-free real-time voice dictation in the message input using the Web Speech API (`SpeechRecognition`). Real-time speech transcription appending directly to the message input with audio wave pulse indicator.
+- **Text-to-Speech (TTS) Message Readout:** Hands-free speech synthesis listening for any text message using the Web Speech API (`window.speechSynthesis`). Includes real-time speaking indicator badge and one-click stop/pause control.
+- **Interactive Spoiler / Hidden Text Formatting:** Conceal sensitive text or spoilers using `||hidden text||` syntax. Renders with a frosted glass blur effect that smoothly unblurs and reveals on tap/click and re-blurs on second tap.
+- **Persistent Scratchpad & Quick Notes:** Slide-over local scratchpad drawer (`QuickNotesDrawer.jsx`) accessible from the chat header. Allows creating and organizing persistent notes, checklists, and snippets saved in browser storage, with a "Send to Chat" button to instantly dispatch notes to the active conversation.
+- **Multi-Format Conversation Export:** Export entire chat transcripts in multiple formats:
+  - *Styled HTML Transcript:* Self-contained, beautifully styled HTML report with dark mode theme, sender badges, media attachments, and message bubbles.
+  - *JSON Data Export:* Structured JSON containing chat metadata, participants, timestamps, and message payloads for backups and developer analysis.
+  - *Formatted TXT:* Clean ASCII transcript with timestamps and delivery info.

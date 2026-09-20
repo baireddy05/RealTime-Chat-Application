@@ -45,16 +45,9 @@ async function runTest() {
 
     // 4. Click on a chat contact from the conversation list
     console.log("4. Selecting chat conversation from sidebar...");
-    const conversationList = page.locator("div.overflow-y-auto.space-y-1 > div, section[aria-label='Chats List'] div.cursor-pointer");
-    await conversationList.first().waitFor({ state: "visible", timeout: 10000 });
-    
-    // Prefer User2 or General Group if available
-    const user2Card = conversationList.filter({ hasText: /User2|General Group/ }).first();
-    if (await user2Card.count() > 0) {
-      await user2Card.click();
-    } else {
-      await conversationList.first().click();
-    }
+    const user2Card = page.locator("text=User2").first();
+    await user2Card.waitFor({ state: "visible", timeout: 10000 });
+    await user2Card.click();
     await page.waitForTimeout(2000);
     console.log("✓ Opened conversation");
     await page.screenshot({ path: path.join(screenshotDir, "03_conversation_open.png") });
@@ -99,6 +92,60 @@ async function runTest() {
         console.log("✓ 'Translated' tag displayed in bubble:", await translatedTag.count() > 0);
       } else {
         console.log("Translate option not in context menu");
+      }
+    }
+
+    // 9. Test Spoiler Rendering and Reveal
+    console.log("9. Testing Spoiler tag in message input...");
+    await textarea.fill("This contains a ||secret spoiler|| text!");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(1500);
+
+    const spoilerElem = page.locator("span[title*='Spoiler']").last();
+    const hasSpoiler = await spoilerElem.count() > 0;
+    console.log("✓ Spoiler element found in DOM:", hasSpoiler);
+    if (hasSpoiler) {
+      await page.screenshot({ path: path.join(screenshotDir, "08_spoiler_blurred.png") });
+      // Click to reveal spoiler
+      await spoilerElem.click();
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: path.join(screenshotDir, "09_spoiler_revealed.png") });
+      console.log("✓ Spoiler clicked and revealed");
+    }
+
+    // 10. Test Attach Menu (Doodle Canvas & Code Snippet buttons)
+    console.log("10. Testing Attach Menu options...");
+    const attachBtn = page.locator("#attach-button").first();
+    if (await attachBtn.count() > 0) {
+      await attachBtn.click();
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: path.join(screenshotDir, "10_attach_menu.png") });
+
+      const drawBtn = page.locator("button:has-text('Draw & Sketch')");
+      const codeBtn = page.locator("button:has-text('Code Snippet')");
+      console.log("✓ 'Draw & Sketch' option present:", await drawBtn.count() > 0);
+      console.log("✓ 'Code Snippet' option present:", await codeBtn.count() > 0);
+
+      // Close attach menu
+      await page.keyboard.press("Escape");
+    }
+
+    // 11. Test Quick Notes & Scratchpad Drawer
+    console.log("11. Testing Quick Notes Drawer...");
+    const notesBtn = page.locator("button[title='Scratchpad & Notes']").first();
+    if (await notesBtn.count() > 0) {
+      await notesBtn.click();
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: path.join(screenshotDir, "11_quick_notes_drawer.png") });
+
+      const notesHeader = page.locator("h3:has-text('Scratchpad & Notes')");
+      console.log("✓ Scratchpad & Notes drawer opened:", await notesHeader.count() > 0);
+
+      // Close drawer
+      const closeBtn = page.locator("button[title='Close Drawer']").first();
+      if (await closeBtn.count() > 0) {
+        await closeBtn.click();
+        await page.waitForTimeout(500);
       }
     }
 

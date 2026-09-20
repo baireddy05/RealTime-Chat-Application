@@ -18,8 +18,10 @@ import {
   Lock, MessageCircle, Volume2, VolumeX, Reply,
   Edit3, Forward, Star, Info, Plus, Copy,
   UploadCloud, Sparkles, ChevronUp, ChevronDown, DownloadCloud, Bell, BellOff,
-  Clock, Flame, Palette, MessageSquare, MoreVertical
+  Clock, Flame, Palette, MessageSquare, MoreVertical,
+  StickyNote, FileCode, FileText
 } from "lucide-react";
+import QuickNotesDrawer from "./QuickNotesDrawer";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import ScheduledMessagesModal from "./ScheduledMessagesModal";
@@ -229,7 +231,18 @@ const ChatPane = ({ onBack }) => {
   const isAtBottomRef = useRef(true);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
   const [unreadBelowCount, setUnreadBelowCount] = useState(0);
+  const [isQuickNotesOpen, setIsQuickNotesOpen] = useState(false);
   const loadedChatIdRef = useRef(null);
+
+  useBackHandler(isQuickNotesOpen, () => setIsQuickNotesOpen(false), "chat-quick-notes");
+
+  const handleSendNoteToChat = (noteText) => {
+    if (!noteText?.trim()) return;
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    sendMessage({ text: noteText });
+    window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    setIsQuickNotesOpen(false);
+  };
   const prevSelectedChatIdRef = useRef(selectedChat?.id);
   const messagesRef = useRef(messages);
 
@@ -622,10 +635,110 @@ const ChatPane = ({ onBack }) => {
     }
   };
 
-  const handleExportChat = () => {
+  const handleExportChat = (format = "txt") => {
     if (!selectedChat || messages.length === 0) return;
     soundManager.playSendSound();
+    const cleanName = selectedChat.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const dateStr = new Date().toISOString().slice(0, 10);
 
+    if (format === "json") {
+      const exportData = {
+        chatName: selectedChat.name,
+        chatType: selectedChat.type,
+        exportedAt: new Date().toISOString(),
+        totalMessages: messages.length,
+        messages: messages.map((m) => ({
+          id: m._id,
+          sender: m.senderId?.username || (m.senderId === authUser._id ? authUser.username : "User"),
+          text: m.decryptedText || m.text,
+          createdAt: m.createdAt,
+          isEdited: m.isEdited,
+          image: m.image,
+          file: m.file,
+          audio: m.audio,
+          poll: m.poll,
+          reactions: m.reactions,
+        })),
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pulse-chat-${cleanName}-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (format === "html") {
+      const bubblesHtml = messages
+        .filter((m) => !m.isDeleted)
+        .map((m) => {
+          const isMe = (m.senderId?._id || m.senderId) === authUser._id;
+          const senderName = m.senderId?.username || (isMe ? authUser.username : "User");
+          const time = new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          const text = m.decryptedText || (isEncryptedMessage(m.text) ? "[Encrypted message]" : m.text) || "";
+          let mediaHtml = "";
+          if (m.image) mediaHtml += `<div style="margin-top:6px;"><img src="${m.image}" style="max-width:280px;border-radius:12px;display:block;" /></div>`;
+          if (m.file) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">📎 ${m.file.name || "Attachment"}</div>`;
+          if (m.audio) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">🎤 Audio Message</div>`;
+          return `
+            <div class="msg ${isMe ? "mine" : "theirs"}">
+              <div class="sender">${senderName}</div>
+              <div class="text">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+              ${mediaHtml}
+              <div class="time">${time}</div>
+            </div>
+          `;
+        })
+        .join("\n");
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pulse Messenger - ${selectedChat.name}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f1f5f9; margin: 0; padding: 24px; }
+    .container { max-width: 680px; margin: 0 auto; }
+    .header { background: #1e293b; padding: 18px 24px; border-radius: 20px; margin-bottom: 24px; border: 1px solid #334155; }
+    .header h1 { margin: 0 0 6px 0; font-size: 20px; color: #38bdf8; }
+    .header p { margin: 0; font-size: 12px; color: #94a3b8; }
+    .messages { display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-break: break-word; }
+    .mine { align-self: flex-end; background: #2563eb; color: #fff; border-bottom-right-radius: 4px; }
+    .theirs { align-self: flex-start; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-bottom-left-radius: 4px; }
+    .sender { font-size: 11px; font-weight: 700; margin-bottom: 4px; opacity: 0.85; }
+    .time { font-size: 10px; opacity: 0.6; margin-top: 4px; text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${selectedChat.name}</h1>
+      <p>Exported from Pulse Messenger on ${new Date().toLocaleString()} • ${messages.length} messages</p>
+    </div>
+    <div class="messages">
+      ${bubblesHtml}
+    </div>
+  </div>
+</body>
+</html>`;
+      const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pulse-chat-${cleanName}-${dateStr}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Default: TXT
     const divider = "=".repeat(65);
     const subDivider = "-".repeat(65);
     const lines = [
@@ -672,9 +785,8 @@ const ChatPane = ({ onBack }) => {
     const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const cleanName = selectedChat.name.replace(/[^a-zA-Z0-9_-]/g, "_");
     a.href = url;
-    a.download = `pulse-chat-${cleanName}-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `pulse-chat-${cleanName}-${dateStr}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -737,10 +849,10 @@ const ChatPane = ({ onBack }) => {
       {/* 2. WhatsApp-style doodle wallpaper overlay */}
       {themeStyles.hasDoodles && (
         <div
-          className="absolute inset-0 z-0 pointer-events-none opacity-30 transition-opacity"
+          className="absolute inset-0 z-0 pointer-events-none opacity-[0.055] dark:opacity-[0.045] transition-opacity"
           style={{
             backgroundImage: `url("${themeStyles.doodleSvg || CHAT_DOODLE_SVG}")`,
-            backgroundSize: "400px 400px",
+            backgroundSize: "180px 180px",
           }}
         />
       )}
@@ -918,6 +1030,14 @@ const ChatPane = ({ onBack }) => {
               >
                 <span className="material-symbols-outlined text-lg">search</span>
               </button>
+              <button
+                onClick={() => setIsQuickNotesOpen(true)}
+                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                title="Scratchpad & Notes"
+                type="button"
+              >
+                <StickyNote size={17} className="text-amber-500" />
+              </button>
 
           <div className="relative" ref={chatOptionsRef}>
             <button
@@ -1044,15 +1164,38 @@ const ChatPane = ({ onBack }) => {
                   </button>
 
                   {/* Chat History Export */}
+                  <div className="px-3.5 pt-2 pb-1 text-[10px] font-bold text-theme-muted uppercase tracking-wider">
+                    Export Chat
+                  </div>
                   <button
                     onClick={() => {
-                      handleExportChat();
+                      handleExportChat("html");
                       setShowChatOptions(false);
                     }}
-                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors"
+                    className="w-full px-3.5 py-2 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2 text-theme-main hover:text-accent-primary transition-colors text-xs"
                   >
-                    <DownloadCloud size={14} className="text-accent-primary" />
-                    <span>Export Transcript (.txt)</span>
+                    <DownloadCloud size={13} className="text-accent-primary" />
+                    <span>Export Styled HTML</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportChat("json");
+                      setShowChatOptions(false);
+                    }}
+                    className="w-full px-3.5 py-2 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2 text-theme-main hover:text-accent-primary transition-colors text-xs"
+                  >
+                    <FileCode size={13} className="text-cyan-400" />
+                    <span>Export JSON Data</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportChat("txt");
+                      setShowChatOptions(false);
+                    }}
+                    className="w-full px-3.5 py-2 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2 text-theme-main hover:text-accent-primary transition-colors text-xs"
+                  >
+                    <FileText size={13} className="text-zinc-400" />
+                    <span>Export Plain Text (.txt)</span>
                   </button>
 
                   {pinnedMessages.length > 0 && (
@@ -1428,6 +1571,11 @@ const ChatPane = ({ onBack }) => {
       )}
 
       <GroupCallModal />
+      <QuickNotesDrawer
+        isOpen={isQuickNotesOpen}
+        onClose={() => setIsQuickNotesOpen(false)}
+        onSendToChat={handleSendNoteToChat}
+      />
     </div>
   );
 };

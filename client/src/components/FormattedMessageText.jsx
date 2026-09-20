@@ -52,59 +52,94 @@ export const CodeSnippetBlock = ({ code, language }) => {
   );
 };
 
-// Helper to recursively parse text nodes for Emoji and Search Highlights
+export const SpoilerSpan = ({ children }) => {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span
+      onClick={(e) => {
+        e.stopPropagation();
+        setRevealed((prev) => !prev);
+      }}
+      title={revealed ? "Click to conceal spoiler" : "Spoiler: Click to reveal"}
+      className={`inline-block px-1.5 py-0.5 rounded-lg cursor-pointer transition-all duration-200 select-none mx-0.5 font-medium ${
+        revealed
+          ? "bg-current/15 text-inherit shadow-sm"
+          : "bg-slate-700/80 dark:bg-slate-800/90 text-transparent blur-[5px] hover:blur-[3px] border border-white/10"
+      }`}
+    >
+      {children}
+    </span>
+  );
+};
+
+// Helper to recursively parse text nodes for Spoiler, Emoji, URLs, and Search Highlights
 const processText = (textStr, searchQuery) => {
   if (typeof textStr !== "string") return textStr;
   
-  // Format URLs
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const urlParts = textStr.split(urlRegex);
+  // Format Spoilers: ||spoiler||
+  const spoilerRegex = /(\|\|[\s\S]+?\|\|)/g;
+  const spoilerParts = textStr.split(spoilerRegex);
 
-  return urlParts.map((urlSub, j) => {
-    if (urlSub.match(urlRegex)) {
+  return spoilerParts.map((part, sIdx) => {
+    if (part.startsWith("||") && part.endsWith("||") && part.length >= 4) {
+      const spoilerInner = part.slice(2, -2);
       return (
-        <a
+        <SpoilerSpan key={`spoiler-${sIdx}`}>
+          {processText(spoilerInner, searchQuery)}
+        </SpoilerSpan>
+      );
+    }
+
+    // Format URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urlParts = part.split(urlRegex);
+
+    return urlParts.map((urlSub, j) => {
+      if (urlSub.match(urlRegex)) {
+        return (
+          <a
+            key={j}
+            href={urlSub}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 break-all transition-opacity font-semibold opacity-95 hover:opacity-75"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {urlSub}
+          </a>
+        );
+      }
+
+      // Search match highlight
+      if (searchQuery && searchQuery.trim()) {
+        const trimmed = searchQuery.trim();
+        const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const searchRegex = new RegExp(`(${escaped})`, "gi");
+        const matchParts = urlSub.split(searchRegex);
+
+        return matchParts.map((m, k) =>
+          m.toLowerCase() === trimmed.toLowerCase() ? (
+            <mark
+              key={k}
+              className="bg-yellow-400/35 text-current font-bold px-1 rounded border border-yellow-500/30"
+              dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
+            />
+          ) : (
+            <span
+              key={k}
+              dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
+            />
+          )
+        );
+      }
+
+      return (
+        <span
           key={j}
-          href={urlSub}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 break-all transition-opacity font-semibold opacity-95 hover:opacity-75"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {urlSub}
-        </a>
+          dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(urlSub) }}
+        />
       );
-    }
-
-    // Search match highlight
-    if (searchQuery && searchQuery.trim()) {
-      const trimmed = searchQuery.trim();
-      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const searchRegex = new RegExp(`(${escaped})`, "gi");
-      const matchParts = urlSub.split(searchRegex);
-
-      return matchParts.map((m, k) =>
-        m.toLowerCase() === trimmed.toLowerCase() ? (
-          <mark
-            key={k}
-            className="bg-yellow-400/35 text-current font-bold px-1 rounded border border-yellow-500/30"
-            dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
-          />
-        ) : (
-          <span
-            key={k}
-            dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
-          />
-        )
-      );
-    }
-
-    return (
-      <span
-        key={j}
-        dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(urlSub) }}
-      />
-    );
+    });
   });
 };
 

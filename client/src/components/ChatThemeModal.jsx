@@ -587,10 +587,10 @@ const ChatThemeModal = ({ isOpen, onClose }) => {
             {/* 2. WhatsApp-style doodle wallpaper overlay */}
             {styles.hasDoodles && (
               <div
-                className="absolute inset-0 z-0 pointer-events-none opacity-30 transition-opacity"
+                className="absolute inset-0 z-0 pointer-events-none opacity-[0.055] dark:opacity-[0.045] transition-opacity"
                 style={{
                   backgroundImage: `url("${styles.doodleSvg || CHAT_DOODLE_SVG}")`,
-                  backgroundSize: "400px 400px",
+                  backgroundSize: "180px 180px",
                 }}
               />
             )}

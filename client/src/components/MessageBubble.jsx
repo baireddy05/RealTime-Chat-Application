@@ -1,6 +1,6 @@
 import { memo, Fragment, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown, Languages } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MoreVertical, MessageCircle, Edit3, MessageSquare, Info, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -116,6 +116,31 @@ const MessageBubble = memo(({
     } finally {
       setIsTranslating(false);
     }
+  };
+
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const handleToggleSpeech = () => {
+    setOpenMenuMessageId(null);
+    setMenuAnchor(null);
+    if (!('speechSynthesis' in window)) {
+      alert('Text-to-speech is not supported in this browser.');
+      return;
+    }
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const textToRead = message.decryptedText || message.text || "";
+    if (!textToRead.trim()) return;
+
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
   };
 
   // Shadow the message prop so we can view the local copy while holding
@@ -633,6 +658,20 @@ const MessageBubble = memo(({
                               )}
                             </div>
                           </div>
+                          {isSpeaking && (
+                            <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-primary/20 text-accent-primary border border-accent-primary/30 text-[11px] font-semibold animate-pulse">
+                              <Volume2 size={12} className="animate-bounce" />
+                              <span>Reading aloud...</span>
+                              <button
+                                type="button"
+                                onClick={handleToggleSpeech}
+                                className="ml-1 p-0.5 rounded-full hover:bg-white/20 text-white"
+                                title="Stop Read Aloud"
+                              >
+                                <VolumeX size={11} />
+                              </button>
+                            </div>
+                          )}
                           {isTranslating && (
                             <div className="text-[10px] italic opacity-70 flex items-center gap-1 mt-1 font-semibold">
                               <Loader size={10} className="animate-spin" /> Translating...
@@ -809,6 +848,26 @@ const MessageBubble = memo(({
                               >
                                 <Copy size={14} className="text-theme-muted" />
                                 <span>Copy Text</span>
+                              </button>
+                            )}
+
+                            {(message.decryptedText || message.text) && (
+                              <button
+                                type="button"
+                                onClick={handleToggleSpeech}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+                              >
+                                {isSpeaking ? (
+                                  <>
+                                    <VolumeX size={14} className="text-red-400" />
+                                    <span className="text-red-400 font-semibold">Stop Read Aloud</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Volume2 size={14} className="text-accent-primary" />
+                                    <span>Read Aloud (TTS)</span>
+                                  </>
+                                )}
                               </button>
                             )}
 
