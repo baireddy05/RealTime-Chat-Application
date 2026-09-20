@@ -1,0 +1,15 @@
+Pulse — RealTime Chat in 20 seconds ⚡
+
+Your chats. At the speed of thought.
+
+DMs + Groups, instantly. E2EE protected (AES-GCM 256). Typing, receipts, reactions. Voice, video calls, files, GIFs, polls — one cyber-dark workspace.
+
+MERN • Socket.io • WebRTC • E2EE
+
+Feel the Pulse.
+
+#buildinpublic #mern #socketio #webrtc #react #realtime #e2ee
+
+Video: brag-output/brag.mp4 (1920x1080, 20s, with sound)
+Poster: brag-output/brag.jpg
+Alt: the longer 62s screen-recorded cut lives at promo/pulse_ad_final.mp4
