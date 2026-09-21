@@ -51,6 +51,7 @@ const userSchema = new mongoose.Schema(
         wallpaper: String,
         theme: String,
         archived: Boolean,
+        disappearing: Number,
       }, { _id: false }),
       default: {},
     },
@@ -64,6 +65,10 @@ const userSchema = new mongoose.Schema(
       type: Map,
       of: [String],
       default: {},
+    },
+    pinnedChats: {
+      type: [String],
+      default: [],
     },
   },
   { timestamps: true }

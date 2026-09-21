@@ -111,6 +111,49 @@ export const useChatStore = create((set, get) => ({
   })(),
 
   setDisappearingTimer: (seconds) => set({ disappearingTimer: seconds }),
+
+  // Per-chat default disappearing timer (stored on the user profile).
+  // Used when neither the message nor the session timer specifies one.
+  getChatDefaultDisappearing: (chatId) => {
+    if (!chatId) return null;
+    const prefs = useAuthStore.getState().authUser?.chatPreferences?.[chatId];
+    const v = prefs?.disappearing;
+    return typeof v === "number" && v > 0 ? v : null;
+  },
+
+  setChatDisappearing: async (chatId, seconds) => {
+    try {
+      const res = await axiosInstance.put(`/chat/preferences/${chatId}`, { disappearing: seconds });
+      const prefs = res.data?.preferences;
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        const prev = authState.authUser.chatPreferences || {};
+        useAuthStore.setState({
+          authUser: {
+            ...authState.authUser,
+            chatPreferences: { ...prev, [chatId]: { ...(prev[chatId] || {}), disappearing: prefs?.disappearing ?? seconds } },
+          },
+        });
+      }
+      return { success: true, preferences: prefs };
+    } catch (error) {
+      console.error("Error setting chat disappearing default:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Chat lock (PIN gate session state; locks themselves live in localStorage)
+  unlockedChats: [],
+  unlockChat: (chatId) =>
+    set((state) =>
+      state.unlockedChats.includes(chatId)
+        ? state
+        : { unlockedChats: [...state.unlockedChats, chatId] }
+    ),
+  relockChat: (chatId) =>
+    set((state) => ({
+      unlockedChats: state.unlockedChats.filter((id) => id !== chatId),
+    })),
   setIsScheduledOpen: (val) => set({ isScheduledOpen: val }),
   setIsChatThemeOpen: (val) => set({ isChatThemeOpen: val }),
   setIsSettingsOpen: (val) => set({ isSettingsOpen: val }),
@@ -337,6 +380,23 @@ export const useChatStore = create((set, get) => ({
     } catch (error) {
       console.error(error);
       return false;
+    }
+  },
+
+  togglePinChat: async (chatId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/pin/${chatId}`);
+      const pinnedChats = res.data?.pinnedChats || [];
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        useAuthStore.setState({
+          authUser: { ...authState.authUser, pinnedChats },
+        });
+      }
+      return { success: true, pinned: !!res.data?.pinned, pinnedChats };
+    } catch (error) {
+      console.error("Error pinning chat:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
     }
   },
 
@@ -610,6 +670,30 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Open a view-once photo/voice note. Returns the one-time content URL.
+  viewOnceMedia: async (messageId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/message/${messageId}/view-once`);
+      return { success: true, ...res.data };
+    } catch (error) {
+      if (error.response?.status === 410) {
+        // Already opened/gone: reflect the consumed state locally too
+        const { messages } = get();
+        const idStr = messageId?.toString();
+        set({
+          messages: messages.map((m) =>
+            (m._id || m.id)?.toString() === idStr
+              ? { ...m, image: null, audio: null, viewOnceOpened: true }
+              : m
+          ),
+        });
+        return { success: false, gone: true, error: error.response?.data?.error };
+      }
+      console.error("Error opening view-once media:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
   sendMessage: async (messageData) => {
     const { selectedChat, replyingTo, disappearingTimer, isSending } = get();
     if (!selectedChat) return;
@@ -635,7 +719,9 @@ export const useChatStore = create((set, get) => ({
         ...messageData,
         text: textToSend,
         isEncrypted,
-        expiresIn: messageData.expiresIn !== undefined ? messageData.expiresIn : (disappearingTimer || undefined),
+        expiresIn: messageData.expiresIn !== undefined
+          ? messageData.expiresIn
+          : (disappearingTimer || get().getChatDefaultDisappearing(selectedChat?.id) || undefined),
         replyTo: messageData.replyTo !== undefined ? messageData.replyTo : (replyingTo ? {
           messageId: replyingTo._id,
           senderName: replyingTo.senderId?.username || replyingTo.senderName || "User",
@@ -895,6 +981,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("userStoppedTyping");
     socket.off("messagesRead");
     socket.off("messageDeleted");
+    socket.off("viewOnceConsumed");
     socket.off("messagePinned");
     socket.off("roomDeleted");
     socket.off("locationUpdated");
@@ -1403,6 +1490,25 @@ export const useChatStore = create((set, get) => ({
       set({ messages: updated, lastMessages: newLastMessages });
     });
 
+    // View-once media fully consumed: wipe the payload everywhere
+    socket.on("viewOnceConsumed", ({ messageId }) => {
+      if (!messageId) return;
+      const { messages, lastMessages } = get();
+      const idStr = messageId.toString();
+      const updated = messages.map((m) =>
+        (m._id || m.id)?.toString() === idStr
+          ? { ...m, image: null, audio: null, viewOnceOpened: true }
+          : m
+      );
+      const newLastMessages = { ...lastMessages };
+      Object.keys(newLastMessages).forEach((key) => {
+        if (newLastMessages[key]?._id?.toString() === idStr) {
+          newLastMessages[key] = { ...newLastMessages[key], image: null, audio: null, viewOnceOpened: true };
+        }
+      });
+      set({ messages: updated, lastMessages: newLastMessages });
+    });
+
     // Real-time message pinning
     socket.on("messagePinned", ({ messageId, isPinned }) => {
       const { messages } = get();
@@ -1506,6 +1612,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("userStoppedTyping");
     socket.off("messagesRead");
     socket.off("messageDeleted");
+    socket.off("viewOnceConsumed");
     socket.off("messagePinned");
     socket.off("roomDeleted");
     socket.off("locationUpdated");
@@ -1552,6 +1659,33 @@ export const useChatStore = create((set, get) => ({
       return { success: true };
     } catch (error) {
       console.error("Error deleting message:", error);
+      return { success: false };
+    }
+  },
+
+  // Delete for me: hides any message from my own views only
+  hideMessage: async (messageId) => {
+    try {
+      await axiosInstance.post(`/chat/message/${messageId}/hide`);
+      const { messages, threadReplies, lastMessages } = get();
+      const idStr = messageId?.toString();
+      const newLastMessages = { ...lastMessages };
+      let changedLast = false;
+      Object.keys(newLastMessages).forEach((key) => {
+        if (newLastMessages[key]?._id?.toString() === idStr) {
+          const rest = (messages || []).filter((m) => (m._id || m.id)?.toString() !== idStr);
+          newLastMessages[key] = rest[rest.length - 1] || null;
+          changedLast = true;
+        }
+      });
+      set({
+        messages: (messages || []).filter((m) => (m._id || m.id)?.toString() !== idStr),
+        threadReplies: (threadReplies || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
+        ...(changedLast ? { lastMessages: newLastMessages } : {}),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error hiding message:", error);
       return { success: false };
     }
   },
@@ -1960,10 +2094,18 @@ export const useChatStore = create((set, get) => ({
         isEncrypted = true;
       }
 
+      // Unopened view-once media must never leak through forwarding
+      const viewOnceBlocked = message.viewOnce && !message.viewOnceOpened;
+      const fwdImage = viewOnceBlocked ? null : message.image || null;
+      const fwdAudio = viewOnceBlocked ? null : message.audio || null;
+      if (!plainText && !fwdImage && !fwdAudio && !message.file && !message.contact && !message.poll) {
+        return { success: false, error: "View-once media can't be forwarded" };
+      }
+
       const payload = {
         text: textToSend,
-        image: message.image || null,
-        audio: message.audio || null,
+        image: fwdImage,
+        audio: fwdAudio,
         file: message.file || null,
         contact: message.contact || null,
         poll: message.poll || null,

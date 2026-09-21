@@ -39,6 +39,8 @@ import GroupCallModal from "./GroupCallModal";
 import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import MessageBubble from "./MessageBubble";
+import ChatLockGate from "./ChatLockGate";
+import { isChatLocked } from "../lib/chatLock";
 import { useBackHandler } from "../lib/backNavigation";
 import { downloadFile } from "../lib/download";
 import { isEncryptedMessage, getConversationKey, decryptMessage } from "../lib/crypto";
@@ -166,6 +168,8 @@ const ChatPane = ({ onBack }) => {
   const getScheduledMessages = useChatStore((s) => s.getScheduledMessages);
   const archivedChats = useChatStore((s) => s.archivedChats);
   const toggleArchiveChat = useChatStore((s) => s.toggleArchiveChat);
+  const unlockedChats = useChatStore((s) => s.unlockedChats);
+  const unlockChat = useChatStore((s) => s.unlockChat);
   const isThreadOpen = useChatStore((s) => s.isThreadOpen);
   const closeThread = useChatStore((s) => s.closeThread);
   const isTasksOpen = useChatStore((s) => s.isTasksOpen);
@@ -629,6 +633,38 @@ const ChatPane = ({ onBack }) => {
             Select a conversation to start messaging.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // Device-locked chats render a PIN gate instead of any content
+  if (isChatLocked(selectedChat?.id) && !unlockedChats.includes(selectedChat?.id)) {
+    return (
+      <div className="h-full w-full flex flex-col overflow-hidden relative text-on-surface bg-transparent">
+        <div className="flex items-center gap-2.5 px-3 sm:px-4 py-2.5 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] z-30 flex-shrink-0">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="md:hidden p-1.5 text-zinc-500 hover:text-zinc-900 rounded-xl hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 flex-shrink-0 transition-colors"
+              title="Back to conversations"
+            >
+              <span className="material-symbols-outlined text-lg">arrow_back</span>
+            </button>
+          )}
+          <div className="w-9 h-9 rounded-full bg-[var(--glass-hover)] border border-[var(--glass-border)] flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-lg text-theme-muted">lock</span>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <h2 className="text-zinc-900 dark:text-white font-semibold truncate text-sm sm:text-base tracking-tight">
+              {(selectedChat.name || "Chat").replace(/^#/, "")}
+            </h2>
+            <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">Locked chat</span>
+          </div>
+        </div>
+        <ChatLockGate
+          chatName={(selectedChat.name || "").replace(/^#/, "")}
+          onUnlock={() => unlockChat(selectedChat.id)}
+        />
       </div>
     );
   }

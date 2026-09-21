@@ -107,6 +107,7 @@ export const useAuthStore = create((set, get) => ({
           activeThreadMessage: null,
           threadReplies: [],
           isThreadOpen: false,
+          unlockedChats: [],
         });
       } catch {}
       try {

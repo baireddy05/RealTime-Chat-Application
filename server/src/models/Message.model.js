@@ -55,6 +55,12 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    hiddenFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     isPinned: {
       type: Boolean,
       default: false,
@@ -188,6 +194,16 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    viewOnce: {
+      type: Boolean,
+      default: false,
+    },
+    viewedOnceBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     isAnnouncement: {
       type: Boolean,
       default: false,
@@ -204,6 +220,7 @@ messageSchema.index({ roomId: 1, isScheduled: 1, parentMessageId: 1 });
 messageSchema.index({ parentMessageId: 1, createdAt: 1 });
 messageSchema.index({ isScheduled: 1, scheduledFor: 1 });
 messageSchema.index({ starredBy: 1 });
+messageSchema.index({ hiddenFor: 1 });
 messageSchema.index({ expiresAt: 1, isDeleted: 1 });
 // NOTE: No TTL hard-delete index here on purpose — expiring messages are
 // soft-deleted by messageScheduler.js (isDeleted=true) so read/delivery

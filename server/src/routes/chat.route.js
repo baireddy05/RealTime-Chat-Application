@@ -9,6 +9,7 @@ import {
   reactToMessage,
   markMessagesAsRead,
   deleteMessage,
+  hideMessageForMe,
   editMessage,
   togglePinMessage,
   toggleStarMessage,
@@ -32,7 +33,10 @@ import {
   proxyDownloadFile,
   votePoll,
   viewWhisper,
+  viewOnceMedia,
   toggleArchiveChat,
+  togglePinChat,
+  setChatPreferences,
   createReminder,
   getReminders,
   cancelReminder,
@@ -121,15 +125,19 @@ router.post("/send/:id", protectRoute, sendMessage);
 router.post("/:messageId/react", protectRoute, reactToMessage);
 router.post("/:messageId/vote", protectRoute, votePoll);
 router.post("/:messageId/whisper", protectRoute, viewWhisper);
+router.post("/message/:messageId/view-once", protectRoute, viewOnceMedia);
 router.post("/:id/read", protectRoute, markMessagesAsRead);
 
 router.put("/message/:messageId", protectRoute, editMessage);
 router.delete("/message/:messageId", protectRoute, deleteMessage);
+router.post("/message/:messageId/hide", protectRoute, hideMessageForMe);
 router.post("/message/:messageId/pin", protectRoute, togglePinMessage);
 router.post("/message/:messageId/star", protectRoute, toggleStarMessage);
 router.post("/message/:messageId/translate", protectRoute, translateMessage);
 router.get("/message/:messageId/receipts", protectRoute, getMessageReceipts);
 
 router.post("/archive/:id", protectRoute, toggleArchiveChat);
+router.post("/pin/:chatId", protectRoute, togglePinChat);
+router.put("/preferences/:chatId", protectRoute, setChatPreferences);
 
 export default router;

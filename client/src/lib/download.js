@@ -52,6 +52,20 @@ export const downloadFile = async (url, filename = "document.pdf") => {
     cleanFilename += ".pdf";
   }
 
+  // 0. Our own backend file store: authenticated blob download (never CORS-blocked)
+  if (url.includes("/api/upload/file/")) {
+    try {
+      const response = await axiosInstance.get(url, { responseType: "blob", timeout: 120000 });
+      if (response.data) {
+        triggerBlobDownload(response.data, cleanFilename);
+        return;
+      }
+    } catch (err) {
+      console.warn("[Download] Backend file download failed:", err?.response?.data || err.message);
+      return;
+    }
+  }
+
   // 1. Data URLs (Base64) - Convert directly to binary Blob (Bypasses Chrome/Safari data-URL download block)
   if (url.startsWith("data:")) {
     const blob = dataUrlToBlob(url);

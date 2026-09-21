@@ -328,6 +328,7 @@ export const getMessages = async (req, res) => {
     const notExpired = { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] };
     const notThreadReply = { parentMessageId: null };
     const notScheduled = { isScheduled: { $ne: true } };
+    const notHidden = { hiddenFor: { $ne: myId } };
 
     if (type === "room") {
       const room = await Room.findById(id).select("members").lean();
@@ -341,12 +342,13 @@ export const getMessages = async (req, res) => {
         return res.status(403).json({ error: "You are not a member of this room" });
       }
 
-      const messages = await Message.find({ roomId: id, ...notScheduled, ...notThreadReply, ...notExpired, ...beforeFilter })
+      const messages = await Message.find({ roomId: id, ...notScheduled, ...notThreadReply, ...notExpired, ...notHidden, ...beforeFilter })
         .populate("senderId", "username profilePic")
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
       messages.reverse();
+      const visible = scrubViewOnce(messages, myId);
 
       // Mark un-delivered messages as delivered
       await Message.updateMany(
@@ -355,13 +357,14 @@ export const getMessages = async (req, res) => {
       );
       io.to(id).emit("messageDelivered", { chatId: id, delivererId: myId, type: "room" });
 
-      return res.status(200).json(messages);
+      return res.status(200).json(visible);
     } else {
       // NOTE: expiry + DM pair filters are combined with $and — spreading two
       // $or clauses would let the second overwrite the first.
       const messages = await Message.find({
         ...notScheduled,
         ...notThreadReply,
+        ...notHidden,
         ...beforeFilter,
         $and: [
           { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
@@ -378,6 +381,7 @@ export const getMessages = async (req, res) => {
         .limit(limit)
         .lean();
       messages.reverse();
+      const visible = scrubViewOnce(messages, myId);
 
       await Message.updateMany(
         { senderId: id, receiverId: myId, "deliveries.userId": { $ne: myId } },
@@ -385,7 +389,7 @@ export const getMessages = async (req, res) => {
       );
       io.to(id.toString()).emit("messageDelivered", { chatId: myId, delivererId: myId, type: "user" });
 
-      return res.status(200).json(messages);
+      return res.status(200).json(visible);
     }
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
@@ -417,6 +421,7 @@ export const sendMessage = async (req, res) => {
       videoNote,
       location,
       liveUntil,
+      viewOnce,
     } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
@@ -545,6 +550,8 @@ export const sendMessage = async (req, res) => {
         videoNote: resolvedVideoNote,
         location: resolvedLocation,
         liveUntil: resolvedLiveUntil,
+        // View-once is only meaningful for photo/voice payloads
+        viewOnce: Boolean(viewOnce) && !!(image || audio),
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -580,6 +587,8 @@ export const sendMessage = async (req, res) => {
         videoNote: resolvedVideoNote,
         location: resolvedLocation,
         liveUntil: resolvedLiveUntil,
+        // View-once is only meaningful for photo/voice payloads
+        viewOnce: Boolean(viewOnce) && !!(image || audio),
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -677,6 +686,41 @@ export const deleteMessage = async (req, res) => {
     res.status(200).json({ success: true, messageId: message._id });
   } catch (error) {
     console.error("Error in deleteMessage controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Delete for me: hides any visible message from the requester's own views
+// only. Nobody else is notified and nothing else changes.
+export const hideMessageForMe = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId)
+      .select("senderId receiverId roomId")
+      .lean();
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    let allowed = false;
+    if (message.roomId) {
+      const room = await Room.findById(message.roomId).select("members").lean();
+      allowed = !!room && (room.members || []).some((m) => m.toString() === userId.toString());
+    } else {
+      allowed = [message.senderId?.toString(), message.receiverId?.toString()].includes(
+        userId.toString()
+      );
+    }
+    if (!allowed) {
+      return res.status(403).json({ error: "You are not part of this conversation" });
+    }
+
+    await Message.findByIdAndUpdate(messageId, { $addToSet: { hiddenFor: userId } });
+    res.status(200).json({ success: true, messageId });
+  } catch (error) {
+    console.error("Error in hideMessageForMe controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -939,6 +983,104 @@ export const viewWhisper = async (req, res) => {
   }
 };
 
+// Open a view-once photo/voice note. The content URL is returned a single
+// time per viewer; once every recipient has opened it the payload is wiped
+// and all parties are told it was consumed.
+export const viewOnceMedia = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message || !message.viewOnce) {
+      return res.status(404).json({ error: "View-once media not found" });
+    }
+    if (message.isDeleted) {
+      return res.status(410).json({ error: "This view-once media is gone" });
+    }
+
+    // Must be a conversation participant
+    let allowed = false;
+    let audience = [];
+    if (message.roomId) {
+      const room = await Room.findById(message.roomId).select("members").lean();
+      allowed = !!room && (room.members || []).some((m) => m.toString() === userId.toString());
+      audience = (room?.members || []).map((m) => m.toString()).filter((id) => id !== message.senderId.toString());
+    } else {
+      allowed = [message.senderId?.toString(), message.receiverId?.toString()].includes(userId.toString());
+      if (message.receiverId) audience = [message.receiverId.toString()];
+    }
+    if (!allowed) {
+      return res.status(403).json({ error: "You are not part of this conversation" });
+    }
+
+    const mediaUrl = message.image || message.audio || null;
+    const isSender = message.senderId.toString() === userId.toString();
+    // The sender can always re-view what they sent without consuming it
+    if (isSender) {
+      if (!mediaUrl) return res.status(410).json({ error: "This view-once media is gone" });
+      return res.status(200).json({
+        success: true,
+        url: mediaUrl,
+        type: message.image ? "image" : "audio",
+        consumed: false,
+      });
+    }
+
+    if ((message.viewedOnceBy || []).some((id) => id.toString() === userId.toString())) {
+      return res.status(410).json({ error: "You already opened this view-once media" });
+    }
+    if (!mediaUrl) {
+      return res.status(410).json({ error: "This view-once media is gone" });
+    }
+
+    message.viewedOnceBy = [...(message.viewedOnceBy || []), userId];
+    const viewedSet = new Set(message.viewedOnceBy.map((id) => id.toString()));
+    const fullyViewed = audience.length === 0 || audience.every((id) => viewedSet.has(id));
+
+    if (fullyViewed) {
+      message.image = null;
+      message.audio = null;
+    }
+    await message.save();
+
+    if (fullyViewed) {
+      const payload = { messageId: message._id };
+      if (message.roomId) {
+        io.to(message.roomId.toString()).emit("viewOnceConsumed", payload);
+      } else {
+        io.to(message.receiverId.toString()).emit("viewOnceConsumed", payload);
+        io.to(message.senderId.toString()).emit("viewOnceConsumed", payload);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      url: mediaUrl,
+      type: message.image ? "image" : "audio",
+      consumed: fullyViewed,
+    });
+  } catch (error) {
+    console.error("Error in viewOnceMedia:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Strip view-once payloads the requesting viewer may no longer see:
+// already-opened by them, or fully consumed by everyone.
+export const scrubViewOnce = (docs, viewerId) => {
+  const vid = viewerId?.toString();
+  return (docs || []).map((m) => {
+    if (!m?.viewOnce) return m;
+    const viewedByMe = (m.viewedOnceBy || []).some((id) => (id?._id || id)?.toString() === vid);
+    const hasMedia = !!(m.image || m.audio);
+    if (!hasMedia || viewedByMe) {
+      return { ...m, image: null, audio: null, viewedOnceBy: [], viewOnceOpened: true };
+    }
+    return { ...m, viewedOnceBy: [] };
+  });
+};
+
 export const editMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -1036,6 +1178,7 @@ export const getStarredMessages = async (req, res) => {
     let filter = {
       starredBy: myId,
       isDeleted: false,
+      hiddenFor: { $ne: myId },
     };
 
     if (id && id !== "all" && id !== "undefined") {
@@ -1582,6 +1725,7 @@ export const getThreadReplies = async (req, res) => {
     const replies = await Message.find({
       parentMessageId: messageId,
       isDeleted: false,
+      hiddenFor: { $ne: req.user._id },
     })
       .sort({ createdAt: 1 })
       .populate("senderId", "username profilePic");
@@ -1730,6 +1874,73 @@ export const toggleArchiveChat = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in toggleArchiveChat: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Merge per-chat preferences (currently: default disappearing timer).
+// Pass { disappearing: null } to clear the chat default.
+export const setChatPreferences = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { disappearing } = req.body || {};
+    const userId = req.user._id;
+
+    if (!chatId || typeof chatId !== "string" || chatId.length > 64) {
+      return res.status(400).json({ error: "Invalid chat id" });
+    }
+    if (disappearing !== null && disappearing !== undefined && ![5, 60, 3600, 86400].includes(Number(disappearing))) {
+      return res.status(400).json({ error: "Invalid disappearing timer value" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (!user.chatPreferences) {
+      user.chatPreferences = new Map();
+    }
+
+    const currentPrefs = user.chatPreferences.get(chatId) || {};
+    user.chatPreferences.set(chatId, {
+      ...currentPrefs,
+      disappearing: disappearing === undefined ? currentPrefs.disappearing ?? null : disappearing,
+    });
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      chatId,
+      preferences: user.chatPreferences.get(chatId),
+    });
+  } catch (error) {
+    console.error("Error in setChatPreferences: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Toggle a chat pinned to the top of the sidebar (stored as id strings,
+// works for both groups and DMs, max 20 pins)
+export const togglePinChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const myId = req.user._id;
+
+    if (!chatId || typeof chatId !== "string" || chatId.length > 64) {
+      return res.status(400).json({ error: "Invalid chat id" });
+    }
+
+    const user = await User.findById(myId).select("pinnedChats").lean();
+    const current = user?.pinnedChats || [];
+    const isPinned = current.includes(chatId);
+    const next = isPinned
+      ? current.filter((id) => id !== chatId)
+      : [...current, chatId].slice(0, 20);
+
+    await User.findByIdAndUpdate(myId, { $set: { pinnedChats: next } });
+    res.status(200).json({ success: true, chatId, pinned: !isPinned, pinnedChats: next });
+  } catch (error) {
+    console.error("Error in togglePinChat:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2453,7 +2664,7 @@ export const searchMessages = async (req, res) => {
       { receiverId: myId },
     ];
 
-    const and = [{ $or: scopeOr }, { isDeleted: false }, { isScheduled: { $ne: true } }];
+    const and = [{ $or: scopeOr }, { isDeleted: false }, { isScheduled: { $ne: true } }, { hiddenFor: { $ne: myId } }];
     // Hide 1-to-1 history with blocked contacts (group messages still show)
     const meForBlock = await User.findById(myId).select("blockedUsers").lean();
     const blockedIds = [

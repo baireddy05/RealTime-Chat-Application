@@ -1,6 +1,6 @@
 import { memo, Fragment, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X, EyeOff } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
@@ -189,6 +189,8 @@ const MessageBubble = memo(({
   const [translatedData, setTranslatedData] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showTranslatePicker, setShowTranslatePicker] = useState(false);
+  const [openingViewOnce, setOpeningViewOnce] = useState(false);
+  const [openedAudioUrl, setOpenedAudioUrl] = useState(null);
 
   const handleTranslate = async (targetLang = "en") => {
     setIsTranslating(true);
@@ -251,6 +253,45 @@ const MessageBubble = memo(({
 
   const isMine = (message.senderId?._id || message.senderId) === authUser._id || message.senderId?._id === authUser._id;
   const sender = message.senderId || {};
+
+  // View-once media: recipients see a placeholder until they tap to open.
+  // Opening fetches the one-time URL and immediately hides the payload locally
+  // (the server tombstones it and notifies everyone else over sockets).
+  const isViewOnce = !!message.viewOnce && !message.isDeleted;
+  const viewOnceOpened = !!message.viewOnceOpened;
+  const viewOnceUnopenedImage = isViewOnce && !isMine && !viewOnceOpened && !!message.image;
+  const viewOnceUnopenedAudio =
+    isViewOnce && !isMine && !viewOnceOpened && !!message.audio && !openedAudioUrl;
+  const viewOnceConsumedVisible =
+    isViewOnce && !isMine && viewOnceOpened && !message.image && !message.audio && !openedAudioUrl;
+
+  const handleOpenViewOnce = async () => {
+    if (openingViewOnce) return;
+    setOpeningViewOnce(true);
+    try {
+      const res = await useChatStore.getState().viewOnceMedia(message._id);
+      if (res.success && res.url) {
+        useChatStore.setState((state) => ({
+          messages: (state.messages || []).map((m) =>
+            m._id === message._id ? { ...m, image: null, audio: null, viewOnceOpened: true } : m
+          ),
+        }));
+        if (res.type === "image") {
+          setActiveImage(res.url);
+        } else {
+          setOpenedAudioUrl(res.url);
+        }
+      }
+    } finally {
+      setOpeningViewOnce(false);
+    }
+  };
+
+  // Quoting an unopened view-once item must not leak its payload
+  const replySafeMessage =
+    (viewOnceUnopenedImage || viewOnceUnopenedAudio) && !isMine
+      ? { ...message, image: null, audio: null }
+      : message;
 
   // Long press handling for touch devices (mobile) & context menu support
   const bubbleRef = useRef(null);
@@ -414,7 +455,7 @@ const MessageBubble = memo(({
         </div>
       )}
       <SwipeableMessage
-        onReply={() => setReplyingTo(message)}
+        onReply={() => setReplyingTo(replySafeMessage)}
         disabled={message.isDeleted || message.isOptimistic}
       >
         <div
@@ -604,7 +645,37 @@ const MessageBubble = memo(({
                           <span className="material-symbols-outlined text-[12px]">visibility_off</span> Whisper
                         </div>
                       )}
-                      {message.image && (
+                      {isViewOnce && isMine && (
+                        <div className="mb-1 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
+                          <span className="material-symbols-outlined text-[11px]">counter_1</span>
+                          View once
+                        </div>
+                      )}
+                      {viewOnceUnopenedImage && (
+                        <button
+                          type="button"
+                          onClick={handleOpenViewOnce}
+                          disabled={openingViewOnce}
+                          className="mb-1.5 w-44 sm:w-52 h-40 sm:h-48 rounded-2xl border border-[var(--glass-border)] bg-black/10 dark:bg-white/5 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-black/15 dark:hover:bg-white/10 active:scale-[0.99] transition-all disabled:opacity-60"
+                        >
+                          <span className="w-11 h-11 rounded-full bg-accent-primary/20 text-accent-primary flex items-center justify-center">
+                            <span className={`material-symbols-outlined text-[22px] ${openingViewOnce ? "animate-spin" : ""}`}>
+                            {openingViewOnce ? "progress_activity" : "visibility"}
+                          </span>
+                          </span>
+                          <span className="text-[11px] font-semibold text-theme-main">
+                            {openingViewOnce ? "Opening…" : "View once"}
+                          </span>
+                          <span className="text-[10px] text-theme-muted">Tap to view — opens a single time</span>
+                        </button>
+                      )}
+                      {viewOnceConsumedVisible && (
+                        <div className="flex items-center gap-1.5 text-[11px] opacity-60 italic py-0.5 select-none">
+                          <span className="material-symbols-outlined text-[13px]">visibility_off</span>
+                          View-once media opened
+                        </div>
+                      )}
+                      {message.image && !viewOnceUnopenedImage && (
                         isStickerOnly ? (
                           <div className="relative group/sticker my-0.5 flex flex-col items-end">
                             <img
@@ -705,7 +776,29 @@ const MessageBubble = memo(({
                       {message.contact && (
                         <ContactCard contact={message.contact} isMine={isMine} />
                       )}
-                      {message.audio && <div className="mb-0.5"><AudioMessagePlayer audioUrl={message.audio} isMine={isMine} /></div>}
+                      {viewOnceUnopenedAudio && (
+                        <button
+                          type="button"
+                          onClick={handleOpenViewOnce}
+                          disabled={openingViewOnce}
+                          className="mb-1.5 min-w-[220px] max-w-[300px] p-3 rounded-2xl border border-[var(--glass-border)] bg-black/10 dark:bg-white/5 flex items-center gap-2.5 cursor-pointer hover:bg-black/15 dark:hover:bg-white/10 active:scale-[0.99] transition-all disabled:opacity-60"
+                        >
+                          <span className="w-9 h-9 rounded-full bg-accent-primary/20 text-accent-primary flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[18px]">mic</span>
+                          </span>
+                          <span className="text-left">
+                            <span className="block text-[11px] font-semibold text-theme-main">
+                              {openingViewOnce ? "Opening…" : "View-once voice note"}
+                            </span>
+                            <span className="block text-[10px] text-theme-muted">Tap to listen once</span>
+                          </span>
+                        </button>
+                      )}
+                      {(message.audio || openedAudioUrl) && !viewOnceUnopenedAudio && (
+                        <div className="mb-0.5">
+                          <AudioMessagePlayer audioUrl={openedAudioUrl || message.audio} isMine={isMine} />
+                        </div>
+                      )}
                       {message.videoNote && (
                         <div className="mb-1 overflow-hidden rounded-full w-48 h-48 sm:w-60 sm:h-60 flex items-center justify-center bg-black/10 dark:bg-black/40 border-[3px] border-accent-primary/20 shadow-md">
                           <video src={message.videoNote} controls playsInline loop className="w-full h-full object-cover rounded-full" />
@@ -1000,7 +1093,7 @@ const MessageBubble = memo(({
                             <button
                               type="button"
                               onClick={() => {
-                                setReplyingTo(message);
+                                setReplyingTo(replySafeMessage);
                                 setOpenMenuMessageId(null);
                                 setMenuAnchor(null);
                               }}
@@ -1189,6 +1282,18 @@ const MessageBubble = memo(({
                                 <span>Delete Message</span>
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                useChatStore.getState().hideMessage(message._id);
+                                setOpenMenuMessageId(null);
+                                setMenuAnchor(null);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10 rounded-xl transition-colors text-left"
+                            >
+                              <EyeOff size={14} />
+                              <span>Delete for me</span>
+                            </button>
                           </div>
                         </div>
                       </>,

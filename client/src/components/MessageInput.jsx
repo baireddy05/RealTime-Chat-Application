@@ -74,6 +74,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [isWhisperMode, setIsWhisperMode] = useState(false);
   const [isAnnouncementMode, setIsAnnouncementMode] = useState(false);
   const [isHD, setIsHD] = useState(false);
+  const [isViewOnce, setIsViewOnce] = useState(false);
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
@@ -147,6 +148,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setEditingMessage,
     disappearingTimer,
     setDisappearingTimer,
+    setChatDisappearing,
     drafts,
     setDraft,
     messages,
@@ -218,6 +220,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       setShowMediaPicker(false);
       setImagePreview(null);
       setDocumentFile(null);
+      setIsViewOnce(false);
       
       if (selectedChat?.id && !editingMessage) {
         const savedDraft = drafts[selectedChat.id];
@@ -468,7 +471,22 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
   };
 
+  // Documents go to our own backend store (Cloudinary blocks PDF/ZIP
+  // delivery with 401s on this account). Falls back to the old paths.
   const uploadRawFile = async (fileObj) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", fileObj.file, fileObj.name || "document");
+      const { data } = await axiosInstance.post("/upload/document", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000,
+      });
+      if (data?.url) {
+        return data.url;
+      }
+    } catch (err) {
+      console.warn("Backend document upload failed, trying Cloudinary:", err?.response?.data || err.message);
+    }
     try {
       const { data } = await axiosInstance.get("/upload/signature");
       const formData = new FormData();
@@ -821,6 +839,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
     removeImage();
     removeDocument();
+    setIsViewOnce(false);
     setShowMediaPicker(false);
     setReplyingTo(null);
     setScheduledFor(null);
@@ -854,6 +873,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     await sendMessage({
       text: currentText,
       image: imageUrl,
+      viewOnce: !!currentImage && isViewOnce,
       file: filePayload,
       scheduledFor: currentSchedule ? new Date(currentSchedule).toISOString() : undefined,
       replyTo: currentReply ? {
@@ -1001,18 +1021,33 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           </div>
           <div className="flex flex-col gap-1 pr-2">
             <span className="text-xs text-theme-muted font-medium">Photo attached</span>
-            <button
-              type="button"
-              onClick={() => setIsHD(!isHD)}
-              className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide transition-all shadow-sm ${
-                isHD 
-                  ? "bg-accent-primary text-white ring-1 ring-accent-primary"
-                  : "bg-black/10 text-zinc-500 dark:bg-white/10 dark:text-zinc-400 hover:bg-black/20 dark:hover:bg-white/20"
-              }`}
-              title={isHD ? "Sending in High Quality" : "Sending compressed"}
-            >
-              HD
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsHD(!isHD)}
+                className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide transition-all shadow-sm ${
+                  isHD
+                    ? "bg-accent-primary text-white ring-1 ring-accent-primary"
+                    : "bg-black/10 text-zinc-500 dark:bg-white/10 dark:text-zinc-400 hover:bg-black/20 dark:hover:bg-white/20"
+                }`}
+                title={isHD ? "Sending in High Quality" : "Sending compressed"}
+              >
+                HD
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsViewOnce((v) => !v)}
+                className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide transition-all shadow-sm flex items-center gap-0.5 ${
+                  isViewOnce
+                    ? "bg-accent-primary text-white ring-1 ring-accent-primary"
+                    : "bg-black/10 text-zinc-500 dark:bg-white/10 dark:text-zinc-400 hover:bg-black/20 dark:hover:bg-white/20"
+                }`}
+                title={isViewOnce ? "View-once ON: photo vanishes after opening" : "Send as view-once photo"}
+              >
+                <span className="material-symbols-outlined text-[12px]">counter_1</span>
+                1×
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1421,6 +1456,36 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               {disappearingTimer === option.value && <Check size={12} strokeWidth={3} />}
             </button>
           ))}
+          <div className="h-px bg-[var(--glass-border)] my-1" />
+          {(() => {
+            const chatDefault = authUser?.chatPreferences?.[selectedChat?.id]?.disappearing ?? null;
+            const labelFor = (v) =>
+              v === 5 ? "5 seconds" : v === 60 ? "1 minute" : v === 3600 ? "1 hour" : v === 86400 ? "24 hours" : null;
+            return (
+              <>
+                {chatDefault && chatDefault !== disappearingTimer && (
+                  <p className="px-2.5 py-1 text-[10px] text-theme-muted">
+                    Chat default: {labelFor(chatDefault) || `${chatDefault}s`}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={!selectedChat?.id}
+                  onClick={async () => {
+                    if (selectedChat?.id) await setChatDisappearing(selectedChat.id, disappearingTimer);
+                    setShowTimerMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-xl transition-all flex items-center justify-between hover:bg-[var(--glass-hover)] text-theme-main disabled:opacity-40"
+                >
+                  <span>
+                    {chatDefault === disappearingTimer && disappearingTimer
+                      ? "✓ Default for this chat"
+                      : "Set as default for this chat"}
+                  </span>
+                </button>
+              </>
+            );
+          })()}
         </div>
       )}
 

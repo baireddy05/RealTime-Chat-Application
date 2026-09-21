@@ -22,6 +22,7 @@ This document serves as the central source of truth for all features currently i
 - **Real-Time WebSockets:** Live instant messaging powered by Socket.io.
 - **Message Editing:** Edit previously sent messages with `(edited)` badges.
 - **Message Deletion:** Delete messages for everyone (Tombstone soft-deletion strategy).
+- **Delete for Me:** Remove any message from your own views only — the other side keeps it, nobody is notified.
 - **Message Forwarding:** Search and forward messages to other contacts or groups.
 - **Scheduled Messages:** Schedule messages to be sent at a future time.
 - **Read Receipts & Message Info:** See when a message was delivered and read.
@@ -34,6 +35,7 @@ This document serves as the central source of truth for all features currently i
 - **Broadcast Lists:** Compose once, deliver as individual DMs to up to 50 recipients (`BroadcastModal.jsx`). Blocked contacts are skipped automatically, with per-send delivery counts.
 - **Live Location Sharing:** Share a real-time updating map pin for 15 minutes, 1 hour, or 8 hours with a pulsing LIVE badge, one-tap stop, and automatic expiry.
 - **Ephemeral Whisper Mode:** Send disappearing messages that vanish permanently after being viewed once by pressing and holding.
+- **View-Once Media:** Send photos and voice notes that can be opened a single time, then vanish everywhere with live socket sync. Quoting and forwarding can never leak the payload.
 
 ## 3. Advanced Interactions & Threading
 - **Quoted Replies / Threading:** Swipe to reply (`SwipeableMessage.jsx`) or click to quote a specific message.
@@ -49,11 +51,14 @@ This document serves as the central source of truth for all features currently i
 - **Draft Indicators:** Unsent text is automatically saved as a draft with a visible indicator in the sidebar.
 - **Saved Messages (Self-Chat):** A dedicated chat to send files, notes, and links to yourself.
 - **Archive Chats:** Hide inactive chats from the main inbox into a dedicated "Archived" view.
+- **Pin Chats to Top:** Pin important conversations above the recent list (max 20), with a pin indicator on each pinned chat.
+- **Chat Lock (PIN Gate):** Lock any chat behind a device-local 4-digit PIN (SHA-256 hashed). Locked chats hide previews and open a PIN pad per session; managed in Settings → Privacy.
 - **HD Media Quality Toggle:** Choose whether to send images compressed (for speed) or in High Definition.
+- **Per-Chat Disappearing Defaults:** Set a default self-destruct timer per chat (overridable per message), stored on your profile and applied automatically to new sends.
 
 ## 4. Media, Files & Rich Content
 - **Drag-and-Drop Files:** Drag files directly into the chat window to upload.
-- **Document & File Sharing:** Upload and share PDFs, zip files, code files, etc.
+- **Document & File Sharing:** Upload and share PDFs, zip files, code files, etc. Documents are stored privately on the backend (GridFS) and stream back as authenticated attachments — never blocked by third-party delivery limits.
 - **Cloud Media Storage:** All media assets are securely hosted and served via Cloudinary integration.
 - **File Downloads:** Direct one-click downloads for shared attachments.
 - **File Size Formatting:** Displays readable file sizes (KB, MB).

@@ -13,6 +13,128 @@ import {
   Lock,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { hasChatPin, setChatPin, clearChatPin, verifyChatPin, getLockedChats } from "../lib/chatLock";
+
+// Chat Lock PIN management (device-local, Privacy tab)
+const ChatLockSettings = () => {
+  const [pinSet, setPinSet] = useState(() => hasChatPin());
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const lockedCount = getLockedChats().length;
+
+  const reset = () => {
+    setCurrent("");
+    setNext("");
+    setConfirm("");
+  };
+
+  const handleSave = async () => {
+    setError("");
+    setDone("");
+    if (!/^\d{4}$/.test(next)) {
+      setError("PIN must be exactly 4 digits.");
+      return;
+    }
+    if (next !== confirm) {
+      setError("New PIN entries do not match.");
+      return;
+    }
+    setSaving(true);
+    if (pinSet) {
+      const ok = await verifyChatPin(current);
+      if (!ok) {
+        setSaving(false);
+        setError("Current PIN is incorrect.");
+        return;
+      }
+    }
+    await setChatPin(next);
+    setPinSet(true);
+    reset();
+    setSaving(false);
+    setDone(pinSet ? "PIN changed." : "PIN set. Lock chats from any chat's ⋮ menu.");
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm("Remove the chat lock PIN? All locked chats will be unlocked on this device.")) return;
+    clearChatPin();
+    setPinSet(false);
+    reset();
+    setDone("PIN removed — locked chats are now open.");
+  };
+
+  const pinInput = (value, onChange, placeholder) => (
+    <input
+      type="password"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      maxLength={4}
+      value={value}
+      onChange={(e) => setValue(onChange, e.target.value.replace(/\D/g, "").slice(0, 4))}
+      placeholder={placeholder}
+      className="flex-1 min-w-0 bg-black/[0.03] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-center tracking-[0.5em] font-mono text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none"
+    />
+  );
+
+  const setValue = (fn, v) => {
+    setError("");
+    setDone("");
+    fn(v);
+  };
+
+  return (
+    <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 space-y-2.5">
+      <div className="flex items-center gap-1.5">
+        <Lock size={15} />
+        <span className="text-xs font-bold text-zinc-900 dark:text-white">Chat Lock PIN</span>
+        {pinSet && (
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            {lockedCount > 0 ? `${lockedCount} locked` : "Active"}
+          </span>
+        )}
+      </div>
+      <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
+        Lock any chat behind a 4-digit PIN on this device. Locked chats hide previews until unlocked, per session.
+      </p>
+      {pinSet && (
+        <div className="flex items-center gap-2">
+          {pinInput(current, setCurrent, "••••")}
+          <span className="text-[10px] text-zinc-500 shrink-0">Current PIN</span>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        {pinInput(next, setNext, "••••")}
+        {pinInput(confirm, setConfirm, "••••")}
+        <span className="text-[10px] text-zinc-500 shrink-0">{pinSet ? "New PIN" : "New 4-digit PIN"}</span>
+      </div>
+      {error && <p className="text-[11px] text-red-500">{error}</p>}
+      {done && <p className="text-[11px] text-emerald-600 dark:text-emerald-400">{done}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-all"
+        >
+          {saving ? "Saving…" : pinSet ? "Change PIN" : "Set PIN"}
+        </button>
+        {pinSet && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+          >
+            Remove PIN
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 import { useThemeStore } from "../store/useThemeStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { UI_THEMES } from "../lib/uiThemes";
@@ -340,6 +462,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   />
                 </button>
               </div>
+
+              <ChatLockSettings />
             </div>
           )}
         </div>

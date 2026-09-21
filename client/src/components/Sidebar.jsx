@@ -6,6 +6,7 @@ import { useFriendStore } from "../store/useFriendStore";
 import CreateGroupModal from "./CreateGroupModal";
 import LabelsManagerModal from "./LabelsManagerModal";
 import MessageTicks from "./MessageTicks";
+import { isChatLocked, setChatLocked, hasChatPin } from "../lib/chatLock";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -119,6 +120,7 @@ const Sidebar = ({
   const getLabels = useChatStore((s) => s.getLabels);
   const setChatLabels = useChatStore((s) => s.setChatLabels);
   const toggleArchiveChat = useChatStore((s) => s.toggleArchiveChat);
+  const togglePinChat = useChatStore((s) => s.togglePinChat);
   const markMessagesAsRead = useChatStore((s) => s.markMessagesAsRead);
   const setIsGroupInfoOpen = useChatStore((s) => s.setIsGroupInfoOpen);
   const globalSearchResults = useChatStore((s) => s.globalSearchResults);
@@ -146,6 +148,8 @@ const Sidebar = ({
   const reportUser = useFriendStore((s) => s.reportUser);
   const blockedUsers = useFriendStore((s) => s.blockedUsers);
   const getBlockedUsers = useFriendStore((s) => s.getBlockedUsers);
+  const unlockedChats = useChatStore((s) => s.unlockedChats);
+  const relockChat = useChatStore((s) => s.relockChat);
 
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -292,6 +296,22 @@ const Sidebar = ({
     const reason = window.prompt(`Report ${openMenuChat.name} for spam or abuse (optional reason):`, "");
     if (reason === null) return;
     await reportUser(openMenuChat.id, reason);
+    closeChatMenu();
+  };
+
+  const handleMenuLock = () => {
+    if (!openMenuChat) return;
+    if (isChatLocked(openMenuChat.id)) {
+      setChatLocked(openMenuChat.id, false);
+      relockChat(openMenuChat.id);
+    } else {
+      if (!hasChatPin()) {
+        alert("Set a chat lock PIN first in Settings → Privacy.");
+        return;
+      }
+      setChatLocked(openMenuChat.id, true);
+      relockChat(openMenuChat.id);
+    }
     closeChatMenu();
   };
 
@@ -481,14 +501,24 @@ const Sidebar = ({
     return 0;
   };
 
+  // Pinned chats float above recent ones (WhatsApp-style), recency kept within each section
+  const pinFirst = (list) => {
+    const pinned = authUser?.pinnedChats || [];
+    if (!pinned || pinned.length === 0) return list;
+    const isPinned = (c) => pinned.includes((c._id || c.id)?.toString());
+    return [...list.filter(isPinned), ...list.filter((c) => !isPinned(c))];
+  };
+
   // Sorted lists by recent activity
   const sortedRooms = useMemo(() => {
-    return [...filteredRooms].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
-  }, [filteredRooms, lastMessages]);
+    return pinFirst([...filteredRooms].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredRooms, lastMessages, authUser?.pinnedChats]);
 
   const sortedFriends = useMemo(() => {
-    return [...filteredFriends].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
-  }, [filteredFriends, lastMessages]);
+    return pinFirst([...filteredFriends].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredFriends, lastMessages, authUser?.pinnedChats]);
 
   // Unified all chats stream (Groups + Direct combined, sorted by recent messages)
   const allChats = useMemo(() => {
@@ -504,8 +534,9 @@ const Sidebar = ({
       });
     }
 
-    return [...roomItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a));
-  }, [filteredRooms, filteredFriends, lastMessages, authUser]);
+    return pinFirst([...roomItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredRooms, filteredFriends, lastMessages, authUser, authUser?.pinnedChats]);
 
   // Compute Unread lists
   const unreadChats = useMemo(() => {
@@ -555,14 +586,16 @@ const Sidebar = ({
     const unread = unreadCounts[roomId] !== undefined ? unreadCounts[roomId] : (room.unreadCount || 0);
     const lastMsg = lastMessages[roomId] || room.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
-    const previewText = getMessageSnippet(lastMsg);
+    // Locked chats hide their contents until unlocked (PIN gate)
+    const roomLocked = isChatLocked(roomId) && !unlockedChats.includes(roomId);
+    const previewText = roomLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
     const senderUsername = isOutgoing ? "You" : lastMsg?.senderId?.username || "";
     const typers = (typingUsers[roomId] || []).filter((u) => u && u !== authUser?.username);
     const isTyping = typers.length > 0;
-    const draftText = drafts[roomId];
+    const draftText = roomLocked ? null : drafts[roomId];
 
     const menuChat = { id: roomId, chatType: "room", name: room.name?.replace(/^#/, ""), room };
 
@@ -666,7 +699,10 @@ const Sidebar = ({
           </div>
 
           <div className="shrink-0 flex flex-col items-end justify-center self-stretch gap-1 text-right">
-            <span className={`text-[10px] font-mono leading-none ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+            <span className={`text-[10px] font-mono leading-none flex items-center gap-1 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+              {(authUser?.pinnedChats || []).includes(roomId) && (
+                <span className="material-symbols-outlined text-[11px]">push_pin</span>
+              )}
               {timeStr || "Active"}
             </span>
             {unread > 0 && (
@@ -696,14 +732,16 @@ const Sidebar = ({
     const unread = unreadCounts[friendId] !== undefined ? unreadCounts[friendId] : (friend.unreadCount || 0);
     const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
-    const previewText = getMessageSnippet(lastMsg);
+    // Locked chats hide their contents until unlocked (PIN gate)
+    const friendLocked = isChatLocked(friendId) && !unlockedChats.includes(friendId);
+    const previewText = friendLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
     const isRead = lastMsg && ((lastMsg.reads || []).some(r => (r.userId?._id || r.userId)?.toString() === friendId) || (lastMsg.readBy || []).some(id => (id?._id || id)?.toString() === friendId));
     const isDelivered = lastMsg && (lastMsg.deliveries || []).some(d => (d.userId?._id || d.userId)?.toString() === friendId);
     const typers = (typingUsers[friendId] || []).filter((u) => u && u !== authUser?.username);
     const isTyping = typers.length > 0;
-    const draftText = drafts[friendId];
+    const draftText = friendLocked ? null : drafts[friendId];
 
     const menuChat = {
       id: friendId,
@@ -815,7 +853,10 @@ const Sidebar = ({
           </div>
 
           <div className="shrink-0 flex flex-col items-end justify-center self-stretch gap-1 text-right">
-            <span className={`text-[10px] font-mono leading-none ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+            <span className={`text-[10px] font-mono leading-none flex items-center gap-1 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+              {(authUser?.pinnedChats || []).includes(friendId) && (
+                <span className="material-symbols-outlined text-[11px]">push_pin</span>
+              )}
               {timeStr || (isOnline ? "Online" : "")}
             </span>
             {unread > 0 && (
@@ -950,6 +991,13 @@ const Sidebar = ({
                       <span>Set Status Mood</span>
                     </button>
                   )}
+                  <button
+                    onClick={() => { setShowLabelsManager(true); setShowOptionsDropdown(false); }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary">label</span>
+                    <span>Chat Labels</span>
+                  </button>
                   {handleInstallPWA && (
                     <button
                       onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
@@ -1175,8 +1223,10 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* Label folders toolbar */}
-        <div className="flex items-center gap-1.5 pt-1 pb-0.5 select-none">
+        {/* Label folders toolbar — hidden entirely when no labels exist
+            so it never leaves a dead gap in the header */}
+        {(labels || []).length > 0 && (
+          <div className="flex items-center gap-1.5 pt-1 pb-0.5 select-none">
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0">
             {(labels || []).map((label) => {
               const active = activeLabelFilter === label._id;
@@ -1206,7 +1256,8 @@ const Sidebar = ({
           >
             <span className="material-symbols-outlined text-[16px]">label</span>
           </button>
-        </div>
+          </div>
+        )}
         {activeLabelFilter && (
           <div className="flex items-center justify-between px-1 pt-0.5 text-[11px] text-theme-muted">
             <span className="truncate">
@@ -1708,6 +1759,29 @@ const Sidebar = ({
             <div className="h-px bg-[var(--glass-border)] my-1" />
 
             <div className="px-1.5 pb-1 flex flex-col">
+              <button
+                type="button"
+                onClick={async () => {
+                  await togglePinChat(openMenuChat.id);
+                  closeChatMenu();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-[16px] text-theme-muted">
+                  {(authUser?.pinnedChats || []).includes(openMenuChat.id) ? "keep_off" : "push_pin"}
+                </span>
+                <span>{(authUser?.pinnedChats || []).includes(openMenuChat.id) ? "Unpin chat" : "Pin to top"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleMenuLock}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-[16px] text-theme-muted">
+                  {isChatLocked(openMenuChat.id) ? "lock_open" : "lock"}
+                </span>
+                <span>{isChatLocked(openMenuChat.id) ? "Unlock chat" : "Lock chat"}</span>
+              </button>
               {(unreadCounts[openMenuChat.id] || 0) > 0 && (
                 <button
                   type="button"
