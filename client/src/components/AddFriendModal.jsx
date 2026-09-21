@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, UserPlus, Search, Loader, Check, UserCheck, Inbox } from "lucide-react";
+import { X, UserPlus, Search, Loader, Check, UserCheck, Inbox, Ban } from "lucide-react";
 import { useFriendStore } from "../store/useFriendStore";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -16,6 +16,9 @@ const AddFriendModal = ({ onClose }) => {
     acceptFriendRequest,
     rejectFriendRequest,
     getFriendRequests,
+    blockedUsers,
+    getBlockedUsers,
+    unblockUser,
   } = useFriendStore();
 
   const { authUser } = useAuthStore();
@@ -23,8 +26,9 @@ const AddFriendModal = ({ onClose }) => {
   // Load all users and latest pending requests immediately on mount
   useEffect(() => {
     getFriendRequests();
+    getBlockedUsers();
     searchUsers("");
-  }, [getFriendRequests, searchUsers]);
+  }, [getFriendRequests, getBlockedUsers, searchUsers]);
 
   // Debounced search when typing
   useEffect(() => {
@@ -52,6 +56,12 @@ const AddFriendModal = ({ onClose }) => {
     setActionLoadingId(requestId);
     await rejectFriendRequest(requestId);
     await searchUsers(searchQuery);
+    setActionLoadingId(null);
+  };
+
+  const handleUnblock = async (userId) => {
+    setActionLoadingId(userId);
+    await unblockUser(userId);
     setActionLoadingId(null);
   };
 
@@ -296,6 +306,48 @@ const AddFriendModal = ({ onClose }) => {
               </div>
             )}
           </div>
+
+          {/* 3. Blocked Contacts Section */}
+          {(blockedUsers || []).length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-red-500/[0.04] dark:bg-red-500/[0.06] border border-red-500/20 flex flex-col gap-2.5">
+              <div className="flex items-center gap-2 px-1">
+                <Ban size={15} className="text-red-400" />
+                <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide">
+                  Blocked ({blockedUsers.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {blockedUsers.map((user) => (
+                  <div
+                    key={user._id}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/5 dark:border-white/10"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={
+                          user.profilePic ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || "User")}&background=27272a&color=ffffff&bold=true`
+                        }
+                        alt={user.username}
+                        className="w-9 h-9 rounded-full object-cover border border-black/10 dark:border-white/10 shadow-sm shrink-0 grayscale"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">{user.username}</p>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">Blocked — no messages either way</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUnblock(user._id)}
+                      disabled={actionLoadingId === user._id}
+                      className="px-3 py-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-bold text-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer"
+                    >
+                      {actionLoadingId === user._id ? <Loader size={12} className="animate-spin" /> : "Unblock"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

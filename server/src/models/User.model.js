@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     readReceipts: {
       type: Boolean,
       default: true,
@@ -65,6 +71,7 @@ const userSchema = new mongoose.Schema(
 
 // Multikey index for O(log N) friend lookups and membership checks
 userSchema.index({ friends: 1 });
+userSchema.index({ blockedUsers: 1 });
 
 const User = mongoose.model("User", userSchema);
 

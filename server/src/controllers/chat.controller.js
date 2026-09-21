@@ -5,6 +5,7 @@ import Reminder from "../models/Reminder.model.js";
 import Event from "../models/Event.model.js";
 import Task from "../models/Task.model.js";
 import mongoose from "mongoose";
+import crypto from "crypto";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 
 // Shared helper: room membership + admin checks for collaboration endpoints
@@ -92,7 +93,14 @@ export const isSafeUrl = (rawUrl) => {
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
+    // Blocked contacts (either direction) are hidden from the sidebar
+    const me = await User.findById(loggedInUserId).select("blockedUsers").lean();
+    const myBlocked = (me?.blockedUsers || []).map((id) => id.toString());
+    const blockers = await User.find({ blockedUsers: loggedInUserId }).select("_id").lean();
+    const hiddenIds = [...myBlocked, ...blockers.map((u) => u._id.toString())];
+    const filteredUsers = await User.find({
+      _id: { $ne: loggedInUserId, ...(hiddenIds.length > 0 ? { $nin: hiddenIds } : {}) },
+    })
       .select("-password")
       .lean();
     if (filteredUsers.length === 0) return res.status(200).json([]);
@@ -408,6 +416,7 @@ export const sendMessage = async (req, res) => {
       videoMessage,
       videoNote,
       location,
+      liveUntil,
     } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
@@ -419,6 +428,14 @@ export const sendMessage = async (req, res) => {
       const lng = location.lng ?? location.longitude;
       if (lat !== undefined && lng !== undefined) {
         resolvedLocation = { lat: Number(lat), lng: Number(lng) };
+      }
+    }
+    // Live location: accept a future expiry timestamp (15m / 1h / 8h presets)
+    let resolvedLiveUntil = null;
+    if (resolvedLocation && liveUntil) {
+      const parsed = new Date(liveUntil);
+      if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+        resolvedLiveUntil = parsed;
       }
     }
 
@@ -439,6 +456,19 @@ export const sendMessage = async (req, res) => {
       const receiverExists = await User.findById(receiverId).select("_id").lean();
       if (!receiverExists) {
         return res.status(404).json({ error: "Receiver not found" });
+      }
+      // Blocked contacts cannot message each other in either direction.
+      // Generic error on purpose so block status isn't probed.
+      const blocked = await User.findOne({
+        $or: [
+          { _id: senderId, blockedUsers: receiverId },
+          { _id: receiverId, blockedUsers: senderId },
+        ],
+      })
+        .select("_id")
+        .lean();
+      if (blocked) {
+        return res.status(403).json({ error: "Message could not be delivered" });
       }
     }
 
@@ -514,6 +544,7 @@ export const sendMessage = async (req, res) => {
         isAnnouncement: resolvedAnnouncement,
         videoNote: resolvedVideoNote,
         location: resolvedLocation,
+        liveUntil: resolvedLiveUntil,
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -548,6 +579,7 @@ export const sendMessage = async (req, res) => {
         isWhisper: Boolean(isWhisper),
         videoNote: resolvedVideoNote,
         location: resolvedLocation,
+        liveUntil: resolvedLiveUntil,
       });
       await newMessage.save();
       await newMessage.populate("senderId", "username profilePic");
@@ -1297,6 +1329,249 @@ export const toggleRoomAdmin = async (req, res) => {
     res.status(200).json({ success: true, room });
   } catch (error) {
     console.error("Error in toggleRoomAdmin:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Group invite links, leave & delete ----
+
+const generateInviteCode = () => crypto.randomBytes(6).toString("base64url");
+
+// Admin-only: return the current invite code, generating one if needed
+export const getOrCreateInvite = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const { room, isAdmin } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isAdmin) return res.status(403).json({ error: "Only group admins can manage invite links" });
+
+    let doc = await Room.findById(roomId).select("inviteCode").lean();
+    if (!doc?.inviteCode) {
+      for (let i = 0; i < 3; i++) {
+        try {
+          const updated = await Room.findByIdAndUpdate(
+            roomId,
+            { $set: { inviteCode: generateInviteCode() } },
+            { new: true }
+          )
+            .select("inviteCode")
+            .lean();
+          doc = updated;
+          break;
+        } catch (e) {
+          if (e?.code !== 11000) throw e; // retry once on random collision
+        }
+      }
+    }
+    if (!doc?.inviteCode) return res.status(500).json({ error: "Could not generate invite link" });
+    res.status(200).json({ inviteCode: doc.inviteCode });
+  } catch (error) {
+    console.error("Error in getOrCreateInvite:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Admin-only: revoke the invite link (old links stop working immediately)
+export const revokeInvite = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const { room, isAdmin } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isAdmin) return res.status(403).json({ error: "Only group admins can manage invite links" });
+
+    await Room.findByIdAndUpdate(roomId, { $unset: { inviteCode: "" } });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error in revokeInvite:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Join a group with an invite code (any authenticated user)
+export const joinRoomByCode = async (req, res) => {
+  try {
+    const code = (req.params.code || "").trim();
+    const myId = req.user._id;
+    if (!code) return res.status(400).json({ error: "Invite code is required" });
+
+    const room = await Room.findOne({ inviteCode: code });
+    if (!room) return res.status(404).json({ error: "Invalid or expired invite link" });
+
+    const alreadyMember = (room.members || []).some((m) => m.toString() === myId.toString());
+    if (!alreadyMember) {
+      room.members.push(myId);
+      await room.save();
+    }
+    await room.populate("members", "username profilePic status");
+    await room.populate("createdBy", "username profilePic");
+    await room.populate("admins", "username profilePic");
+
+    io.in(myId.toString()).socketsJoin(room._id.toString());
+    io.to(myId.toString()).emit("newRoom", room);
+    emitRoomUpdated(room);
+
+    res.status(200).json(room);
+  } catch (error) {
+    console.error("Error in joinRoomByCode:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Leave a group. Creator ownership transfers to a remaining admin/member;
+// the last member out deletes the group and its messages.
+export const leaveRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const { room, isMember, isCreator } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isMember) return res.status(403).json({ error: "You are not a member of this room" });
+
+    const remaining = (room.members || []).filter((m) => m.toString() !== myId.toString());
+    if (remaining.length === 0) {
+      await Message.deleteMany({ roomId });
+      await Event.deleteMany({ roomId });
+      await Task.deleteMany({ roomId });
+      await Room.findByIdAndDelete(roomId);
+      io.to(roomId.toString()).emit("roomDeleted", { roomId });
+      io.to(myId.toString()).emit("roomDeleted", { roomId });
+      return res.status(200).json({ success: true, deleted: true, roomId });
+    }
+
+    let newCreator = null;
+    let update;
+    if (isCreator) {
+      const remainingAdmins = (room.admins || [])
+        .map((a) => a.toString())
+        .filter((a) => a !== myId.toString() && remaining.some((m) => m.toString() === a));
+      newCreator = remainingAdmins[0] || remaining[0].toString();
+      // $pull and $addToSet cannot target the same path in one update,
+      // so the post-leave admin list is computed here and $set instead.
+      const adminsSet = new Set((room.admins || []).map((a) => a.toString()));
+      adminsSet.delete(myId.toString());
+      adminsSet.add(newCreator);
+      update = {
+        $pull: { members: myId },
+        $set: { createdBy: newCreator, admins: [...adminsSet] },
+      };
+    } else {
+      update = { $pull: { members: myId, admins: myId } };
+    }
+    const updated = await Room.findByIdAndUpdate(roomId, update, { new: true });
+    await updated.populate("members", "username profilePic status");
+    await updated.populate("createdBy", "username profilePic");
+    await updated.populate("admins", "username profilePic");
+
+    emitRoomUpdated(updated, [myId]);
+
+    res.status(200).json({ success: true, room: updated, transferredTo: newCreator });
+  } catch (error) {
+    console.error("Error in leaveRoom:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Creator-only: delete the group, its messages, events and tasks
+export const deleteRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const { room, isCreator } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isCreator) {
+      return res.status(403).json({ error: "Only the group creator can delete the group" });
+    }
+
+    const memberIds = (room.members || []).map((m) => m.toString());
+    await Message.deleteMany({ roomId });
+    await Event.deleteMany({ roomId });
+    await Task.deleteMany({ roomId });
+    await Room.findByIdAndDelete(roomId);
+
+    io.to(roomId.toString()).emit("roomDeleted", { roomId });
+    memberIds.forEach((id) => io.to(id).emit("roomDeleted", { roomId }));
+
+    res.status(200).json({ success: true, roomId });
+  } catch (error) {
+    console.error("Error in deleteRoom:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Live location sharing ----
+
+const emitLocationUpdated = (msg) => {
+  const payload = {
+    messageId: msg._id,
+    location: msg.location,
+    liveUntil: msg.liveUntil,
+  };
+  if (msg.roomId) {
+    io.to(msg.roomId.toString()).emit("locationUpdated", payload);
+  } else if (msg.receiverId && msg.senderId) {
+    io.to(msg.receiverId.toString()).emit("locationUpdated", payload);
+    io.to(msg.senderId.toString()).emit("locationUpdated", payload);
+  }
+};
+
+// Sender pushes a fresh GPS fix for their live location message
+export const updateLiveLocation = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { lat, lng } = req.body || {};
+    const myId = req.user._id;
+
+    if (typeof lat !== "number" || typeof lng !== "number" || !isFinite(lat) || !isFinite(lng)) {
+      return res.status(400).json({ error: "Valid lat/lng numbers are required" });
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({ error: "Coordinates out of range" });
+    }
+
+    const msg = await Message.findById(messageId).select("senderId roomId receiverId location liveUntil");
+    if (!msg || !msg.location) {
+      return res.status(404).json({ error: "Location message not found" });
+    }
+    if (msg.senderId.toString() !== myId.toString()) {
+      return res.status(403).json({ error: "Only the sender can update a live location" });
+    }
+    if (!msg.liveUntil || new Date(msg.liveUntil).getTime() <= Date.now()) {
+      return res.status(410).json({ error: "Live location sharing has ended" });
+    }
+
+    msg.location = { lat, lng };
+    await msg.save();
+    emitLocationUpdated(msg);
+
+    res.status(200).json({ success: true, location: msg.location, liveUntil: msg.liveUntil });
+  } catch (error) {
+    console.error("Error in updateLiveLocation:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Sender stops sharing early
+export const stopLiveLocation = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const myId = req.user._id;
+
+    const msg = await Message.findById(messageId).select("senderId roomId receiverId location liveUntil");
+    if (!msg || !msg.location) {
+      return res.status(404).json({ error: "Location message not found" });
+    }
+    if (msg.senderId.toString() !== myId.toString()) {
+      return res.status(403).json({ error: "Only the sender can stop a live location" });
+    }
+    msg.liveUntil = new Date();
+    await msg.save();
+    emitLocationUpdated(msg);
+
+    res.status(200).json({ success: true, liveUntil: msg.liveUntil });
+  } catch (error) {
+    console.error("Error in stopLiveLocation:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2179,6 +2454,20 @@ export const searchMessages = async (req, res) => {
     ];
 
     const and = [{ $or: scopeOr }, { isDeleted: false }, { isScheduled: { $ne: true } }];
+    // Hide 1-to-1 history with blocked contacts (group messages still show)
+    const meForBlock = await User.findById(myId).select("blockedUsers").lean();
+    const blockedIds = [
+      ...((meForBlock?.blockedUsers || []).map((id) => id.toString())),
+      ...((await User.find({ blockedUsers: myId }).select("_id").lean()).map((u) => u._id.toString())),
+    ];
+    if (blockedIds.length > 0) {
+      and.push({
+        $or: [
+          { roomId: { $ne: null } },
+          { senderId: { $nin: blockedIds }, receiverId: { $nin: blockedIds } },
+        ],
+      });
+    }
     if (q) {
       // E2EE ciphertext is opaque — match plaintext fields only
       and.push({ text: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } });

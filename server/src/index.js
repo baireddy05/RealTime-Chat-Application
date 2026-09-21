@@ -10,6 +10,7 @@ import chatRoutes from "./routes/chat.route.js";
 import uploadRoutes from "./routes/upload.route.js";
 import friendRoutes from "./routes/friend.route.js";
 import statusRoutes from "./routes/status.route.js";
+import callRoutes from "./routes/call.route.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -47,6 +48,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/statuses", statusRoutes);
+app.use("/api/calls", callRoutes);
 
 import { startMessageScheduler } from "./lib/messageScheduler.js";
 

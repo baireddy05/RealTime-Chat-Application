@@ -31,6 +31,22 @@ const messageSchema = new mongoose.Schema(
       lat: Number,
       lng: Number,
     },
+    liveUntil: {
+      type: Date,
+      default: null,
+    },
+    isBroadcast: {
+      type: Boolean,
+      default: false,
+    },
+    isSystemMessage: {
+      type: Boolean,
+      default: false,
+    },
+    systemKind: {
+      type: String,
+      default: null,
+    },
     isSticker: {
       type: Boolean,
       default: false,

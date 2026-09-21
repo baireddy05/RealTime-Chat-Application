@@ -25,7 +25,7 @@ export const signup = async (req, res) => {
 
     const newUser = new User({
       username,
-      email,
+      email: email.toLowerCase().trim(),
       password: hashedPassword,
     });
 

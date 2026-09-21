@@ -13,6 +13,9 @@ const AddFriendModal = lazy(() => import("../components/AddFriendModal"));
 const StatusModal = lazy(() => import("../components/StatusModal"));
 const StarredDrawer = lazy(() => import("../components/StarredDrawer"));
 const CreateGroupModal = lazy(() => import("../components/CreateGroupModal"));
+const JoinGroupModal = lazy(() => import("../components/JoinGroupModal"));
+const BroadcastModal = lazy(() => import("../components/BroadcastModal"));
+const CallsModal = lazy(() => import("../components/CallsModal"));
 const SettingsModal = lazy(() => import("../components/SettingsModal"));
 import PulseLogo from "../components/PulseLogo";
 import { useChatStore } from "../store/useChatStore";
@@ -56,6 +59,9 @@ const HomePage = () => {
   const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
   const [isStatusStoriesOpen, setIsStatusStoriesOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isJoinGroupOpen, setIsJoinGroupOpen] = useState(false);
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const [isCallsOpen, setIsCallsOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("chats");
 
   // Initialize mobile root back-navigation guard
@@ -77,6 +83,9 @@ const HomePage = () => {
   );
   useBackHandler(isStatusStoriesOpen, () => setIsStatusStoriesOpen(false), "home-modal-stories");
   useBackHandler(isCreateGroupOpen, () => setIsCreateGroupOpen(false), "home-modal-create-group");
+  useBackHandler(isJoinGroupOpen, () => setIsJoinGroupOpen(false), "home-modal-join-group");
+  useBackHandler(isBroadcastOpen, () => setIsBroadcastOpen(false), "home-modal-broadcast");
+  useBackHandler(isCallsOpen, () => setIsCallsOpen(false), "home-modal-calls");
   useBackHandler(isStarredOpen, () => setIsStarredOpen(false), "home-modal-starred");
   useBackHandler(isChatThemeOpen, () => setIsChatThemeOpen(false), "home-modal-chat-theme");
   useBackHandler(isSettingsOpen, () => setIsSettingsOpen(false), "home-modal-settings");
@@ -523,6 +532,9 @@ const HomePage = () => {
           onOpenSetStatus={() => setIsSetStatusOpen(true)}
           onOpenAddFriend={() => setIsAddFriendOpen(true)}
           onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
+          onOpenJoinGroup={() => setIsJoinGroupOpen(true)}
+          onOpenBroadcast={() => setIsBroadcastOpen(true)}
+          onOpenCalls={() => setIsCallsOpen(true)}
           onOpenStatus={() => setIsStatusStoriesOpen(true)}
           onOpenStarred={() => setIsStarredOpen(true)}
           authUser={authUser}
@@ -669,6 +681,9 @@ const HomePage = () => {
       {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
       {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
       {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
+      {isJoinGroupOpen && <JoinGroupModal onClose={() => setIsJoinGroupOpen(false)} />}
+      {isBroadcastOpen && <BroadcastModal onClose={() => setIsBroadcastOpen(false)} />}
+      {isCallsOpen && <CallsModal onClose={() => setIsCallsOpen(false)} />}
       {(isAddFriendOpen || isContactsModalOpen) && (
         <AddFriendModal
           onClose={() => {

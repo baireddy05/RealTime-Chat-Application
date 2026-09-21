@@ -90,6 +90,9 @@ const Sidebar = ({
   onOpenSetStatus,
   onOpenAddFriend,
   onOpenCreateGroup,
+  onOpenJoinGroup,
+  onOpenBroadcast,
+  onOpenCalls,
   onOpenStatus,
   onOpenStarred,
   statusEmoji = "💻",
@@ -139,6 +142,10 @@ const Sidebar = ({
   const rejectFriendRequest = useFriendStore((s) => s.rejectFriendRequest);
   const subscribeToFriendEvents = useFriendStore((s) => s.subscribeToFriendEvents);
   const unsubscribeFromFriendEvents = useFriendStore((s) => s.unsubscribeFromFriendEvents);
+  const blockUser = useFriendStore((s) => s.blockUser);
+  const reportUser = useFriendStore((s) => s.reportUser);
+  const blockedUsers = useFriendStore((s) => s.blockedUsers);
+  const getBlockedUsers = useFriendStore((s) => s.getBlockedUsers);
 
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -273,6 +280,21 @@ const Sidebar = ({
     await setChatLabels(openMenuChat.id, next);
   };
 
+  const handleMenuBlock = async () => {
+    if (!openMenuChat || openMenuChat.chatType !== "user") return;
+    if (!window.confirm(`Block ${openMenuChat.name}? You will stop receiving their messages and they won't see you online.`)) return;
+    await blockUser(openMenuChat.id);
+    closeChatMenu();
+  };
+
+  const handleMenuReport = async () => {
+    if (!openMenuChat || openMenuChat.chatType !== "user") return;
+    const reason = window.prompt(`Report ${openMenuChat.name} for spam or abuse (optional reason):`, "");
+    if (reason === null) return;
+    await reportUser(openMenuChat.id, reason);
+    closeChatMenu();
+  };
+
   // ---- Filter-tabs overflow: arrows + mouse-wheel support for laptop
   // The tabs strip hides its scrollbar, so without affordances laptop users
   // can never reach overflowed tabs (e.g. Archived). Track both ends and
@@ -331,11 +353,12 @@ const Sidebar = ({
     getFriends();
     getFriendRequests();
     getLabels();
+    getBlockedUsers();
     subscribeToFriendEvents();
     return () => {
       unsubscribeFromFriendEvents();
     };
-  }, [getRooms, getFriends, getFriendRequests, getLabels, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
+  }, [getRooms, getFriends, getFriendRequests, getLabels, getBlockedUsers, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
 
   // Keyboard shortcut: Command+K or Ctrl+K focuses the search input
   useEffect(() => {
@@ -374,17 +397,26 @@ const Sidebar = ({
 
   // Unified search (WhatsApp-style): the main bar filters chats AND searches
   // message text across every conversation in one debounced pass.
+  const [searchMediaOnly, setSearchMediaOnly] = useState(false);
+  const [searchFrom, setSearchFrom] = useState("");
+  const [searchTo, setSearchTo] = useState("");
+  const [showSearchFilters, setShowSearchFilters] = useState(false);
   useEffect(() => {
     const q = searchQuery.trim();
     if (q.length >= 2) {
       const timer = setTimeout(() => {
         searchUsers(searchQuery);
-        searchMessages({ query: q });
+        searchMessages({
+          query: q,
+          ...(searchMediaOnly ? { hasMedia: true } : {}),
+          ...(searchFrom ? { from: searchFrom } : {}),
+          ...(searchTo ? { to: searchTo } : {}),
+        });
       }, 400);
       return () => clearTimeout(timer);
     }
     clearGlobalSearch();
-  }, [searchQuery, searchUsers, searchMessages, clearGlobalSearch]);
+  }, [searchQuery, searchUsers, searchMessages, clearGlobalSearch, searchMediaOnly, searchFrom, searchTo]);
 
   // Drop stale message results when the sidebar unmounts
   useEffect(() => {
@@ -657,7 +689,10 @@ const Sidebar = ({
     const authUserId = authUser?._id?.toString();
     const isSelfChat = friend.isSelfChat || friendId === authUserId;
     const isSelected = (selectedChat?.id || selectedChat?._id)?.toString() === friendId;
-    const isOnline = isSelfChat ? true : onlineUsersSet.has(friendId);
+    const isOnline = isSelfChat
+      ? true
+      : onlineUsersSet.has(friendId) &&
+        !(blockedUsers || []).some((b) => (b._id || b)?.toString() === friendId);
     const unread = unreadCounts[friendId] !== undefined ? unreadCounts[friendId] : (friend.unreadCount || 0);
     const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
@@ -922,6 +957,33 @@ const Sidebar = ({
                     >
                       <span className="material-symbols-outlined text-[16px] text-accent-primary">install_desktop</span>
                       <span>Install Pulse PWA</span>
+                    </button>
+                  )}
+                  {onOpenJoinGroup && (
+                    <button
+                      onClick={() => { onOpenJoinGroup(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">ticket</span>
+                      <span>Join Group with Code</span>
+                    </button>
+                  )}
+                  {onOpenBroadcast && (
+                    <button
+                      onClick={() => { onOpenBroadcast(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">campaign</span>
+                      <span>Broadcast Lists</span>
+                    </button>
+                  )}
+                  {onOpenCalls && (
+                    <button
+                      onClick={() => { onOpenCalls(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">call_log</span>
+                      <span>Call History</span>
                     </button>
                   )}
                   <button
@@ -1352,8 +1414,64 @@ const Sidebar = ({
         <div className="mb-2 p-2 rounded-2xl bg-white/95 dark:bg-[#14131a]/90 border border-black/10 dark:border-white/10 shadow-xl flex flex-col gap-1 shrink-0 max-h-56 overflow-y-auto custom-scrollbar">
           <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase font-semibold px-1 flex items-center justify-between">
             <span>Messages</span>
-            {!isGlobalSearchLoading && <span>{globalSearchResults.length}</span>}
+            <span className="flex items-center gap-1">
+              {!isGlobalSearchLoading && <span>{globalSearchResults.length}</span>}
+              <button
+                type="button"
+                onClick={() => setShowSearchFilters((v) => !v)}
+                title="Message filters"
+                className={`p-0.5 rounded-full transition-colors ${
+                  searchMediaOnly || searchFrom || searchTo || showSearchFilters
+                    ? "text-accent-primary"
+                    : "text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]">tune</span>
+              </button>
+            </span>
           </div>
+          {showSearchFilters && (
+            <div className="flex flex-wrap items-center gap-1.5 px-1 py-1">
+              <button
+                type="button"
+                onClick={() => setSearchMediaOnly((v) => !v)}
+                className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-all ${
+                  searchMediaOnly
+                    ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
+                    : "border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400"
+                }`}
+              >
+                Media
+              </button>
+              <input
+                type="date"
+                value={searchFrom}
+                onChange={(e) => setSearchFrom(e.target.value)}
+                title="From date"
+                className="glass-input rounded-full px-2 py-1 text-[10px] text-theme-main border border-black/10 dark:border-white/10 max-w-[118px]"
+              />
+              <input
+                type="date"
+                value={searchTo}
+                onChange={(e) => setSearchTo(e.target.value)}
+                title="To date"
+                className="glass-input rounded-full px-2 py-1 text-[10px] text-theme-main border border-black/10 dark:border-white/10 max-w-[118px]"
+              />
+              {(searchMediaOnly || searchFrom || searchTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMediaOnly(false);
+                    setSearchFrom("");
+                    setSearchTo("");
+                  }}
+                  className="text-[10px] font-semibold text-accent-primary hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
           {isGlobalSearchLoading && globalSearchResults.length === 0 ? (
             <div className="flex items-center justify-center py-6 gap-2 text-zinc-500 dark:text-zinc-400">
               <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
@@ -1643,6 +1761,29 @@ const Sidebar = ({
                 </button>
               )}
             </div>
+            {openMenuChat.chatType === "user" && openMenuChat.id !== authUser?._id && (
+              <>
+                <div className="h-px bg-[var(--glass-border)] my-1" />
+                <div className="px-1.5 pb-1 flex flex-col">
+                  <button
+                    type="button"
+                    onClick={handleMenuBlock}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 rounded-xl transition-colors text-left"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">block</span>
+                    <span>Block {openMenuChat.name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMenuReport}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 rounded-xl transition-colors text-left"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">flag</span>
+                    <span>Report spam</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </>,
         document.body

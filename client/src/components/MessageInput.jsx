@@ -150,8 +150,41 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     drafts,
     setDraft,
     messages,
+    updateLiveLocation,
+    stopLiveLocation,
   } = useChatStore();
   const { authUser, socket } = useAuthStore();
+
+  // Live location sharing session (GPS watch pushing fixes to our live message)
+  const [showLiveMenu, setShowLiveMenu] = useState(false);
+  const [liveShare, setLiveShare] = useState(null); // { messageId }
+  const liveWatchIdRef = useRef(null);
+  const liveLastPushRef = useRef(0);
+  const liveShareRef = useRef(null);
+  liveShareRef.current = liveShare;
+
+  const clearLiveWatch = () => {
+    if (liveWatchIdRef.current !== null && navigator.geolocation?.clearWatch) {
+      try {
+        navigator.geolocation.clearWatch(liveWatchIdRef.current);
+      } catch {}
+    }
+    liveWatchIdRef.current = null;
+  };
+
+  // Stop pushing fixes on unmount; the share itself stays live server-side
+  // until it expires or is stopped explicitly.
+  useEffect(() => {
+    return () => {
+      if (liveWatchIdRef.current !== null && navigator.geolocation?.clearWatch) {
+        try {
+          navigator.geolocation.clearWatch(liveWatchIdRef.current);
+        } catch {}
+      }
+    };
+  }, []);
+
+  useBackHandler(showLiveMenu, () => setShowLiveMenu(false), "input-live-menu");
 
   // Populate text when editing a message
   useEffect(() => {
@@ -571,6 +604,65 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         alert("Unable to retrieve your location: " + error.message);
       }
     );
+  };
+
+  const startLiveShare = (minutes) => {
+    setShowLiveMenu(false);
+    setShowAttachMenu(false);
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    if (liveShare) {
+      alert("You are already sharing live location. Stop it first to start a new share.");
+      return;
+    }
+    const liveUntil = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+        const res = await sendMessage({
+          text: "",
+          location: { lat: latitude, lng: longitude },
+          liveUntil,
+        });
+        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+        const messageId = res?.data?._id;
+        if (!res.success || !messageId) return;
+        setLiveShare({ messageId });
+        liveLastPushRef.current = Date.now();
+        try {
+          liveWatchIdRef.current = navigator.geolocation.watchPosition(
+            async (pos) => {
+              // Throttle fixes to one push per 8s
+              if (Date.now() - liveLastPushRef.current < 8000) return;
+              liveLastPushRef.current = Date.now();
+              const id = liveShareRef.current?.messageId;
+              if (!id) return;
+              const out = await updateLiveLocation(id, pos.coords.latitude, pos.coords.longitude);
+              if (!out.success && out.expired) {
+                clearLiveWatch();
+                setLiveShare(null);
+              }
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+          );
+        } catch {}
+      },
+      (error) => {
+        alert("Unable to retrieve your location: " + error.message);
+      }
+    );
+  };
+
+  const stopLiveShare = async () => {
+    const id = liveShare?.messageId;
+    clearLiveWatch();
+    setLiveShare(null);
+    setShowLiveMenu(false);
+    if (id) await stopLiveLocation(id);
   };
 
   const handleSendSketch = async (dataUrl) => {
@@ -1127,6 +1219,19 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
             <span>Share Location</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowLiveMenu(true);
+              setShowAttachMenu(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors"
+          >
+            <div className="w-7 h-7 rounded-xl bg-red-500/20 text-red-500 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[15px]">share_location</span>
+            </div>
+            <span>Share Live Location</span>
+          </button>
           <div className="h-px bg-[var(--glass-border)] my-1" />
           <button
             type="button"
@@ -1229,6 +1334,58 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               <Code2 size={14} />
             </div>
             <span>Code Snippet</span>
+          </button>
+        </div>
+      )}
+
+      {/* Live Location Duration Picker */}
+      {showLiveMenu && (
+        <div className="absolute bottom-full mb-2 left-2 sm:left-12 md:left-14 z-50 bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl p-2 shadow-glass w-56 max-w-[calc(100vw-16px)] animate-scaleIn space-y-1">
+          <div className="px-2.5 py-1 text-[10px] font-semibold text-theme-muted uppercase tracking-wider flex items-center justify-between">
+            <span>Share live location for</span>
+            <button
+              type="button"
+              onClick={() => setShowLiveMenu(false)}
+              className="text-theme-muted hover:text-theme-main transition-colors"
+              title="Close"
+            >
+              <X size={13} />
+            </button>
+          </div>
+          {[
+            { label: "15 minutes", minutes: 15 },
+            { label: "1 hour", minutes: 60 },
+            { label: "8 hours", minutes: 480 },
+          ].map((opt) => (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => startLiveShare(opt.minutes)}
+              className="w-full text-left px-2.5 py-2 rounded-2xl hover:bg-[var(--glass-hover)] text-theme-main text-xs font-medium transition-colors flex items-center justify-between"
+            >
+              <span>{opt.label}</span>
+              <span className="material-symbols-outlined text-[15px] text-red-500">share_location</span>
+            </button>
+          ))}
+          <p className="px-2.5 pb-1 text-[10px] text-theme-muted">
+            Your position updates live until time runs out or you stop it.
+          </p>
+        </div>
+      )}
+
+      {/* Active live-share banner */}
+      {liveShare && (
+        <div className="mb-2 px-3 py-1.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-between text-xs text-red-400 animate-fadeIn">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span>Sharing live location</span>
+          </div>
+          <button
+            type="button"
+            onClick={stopLiveShare}
+            className="px-2.5 py-1 rounded-full bg-red-500/20 hover:bg-red-500/30 font-bold transition-colors"
+          >
+            Stop
           </button>
         </div>
       )}

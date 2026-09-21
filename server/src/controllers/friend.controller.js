@@ -1,7 +1,23 @@
 import User from "../models/User.model.js";
 import FriendRequest from "../models/FriendRequest.model.js";
+import Report from "../models/Report.model.js";
 import Message from "../models/Message.model.js";
+import mongoose from "mongoose";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+
+// True when either user blocked the other (checked before delivery)
+export const isBlockedPair = async (a, b) => {
+  if (!a || !b) return false;
+  const doc = await User.findOne({
+    $or: [
+      { _id: a, blockedUsers: b },
+      { _id: b, blockedUsers: a },
+    ],
+  })
+    .select("_id")
+    .lean();
+  return !!doc;
+};
 
 // Get logged in user's friends
 export const getFriends = async (req, res) => {
@@ -10,12 +26,22 @@ export const getFriends = async (req, res) => {
     const user = await User.findById(loggedInUserId)
       .populate("friends", "username email profilePic status bio")
       .lean();
+    // Blocked contacts (either direction) disappear from the friends list
+    const myBlocked = new Set((user?.blockedUsers || []).map((id) => id.toString()));
+    const blockers = await User.find({
+      _id: { $in: (user?.friends || []).map((f) => f._id) },
+      blockedUsers: loggedInUserId,
+    })
+      .select("_id")
+      .lean();
+    const blockedMe = new Set(blockers.map((u) => u._id.toString()));
     // Deduplicate friends (in case of legacy duplicates in the array)
     const seen = new Set();
     const uniqueFriends = (user?.friends || []).filter((f) => {
       const id = f._id.toString();
       if (seen.has(id)) return false;
       seen.add(id);
+      if (myBlocked.has(id) || blockedMe.has(id)) return false;
       return true;
     });
 
@@ -119,6 +145,18 @@ export const searchUsers = async (req, res) => {
       ],
       status: "pending",
     }).lean();
+
+    // Never surface blocked contacts (either direction) in discovery
+    const currentFull = await User.findById(currentUserId).select("blockedUsers").lean();
+    const hiddenSet = new Set((currentFull?.blockedUsers || []).map((id) => id.toString()));
+    const blockedBy = await User.find({
+      _id: { $in: foundUsers.map((u) => u._id) },
+      blockedUsers: currentUserId,
+    })
+      .select("_id")
+      .lean();
+    blockedBy.forEach((u) => hiddenSet.add(u._id.toString()));
+    foundUsers = foundUsers.filter((u) => !hiddenSet.has(u._id.toString()));
 
     const results = foundUsers.map((user) => {
       let relationship = "none";
@@ -300,6 +338,114 @@ export const removeFriend = async (req, res) => {
     res.status(200).json({ message: "Friend removed successfully" });
   } catch (error) {
     console.error("Error in removeFriend controller:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Block a user: unfriends both ways, clears pending requests, and stops
+// all future DM delivery in either direction (enforced in sendMessage).
+export const blockUser = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+    if (currentUserId.toString() === userId.toString()) {
+      return res.status(400).json({ message: "You cannot block yourself" });
+    }
+    const target = await User.findById(userId).select("_id").lean();
+    if (!target) return res.status(404).json({ message: "User not found" });
+
+    await User.findByIdAndUpdate(currentUserId, {
+      $addToSet: { blockedUsers: userId },
+      $pull: { friends: userId },
+    });
+    await User.findByIdAndUpdate(userId, { $pull: { friends: currentUserId } });
+    await FriendRequest.deleteMany({
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId },
+      ],
+    });
+
+    io.to(userId.toString()).emit("friendRemoved", { userId: currentUserId });
+
+    res.status(200).json({ message: "User blocked", userId });
+  } catch (error) {
+    console.error("Error in blockUser controller:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Unblock a user (does not restore the friendship — send a new request)
+export const unblockUser = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const { userId } = req.params;
+
+    await User.findByIdAndUpdate(currentUserId, { $pull: { blockedUsers: userId } });
+
+    res.status(200).json({ message: "User unblocked", userId });
+  } catch (error) {
+    console.error("Error in unblockUser controller:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// List users I blocked
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const me = await User.findById(req.user._id)
+      .populate("blockedUsers", "username email profilePic status bio")
+      .lean();
+    res.status(200).json(me?.blockedUsers || []);
+  } catch (error) {
+    console.error("Error in getBlockedUsers controller:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Report spam/abuse: records the report and auto-blocks the reported user
+export const reportUser = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const { userId } = req.params;
+    const { reason = "" } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+    if (currentUserId.toString() === userId.toString()) {
+      return res.status(400).json({ message: "You cannot report yourself" });
+    }
+    const target = await User.findById(userId).select("_id").lean();
+    if (!target) return res.status(404).json({ message: "User not found" });
+
+    await Report.create({
+      reporter: currentUserId,
+      reported: userId,
+      reason: typeof reason === "string" ? reason.slice(0, 500) : "",
+    });
+
+    // Reporting implies blocking (same cleanup as blockUser)
+    await User.findByIdAndUpdate(currentUserId, {
+      $addToSet: { blockedUsers: userId },
+      $pull: { friends: userId },
+    });
+    await User.findByIdAndUpdate(userId, { $pull: { friends: currentUserId } });
+    await FriendRequest.deleteMany({
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId },
+      ],
+    });
+    io.to(userId.toString()).emit("friendRemoved", { userId: currentUserId });
+
+    res.status(201).json({ message: "Report submitted. The user has been blocked." });
+  } catch (error) {
+    console.error("Error in reportUser controller:", error.message);
     res.status(500).json({ message: "Internal server error" });
   }
 };

@@ -896,6 +896,8 @@ export const useChatStore = create((set, get) => ({
     socket.off("messagesRead");
     socket.off("messageDeleted");
     socket.off("messagePinned");
+    socket.off("roomDeleted");
+    socket.off("locationUpdated");
     socket.off("pollUpdated");
     socket.off("newStatus");
     socket.off("deletedStatus");
@@ -1410,6 +1412,30 @@ export const useChatStore = create((set, get) => ({
       set({ messages: updated });
     });
 
+    // Real-time group deletion (leave-last-out, creator delete, kick cleanup)
+    socket.on("roomDeleted", ({ roomId }) => {
+      if (!roomId) return;
+      const { rooms, selectedChat } = get();
+      const idStr = roomId.toString();
+      set({
+        rooms: (rooms || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
+        selectedChat: selectedChat?.id?.toString() === idStr ? null : selectedChat,
+      });
+    });
+
+    // Real-time live-location position updates
+    socket.on("locationUpdated", ({ messageId, location, liveUntil }) => {
+      if (!messageId) return;
+      const { messages } = get();
+      set({
+        messages: messages.map((m) =>
+          (m._id || m.id)?.toString() === messageId.toString()
+            ? { ...m, location: location || m.location, liveUntil: liveUntil || m.liveUntil }
+            : m
+        ),
+      });
+    });
+
     // Real-time group events
     const upsertEvent = (event) => {
       set((state) => {
@@ -1481,6 +1507,8 @@ export const useChatStore = create((set, get) => ({
     socket.off("messagesRead");
     socket.off("messageDeleted");
     socket.off("messagePinned");
+    socket.off("roomDeleted");
+    socket.off("locationUpdated");
     socket.off("messageExpired");
     socket.off("roomUpdated");
     socket.off("pollUpdated");
@@ -1745,6 +1773,176 @@ export const useChatStore = create((set, get) => ({
       return { success: true, room: updatedRoom };
     } catch (error) {
       console.error("Error toggling group admin:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Group invite links, leave & delete ----
+  createInviteCode: async (roomId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/rooms/${roomId}/invite`);
+      return { success: true, inviteCode: res.data.inviteCode };
+    } catch (error) {
+      console.error("Error creating invite link:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  revokeInviteCode: async (roomId) => {
+    try {
+      await axiosInstance.delete(`/chat/rooms/${roomId}/invite`);
+      return { success: true };
+    } catch (error) {
+      console.error("Error revoking invite link:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  joinGroupByCode: async (code) => {
+    try {
+      const clean = (code || "").trim();
+      if (!clean) return { success: false, error: "Invite code is required" };
+      const res = await axiosInstance.post(`/chat/rooms/join/${encodeURIComponent(clean)}`);
+      const room = res.data;
+      const { rooms } = get();
+      if (room?._id && !rooms.some((r) => (r._id || r.id)?.toString() === room._id.toString())) {
+        set({ rooms: [room, ...rooms] });
+      }
+      return { success: true, room };
+    } catch (error) {
+      console.error("Error joining group:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  leaveGroup: async (roomId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/rooms/${roomId}/leave`);
+      const { rooms, selectedChat } = get();
+      const idStr = roomId?.toString();
+      if (res.data?.deleted || !res.data?.room) {
+        set({
+          rooms: (rooms || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
+          selectedChat: selectedChat?.id?.toString() === idStr ? null : selectedChat,
+        });
+      } else {
+        const updatedRoom = res.data.room;
+        set({
+          rooms: rooms.map((r) => ((r._id || r.id)?.toString() === idStr ? updatedRoom : r)),
+          selectedChat: selectedChat?.id?.toString() === idStr ? null : selectedChat,
+        });
+      }
+      return { success: true, deleted: !!res.data?.deleted, transferredTo: res.data?.transferredTo };
+    } catch (error) {
+      console.error("Error leaving group:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  deleteGroup: async (roomId) => {
+    try {
+      await axiosInstance.delete(`/chat/rooms/${roomId}`);
+      const { rooms, selectedChat } = get();
+      const idStr = roomId?.toString();
+      set({
+        rooms: (rooms || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
+        selectedChat: selectedChat?.id?.toString() === idStr ? null : selectedChat,
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Broadcast lists ----
+  broadcasts: [],
+  isBroadcastsLoading: false,
+
+  getBroadcasts: async () => {
+    set({ isBroadcastsLoading: true });
+    try {
+      const res = await axiosInstance.get("/chat/broadcasts");
+      set({ broadcasts: res.data || [] });
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching broadcasts:", error);
+      return [];
+    } finally {
+      set({ isBroadcastsLoading: false });
+    }
+  },
+
+  createBroadcast: async ({ name, recipientIds }) => {
+    try {
+      const res = await axiosInstance.post("/chat/broadcasts", { name, recipientIds });
+      set((state) => ({ broadcasts: [res.data, ...state.broadcasts] }));
+      return { success: true, list: res.data };
+    } catch (error) {
+      console.error("Error creating broadcast:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  updateBroadcast: async (id, { name, recipientIds }) => {
+    try {
+      const res = await axiosInstance.put(`/chat/broadcasts/${id}`, { name, recipientIds });
+      set((state) => ({
+        broadcasts: state.broadcasts.map((b) => (b._id === id ? res.data : b)),
+      }));
+      return { success: true, list: res.data };
+    } catch (error) {
+      console.error("Error updating broadcast:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  deleteBroadcast: async (id) => {
+    try {
+      await axiosInstance.delete(`/chat/broadcasts/${id}`);
+      set((state) => ({ broadcasts: state.broadcasts.filter((b) => b._id !== id) }));
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting broadcast:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  sendBroadcast: async (id, messageData) => {
+    try {
+      const res = await axiosInstance.post(`/chat/broadcasts/${id}/send`, messageData);
+      return { success: true, ...res.data };
+    } catch (error) {
+      console.error("Error sending broadcast:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Live location ----
+  updateLiveLocation: async (messageId, lat, lng) => {
+    try {
+      await axiosInstance.put(`/chat/message/${messageId}/location`, { lat, lng });
+      return { success: true };
+    } catch (error) {
+      if (error.response?.status === 410) return { success: false, expired: true };
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  stopLiveLocation: async (messageId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/message/${messageId}/stop-live`);
+      const { messages } = get();
+      set({
+        messages: messages.map((m) =>
+          (m._id || m.id)?.toString() === messageId?.toString()
+            ? { ...m, liveUntil: res.data?.liveUntil || new Date().toISOString() }
+            : m
+        ),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error stopping live location:", error);
       return { success: false, error: error.response?.data?.error || error.message };
     }
   },

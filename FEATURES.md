@@ -16,6 +16,9 @@ This document serves as the central source of truth for all features currently i
 ## 2. Core Messaging & Real-Time Communication
 - **Direct Messaging (1-to-1):** Real-time private conversations with friends.
 - **Groups:** Create custom groups, invite members, and view group information (`CreateGroupModal.jsx`). Group admins can add or remove members at any time from the group info panel.
+- **Group Invite Links:** Admins generate shareable invite codes, copy/share them, and revoke them instantly. Anyone joins via Join Group — no admin action needed per join.
+- **Leave & Delete Groups:** Members leave anytime (creator ownership auto-transfers); creators can delete the group with all its messages.
+- **Block & Report Users:** Block contacts from the chat menu (stops DMs and calls both ways, hides them and their presence), report spam with an optional reason, and manage the blocked list from Add Contact.
 - **Real-Time WebSockets:** Live instant messaging powered by Socket.io.
 - **Message Editing:** Edit previously sent messages with `(edited)` badges.
 - **Message Deletion:** Delete messages for everyone (Tombstone soft-deletion strategy).
@@ -25,9 +28,11 @@ This document serves as the central source of truth for all features currently i
 - **Live Typing Indicators:** Real-time visual feedback when the other person is typing.
 - **Message Formatting:** Rich text formatting.
 - **In-Chat Search:** Search for specific messages inside a conversation.
-- **Global Message Search:** Type in the main search bar to filter chats and find matching messages across every conversation at once, with jump-to-message navigation.
+- **Global Message Search:** Type in the main search bar to filter chats and find matching messages across every conversation at once, with media-only and date-range filters and jump-to-message navigation.
 - **Chat Labels & Folders:** Create color-coded labels (Work, Family, …), assign them in one tap from any chat's ⋮ menu (long-press on mobile), filter the inbox by label, and see label dots on every conversation.
 - **Interactive Polls:** Create polls with single or multiple answers and see real-time voting results.
+- **Broadcast Lists:** Compose once, deliver as individual DMs to up to 50 recipients (`BroadcastModal.jsx`). Blocked contacts are skipped automatically, with per-send delivery counts.
+- **Live Location Sharing:** Share a real-time updating map pin for 15 minutes, 1 hour, or 8 hours with a pulsing LIVE badge, one-tap stop, and automatic expiry.
 - **Ephemeral Whisper Mode:** Send disappearing messages that vanish permanently after being viewed once by pressing and holding.
 
 ## 3. Advanced Interactions & Threading
@@ -69,6 +74,7 @@ This document serves as the central source of truth for all features currently i
 - **Picture-in-Picture (PiP) Video:** Seamless PiP floating preview with instant main/mini view swapping and aspect ratio cycling.
 - **Real-Time Peer State Badges:** Live WebSocket synchronization showing when the remote peer mutes their mic or turns off their camera.
 - **Mobile Hardware Back Interception:** Android physical back button and iOS swipe gesture support to cleanly decline incoming calls or hang up.
+- **Call History & Missed Calls:** Automatic per-user call log (missed, declined, completed with duration) with tap-to-redial, per-user clearing, and in-chat missed-call notices.
 
 ## 6. Organization, UI, & Customization
 - **User Profiles:** Customizable profiles with avatars and bio.

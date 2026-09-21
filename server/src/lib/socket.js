@@ -5,6 +5,8 @@ import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import Room from "../models/Room.model.js";
 import Message from "../models/Message.model.js";
+import CallLog from "../models/CallLog.model.js";
+import User from "../models/User.model.js";
 import { isOriginAllowed } from "./corsConfig.js";
 
 const app = express();
@@ -24,6 +26,43 @@ const io = new Server(server, {
 
 // Store user socket mappings for multi-device support, private messaging, and online status
 const userSocketMap = {}; // { userId: Set<socketId> }
+// In-flight 1-to-1 calls awaiting answer: "a:b" (sorted ids) -> { logId, timer }
+const pendingCalls = new Map();
+const CALL_ANSWER_TIMEOUT_MS = 45000;
+
+const pendingCallKey = (a, b) => [a.toString(), b.toString()].sort().join(":");
+
+// Post an in-chat system notice (missed call) to both participants
+const postMissedCallMessage = async (callerId, receiverId, callType) => {
+  try {
+    const msg = new Message({
+      senderId: callerId,
+      receiverId,
+      text: `Missed ${callType === "audio" ? "voice" : "video"} call`,
+      isSystemMessage: true,
+      systemKind: "missed-call",
+    });
+    await msg.save();
+    await msg.populate("senderId", "username profilePic");
+    io.to(receiverId.toString()).emit("newMessage", msg);
+    io.to(callerId.toString()).emit("newMessage", msg);
+  } catch (err) {
+    console.error("Error posting missed-call message:", err.message);
+  }
+};
+
+const settlePendingCall = async (key, patch) => {
+  const pending = pendingCalls.get(key);
+  if (pending?.timer) clearTimeout(pending.timer);
+  pendingCalls.delete(key);
+  if (!pending?.logId) return;
+  try {
+    await CallLog.findByIdAndUpdate(pending.logId, { $set: patch }).exec();
+  } catch (err) {
+    console.error("Error settling call log:", err.message);
+  }
+};
+
 // Per-socket last-forwarded timestamps to throttle typing fan-out.
 // Clients can emit `typing` on every keystroke; without throttling a fast
 // typist fans out dozens of broadcasts/sec to every room member.
@@ -153,15 +192,52 @@ io.on("connection", (socket) => {
     } catch {}
   });
 
-  // WebRTC Audio/Video Calling Signaling
-  socket.on("callUser", ({ userToCall, signalData, callType, callerInfo, deviceInfo }) => {
+  // WebRTC Audio/Video Calling Signaling (with call-history logging)
+  socket.on("callUser", async ({ userToCall, signalData, callType, callerInfo, deviceInfo }) => {
     if (!userToCall) return;
+    // Blocked contacts cannot call each other either
+    try {
+      const blocked = await User.findOne({
+        $or: [
+          { _id: userId, blockedUsers: userToCall },
+          { _id: userToCall, blockedUsers: userId },
+        ],
+      })
+        .select("_id")
+        .lean();
+      if (blocked) {
+        socket.emit("callUnavailable", { message: "User is currently unavailable" });
+        return;
+      }
+    } catch {}
     const targetSockets = userSocketMap[userToCall.toString()];
     if (targetSockets && targetSockets.size > 0) {
+      const type = callType || "video";
+      // Log BEFORE emitting: the callee can answer instantly, and the
+      // answer/end handlers need the pending entry to already exist.
+      try {
+        const key = pendingCallKey(userId, userToCall);
+        await settlePendingCall(key, {});
+        const log = await CallLog.create({
+          callerId: userId,
+          receiverId: userToCall,
+          callType: type,
+          status: "missed",
+        });
+        const timer = setTimeout(async () => {
+          // Still unanswered after 45s: keep "missed" and post in-chat notice
+          if (!pendingCalls.has(key)) return;
+          pendingCalls.delete(key);
+          await postMissedCallMessage(userId, userToCall.toString(), type);
+        }, CALL_ANSWER_TIMEOUT_MS);
+        pendingCalls.set(key, { logId: log._id, timer });
+      } catch (err) {
+        console.error("Error logging call attempt:", err.message);
+      }
       io.to(userToCall.toString()).emit("incomingCall", {
         signal: signalData,
         from: userId,
-        callType: callType || "video",
+        callType: type,
         callerInfo: callerInfo || { _id: userId },
         deviceInfo: deviceInfo || callerInfo?.deviceInfo || null,
       });
@@ -170,19 +246,54 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("answerCall", ({ to, signal, deviceInfo }) => {
+  socket.on("answerCall", async ({ to, signal, deviceInfo }) => {
     if (!to) return;
     io.to(to.toString()).emit("callAccepted", { signal, deviceInfo });
+    try {
+      const key = pendingCallKey(userId, to);
+      const pending = pendingCalls.get(key);
+      if (pending?.logId) {
+        if (pending.timer) clearTimeout(pending.timer);
+        await CallLog.findByIdAndUpdate(pending.logId, { $set: { answeredAt: new Date() } }).exec();
+      }
+    } catch (err) {
+      console.error("Error logging call answer:", err.message);
+    }
   });
 
-  socket.on("rejectCall", ({ to }) => {
+  socket.on("rejectCall", async ({ to }) => {
     if (!to) return;
     io.to(to.toString()).emit("callRejected");
+    // Receiver actively declined: mark rejected (no missed-call notice)
+    await settlePendingCall(pendingCallKey(userId, to), { status: "rejected", endedAt: new Date() });
   });
 
-  socket.on("endCall", ({ to }) => {
+  socket.on("endCall", async ({ to }) => {
     if (!to) return;
     io.to(to.toString()).emit("callEnded");
+    try {
+      const key = pendingCallKey(userId, to);
+      const pending = pendingCalls.get(key);
+      if (pending?.timer) clearTimeout(pending.timer);
+      pendingCalls.delete(key);
+      if (pending?.logId) {
+        const log = await CallLog.findById(pending.logId).select("answeredAt callType callerId receiverId").lean();
+        const now = new Date();
+        if (log?.answeredAt) {
+          const durationSec = Math.max(0, Math.round((now.getTime() - new Date(log.answeredAt).getTime()) / 1000));
+          await CallLog.findByIdAndUpdate(pending.logId, {
+            $set: { status: "completed", endedAt: now, durationSec },
+          }).exec();
+        } else {
+          // Hung up before answer: caller side sees cancelled, callee missed
+          await CallLog.findByIdAndUpdate(pending.logId, {
+            $set: { status: "cancelled", endedAt: now },
+          }).exec();
+        }
+      }
+    } catch (err) {
+      console.error("Error logging call end:", err.message);
+    }
   });
 
   socket.on("iceCandidate", ({ to, candidate }) => {
@@ -281,6 +392,18 @@ io.on("connection", (socket) => {
     if (userId) {
       for (const key of lastTypingForwardedAt.keys()) {
         if (key.startsWith(`${userId}:`)) lastTypingForwardedAt.delete(key);
+      }
+      // Settle any in-flight call the disconnecting user was part of
+      for (const [key, pending] of pendingCalls.entries()) {
+        if (key.split(":").includes(userId)) {
+          if (pending?.timer) clearTimeout(pending.timer);
+          pendingCalls.delete(key);
+          if (pending?.logId) {
+            CallLog.findByIdAndUpdate(pending.logId, {
+              $set: { status: "cancelled", endedAt: new Date() },
+            }).exec().catch(() => {});
+          }
+        }
       }
     }
     if (userId && userSocketMap[userId]) {

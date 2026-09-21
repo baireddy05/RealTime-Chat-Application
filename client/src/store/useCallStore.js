@@ -690,5 +690,40 @@ export const useCallStore = create((set, get) => ({
       currentFacingMode: "user",
       isSwapped: false,
     });
+    // Refresh history in the background so the log stays current
+    try {
+      get().getCallHistory?.().catch(() => {});
+    } catch {}
+  },
+
+  // ---- Call history ----
+  callHistory: [],
+  isCallHistoryLoading: false,
+
+  getCallHistory: async () => {
+    set({ isCallHistoryLoading: true });
+    try {
+      const { axiosInstance } = await import("../lib/axios");
+      const res = await axiosInstance.get("/calls?limit=50");
+      set({ callHistory: res.data || [] });
+      return res.data;
+    } catch (error) {
+      console.error("[PulseCall] Error fetching call history:", error);
+      return [];
+    } finally {
+      set({ isCallHistoryLoading: false });
+    }
+  },
+
+  clearCallHistory: async () => {
+    try {
+      const { axiosInstance } = await import("../lib/axios");
+      await axiosInstance.delete("/calls");
+      set({ callHistory: [] });
+      return { success: true };
+    } catch (error) {
+      console.error("[PulseCall] Error clearing call history:", error);
+      return { success: false };
+    }
   },
 }));

@@ -158,6 +158,93 @@ export const useFriendStore = create((set, get) => ({
     }
   },
 
+  blockedUsers: [],
+
+  getBlockedUsers: async () => {
+    try {
+      const res = await axiosInstance.get("/friends/blocked");
+      set({ blockedUsers: res.data || [] });
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching blocked users:", error);
+      return [];
+    }
+  },
+
+  blockUser: async (userId) => {
+    try {
+      await axiosInstance.post(`/friends/block/${userId}`);
+      const { friends, blockedUsers } = get();
+      const target = friends.find((f) => f._id?.toString() === userId?.toString());
+      set({
+        friends: friends.filter((f) => f._id?.toString() !== userId?.toString()),
+        blockedUsers: target && !blockedUsers.some((b) => b._id?.toString() === userId?.toString())
+          ? [...blockedUsers, target]
+          : blockedUsers,
+      });
+      // Drop any open chat + cached previews with the blocked user
+      try {
+        const chatState = useChatStore.getState();
+        const idStr = userId?.toString();
+        useChatStore.setState({
+          users: (chatState.users || []).filter((u) => (u._id || u.id)?.toString() !== idStr),
+          lastMessages: Object.fromEntries(
+            Object.entries(chatState.lastMessages || {}).filter(([k]) => k !== idStr)
+          ),
+          unreadCounts: Object.fromEntries(
+            Object.entries(chatState.unreadCounts || {}).filter(([k]) => k !== idStr)
+          ),
+          selectedChat: chatState.selectedChat?.id?.toString() === idStr ? null : chatState.selectedChat,
+        });
+      } catch {}
+      return { success: true };
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      return { success: false, message: error.response?.data?.message || "Failed to block user" };
+    }
+  },
+
+  unblockUser: async (userId) => {
+    try {
+      await axiosInstance.delete(`/friends/block/${userId}`);
+      const { blockedUsers } = get();
+      set({ blockedUsers: blockedUsers.filter((b) => b._id?.toString() !== userId?.toString()) });
+      get().getFriends();
+      return { success: true };
+    } catch (error) {
+      console.error("Error unblocking user:", error);
+      return { success: false };
+    }
+  },
+
+  reportUser: async (userId, reason = "") => {
+    try {
+      await axiosInstance.post(`/friends/report/${userId}`, { reason });
+      // Reporting auto-blocks server-side; mirror the local cleanup directly
+      // (no second block request needed).
+      const { friends, blockedUsers } = get();
+      const target = friends.find((f) => f._id?.toString() === userId?.toString());
+      const idStr = userId?.toString();
+      set({
+        friends: friends.filter((f) => f._id?.toString() !== idStr),
+        blockedUsers: target && !blockedUsers.some((b) => b._id?.toString() === idStr)
+          ? [...blockedUsers, target]
+          : blockedUsers,
+      });
+      try {
+        const chatState = useChatStore.getState();
+        useChatStore.setState({
+          users: (chatState.users || []).filter((u) => (u._id || u.id)?.toString() !== idStr),
+          selectedChat: chatState.selectedChat?.id?.toString() === idStr ? null : chatState.selectedChat,
+        });
+      } catch {}
+      return { success: true };
+    } catch (error) {
+      console.error("Error reporting user:", error);
+      return { success: false, message: error.response?.data?.message || "Failed to submit report" };
+    }
+  },
+
   subscribeToFriendEvents: () => {
     const socket = useAuthStore.getState().socket;
     if (!socket) return;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Users, Hash, Shield, ShieldCheck, UserMinus, UserPlus, Search, Edit2, Check, Loader, CalendarPlus, CalendarClock, MapPin, Plus } from "lucide-react";
+import { X, Users, Hash, Shield, ShieldCheck, UserMinus, UserPlus, Search, Edit2, Check, Loader, CalendarPlus, CalendarClock, MapPin, Plus, Link2, Copy, RefreshCw, LogOut, Trash2 } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
@@ -22,6 +22,7 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const { authUser, onlineUsers } = useAuthStore();
   const {
     updateGroupInfo, kickGroupMember, toggleGroupAdmin, addGroupMembers,
+    createInviteCode, revokeInviteCode, leaveGroup, deleteGroup,
     events, getEvents, createEvent, cancelEvent, rsvpEvent,
   } = useChatStore();
   const { friends, getFriends } = useFriendStore();
@@ -55,6 +56,10 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
   const [isAddingMembers, setIsAddingMembers] = useState(false);
   const [addError, setAddError] = useState("");
+  const [inviteCode, setInviteCode] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [leavingGroup, setLeavingGroup] = useState(false);
 
   const memberIdSet = new Set(members.map((m) => (m._id || m)?.toString()));
   const addCandidates = (friends || []).filter((f) => {
@@ -146,6 +151,53 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
     setLoadingMemberId(memberId);
     await toggleGroupAdmin(groupId, memberId);
     setLoadingMemberId(null);
+  };
+
+  const handleShowInvite = async () => {
+    setInviteLoading(true);
+    const res = await createInviteCode(groupId);
+    setInviteLoading(false);
+    if (res.success) {
+      setInviteCode(res.inviteCode);
+      setInviteCopied(false);
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!inviteCode) return;
+    const text = `Join "${displayName}" on Pulse — invite code: ${inviteCode}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `Join ${displayName}`, text });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch {}
+  };
+
+  const handleRevokeInvite = async () => {
+    setInviteLoading(true);
+    const res = await revokeInviteCode(groupId);
+    setInviteLoading(false);
+    if (res.success) setInviteCode(null);
+  };
+
+  const handleLeave = async () => {
+    if (!window.confirm(`Leave "${displayName}"? You will stop receiving its messages.`)) return;
+    setLeavingGroup(true);
+    const res = await leaveGroup(groupId);
+    setLeavingGroup(false);
+    if (res.success) onClose();
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!window.confirm(`Delete "${displayName}" for everyone? This removes the group, its messages and events permanently.`)) return;
+    setLeavingGroup(true);
+    const res = await deleteGroup(groupId);
+    setLeavingGroup(false);
+    if (res.success) onClose();
   };
 
   return (
@@ -463,6 +515,56 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
             </div>
           )}
 
+          {amIAdmin && (
+            <div className="rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-surface)] p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold text-theme-main">
+                  <Link2 size={12} className="text-accent-primary" /> Invite link
+                </span>
+                {inviteCode ? (
+                  <button
+                    type="button"
+                    onClick={handleRevokeInvite}
+                    disabled={inviteLoading}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-red-400 hover:text-red-300 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw size={11} /> Revoke
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleShowInvite}
+                    disabled={inviteLoading}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-accent-primary hover:opacity-80 disabled:opacity-50 transition-colors"
+                  >
+                    {inviteLoading ? <Loader size={11} className="animate-spin" /> : <Link2 size={11} />}
+                    Get link
+                  </button>
+                )}
+              </div>
+              {inviteCode && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 min-w-0 truncate glass-input rounded-xl px-3 py-2 text-xs font-mono text-theme-main border border-[var(--glass-border)]">
+                      {inviteCode}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyInvite}
+                      className="p-2 rounded-xl bg-accent-primary/15 text-accent-primary hover:bg-accent-primary/25 transition-colors shrink-0"
+                      title="Copy / share invite"
+                    >
+                      {inviteCopied ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-theme-muted">
+                    Anyone with this code can join via “Join group”. Revoking instantly disables it.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1">
             {members.length === 0 ? (
               <div className="py-6 text-center text-xs text-theme-muted">
@@ -566,7 +668,28 @@ const GroupInfoModal = ({ group, onClose, onSelectUser }) => {
         )}
 
         {/* Footer */}
-        <div className="p-3.5 border-t border-[var(--glass-border)] bg-[var(--glass-hover)] flex justify-end">
+        <div className="p-3.5 border-t border-[var(--glass-border)] bg-[var(--glass-hover)] flex items-center justify-between gap-2">
+          {isCreator ? (
+            <button
+              type="button"
+              onClick={handleDeleteGroup}
+              disabled={leavingGroup}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+            >
+              {leavingGroup ? <Loader size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              Delete group
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleLeave}
+              disabled={leavingGroup}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+            >
+              {leavingGroup ? <Loader size={13} className="animate-spin" /> : <LogOut size={13} />}
+              Leave group
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl text-xs font-medium text-theme-muted hover:text-theme-main bg-[var(--glass-surface)] hover:bg-[var(--glass-active)] border border-[var(--glass-border)] transition-colors"

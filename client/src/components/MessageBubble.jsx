@@ -1,4 +1,4 @@
-import { memo, Fragment, useRef, useState } from "react";
+import { memo, Fragment, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
@@ -81,6 +81,75 @@ const formatDateDivider = (dateStr) => {
     year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
   });
 };
+
+// Live/static shared location card. Live pins refresh over sockets and show
+// a LIVE badge + Stop control (sender side) until liveUntil passes.
+const LiveLocationCard = memo(({ message, isMine }) => {
+  const [, forceTick] = useState(0);
+  const [stopping, setStopping] = useState(false);
+
+  useEffect(() => {
+    if (!message.liveUntil) return;
+    const t = setInterval(() => forceTick((x) => x + 1), 30000);
+    return () => clearInterval(t);
+  }, [message.liveUntil, message._id]);
+
+  const live = message.liveUntil && new Date(message.liveUntil).getTime() > Date.now();
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${message.location.lat},${message.location.lng}`;
+
+  const handleStop = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (stopping) return;
+    setStopping(true);
+    await useChatStore.getState().stopLiveLocation(message._id);
+    setStopping(false);
+  };
+
+  return (
+    <div className="mb-1 overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-black/5 dark:bg-white/5 p-1 w-[200px] sm:w-[240px]">
+      <a
+        href={mapsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="block w-full h-32 rounded-xl bg-cover bg-center relative group overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #0f766e 0%, #115e59 45%, #134e4a 100%)" }}
+      >
+        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), transparent 55%), radial-gradient(circle at 75% 80%, rgba(255,255,255,0.2), transparent 50%)" }} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative">
+            {live && <span className="absolute -inset-2 rounded-full bg-red-500/30 animate-ping" />}
+            <div className={`w-10 h-10 rounded-full ${live ? "bg-red-500" : "bg-accent-primary"} flex items-center justify-center shadow-lg text-white relative`}>
+              <span className="material-symbols-outlined">location_on</span>
+            </div>
+          </div>
+        </div>
+        {live && (
+          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold tracking-wider flex items-center gap-1 shadow">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
+          </span>
+        )}
+      </a>
+      <div className="px-2 py-1.5 flex items-center justify-between gap-2 text-[10px] text-theme-muted">
+        <span className="truncate">
+          {live
+            ? `Live location • until ${new Date(message.liveUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            : "Location"}
+        </span>
+        {live && isMine && (
+          <button
+            type="button"
+            onClick={handleStop}
+            disabled={stopping}
+            className="shrink-0 px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 text-[10px] font-bold hover:bg-red-500/25 disabled:opacity-50 transition-colors"
+          >
+            Stop
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
 
 const MessageBubble = memo(({
   message: msgProp,
@@ -307,6 +376,33 @@ const MessageBubble = memo(({
   const isTransparentBubble = isJustEmoji || isStickerOnly;
   const isVisuallyDeleted = message.isDeleted && !isViewingWhisper;
 
+  // System notices (missed calls, etc.) render as centered pills, not bubbles
+  if (message.isSystemMessage) {
+    return (
+      <Fragment key={message._id}>
+        {showDateDivider && (
+          <div className="my-3.5 flex items-center justify-center select-none w-full">
+            <span className="px-3.5 py-1 rounded-xl bg-black/40 dark:bg-zinc-800/80 backdrop-blur-xl text-zinc-100 dark:text-zinc-200 text-[11px] font-semibold tracking-wide shadow-sm border border-white/10 dark:border-white/5">
+              {formatDateDivider(message.createdAt)}
+            </span>
+          </div>
+        )}
+        <div
+          id={`msg-${message._id}`}
+          className="my-1.5 flex items-center justify-center select-none w-full px-4 sm:px-6"
+        >
+          <span className="px-3 py-1 rounded-full bg-black/30 dark:bg-white/10 backdrop-blur-md text-zinc-200 dark:text-zinc-300 text-[11px] font-medium shadow-sm border border-white/10 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[13px] text-red-400">call_missed</span>
+            <span>{message.decryptedText || message.text || "Missed call"}</span>
+            <span className="opacity-60 font-mono text-[10px]">
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </span>
+        </div>
+      </Fragment>
+    );
+  }
+
   return (
     <Fragment key={message._id}>
       {/* Dynamic Date Divider */}
@@ -442,6 +538,11 @@ const MessageBubble = memo(({
                   {message.isForwarded && !message.isDeleted && (
                     <div className="flex items-center gap-1 text-[9px] italic mb-1 opacity-75">
                       <Forward size={10} /> Forwarded
+                    </div>
+                  )}
+                  {message.isBroadcast && !message.isDeleted && (
+                    <div className="flex items-center gap-1 text-[9px] italic mb-1 opacity-75">
+                      <span className="material-symbols-outlined text-[11px]">campaign</span> Broadcast
                     </div>
                   )}
                   {message.replyTo && !message.isDeleted && (
@@ -611,24 +712,7 @@ const MessageBubble = memo(({
                         </div>
                       )}
                       {message.location && (
-                        <div className="mb-1 overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-black/5 dark:bg-white/5 p-1 w-[200px] sm:w-[240px]">
-                          <a 
-                            href={`https://www.google.com/maps/search/?api=1&query=${message.location.lat},${message.location.lng}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="block w-full h-32 rounded-xl bg-cover bg-center relative group"
-                            style={{ backgroundImage: `url(https://maps.googleapis.com/maps/api/staticmap?center=${message.location.lat},${message.location.lng}&zoom=15&size=400x300&markers=color:red%7C${message.location.lat},${message.location.lng}&key=YOUR_API_KEY_HERE)` }}
-                          >
-                            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors rounded-xl flex items-center justify-center">
-                              <div className="w-10 h-10 rounded-full bg-accent-primary flex items-center justify-center shadow-lg text-white">
-                                <span className="material-symbols-outlined">location_on</span>
-                              </div>
-                            </div>
-                          </a>
-                          <div className="px-2 py-1.5 text-[10px] text-theme-muted truncate">
-                            Location Shared
-                          </div>
-                        </div>
+                        <LiveLocationCard message={message} isMine={isMine} />
                       )}
                       {message.poll && (
                         <div className={`mt-1 mb-2 p-3 rounded-2xl border ${isMine ? 'bg-black/10 border-white/10 text-white' : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-zinc-900 dark:text-zinc-100'}`}>

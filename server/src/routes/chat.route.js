@@ -20,6 +20,13 @@ import {
   kickRoomMember,
   addRoomMembers,
   toggleRoomAdmin,
+  getOrCreateInvite,
+  revokeInvite,
+  joinRoomByCode,
+  leaveRoom,
+  deleteRoom,
+  updateLiveLocation,
+  stopLiveLocation,
   getThreadReplies,
   getMessageReceipts,
   proxyDownloadFile,
@@ -46,6 +53,13 @@ import {
   setChatLabels,
   searchMessages,
 } from "../controllers/chat.controller.js";
+import {
+  getBroadcasts,
+  createBroadcast,
+  updateBroadcast,
+  deleteBroadcast,
+  sendBroadcast,
+} from "../controllers/broadcast.controller.js";
 
 const router = express.Router();
 
@@ -55,8 +69,14 @@ router.post("/rooms", protectRoute, createRoom);
 router.put("/rooms/:roomId", protectRoute, updateRoom);
 router.delete("/rooms/:roomId/members/:userId", protectRoute, kickRoomMember);
 router.post("/rooms/:roomId/members", protectRoute, addRoomMembers);
+router.post("/rooms/:roomId/invite", protectRoute, getOrCreateInvite);
+router.delete("/rooms/:roomId/invite", protectRoute, revokeInvite);
+router.post("/rooms/join/:code", protectRoute, joinRoomByCode);
+router.post("/rooms/:roomId/leave", protectRoute, leaveRoom);
+router.delete("/rooms/:roomId", protectRoute, deleteRoom);
 router.post("/rooms/:roomId/admins", protectRoute, toggleRoomAdmin);
-
+router.put("/message/:messageId/location", protectRoute, updateLiveLocation);
+router.post("/message/:messageId/stop-live", protectRoute, stopLiveLocation);
 router.get("/preview-link", protectRoute, previewLink);
 router.get("/download/file", protectRoute, proxyDownloadFile);
 router.get("/scheduled/:id", protectRoute, getScheduledMessages);
@@ -86,6 +106,12 @@ router.get("/labels", protectRoute, getLabels);
 router.post("/labels", protectRoute, createLabel);
 router.delete("/labels/:labelId", protectRoute, deleteLabel);
 router.put("/labels/chat/:chatId", protectRoute, setChatLabels);
+
+router.get("/broadcasts", protectRoute, getBroadcasts);
+router.post("/broadcasts", protectRoute, createBroadcast);
+router.put("/broadcasts/:id", protectRoute, updateBroadcast);
+router.delete("/broadcasts/:id", protectRoute, deleteBroadcast);
+router.post("/broadcasts/:id/send", protectRoute, sendBroadcast);
 
 router.get("/:id", protectRoute, getMessages);
 
