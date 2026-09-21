@@ -1788,6 +1788,70 @@ const Sidebar = ({
         </>,
         document.body
       )}
+      {/* 5. Mobile bottom navigation (WhatsApp-style primary tabs).
+          Rendered inside the sidebar column so it never overlaps content;
+          hidden on desktop where the activity rail serves this role. */}
+      <nav
+        aria-label="Primary"
+        className="md:hidden shrink-0 -mx-3 -mb-3 mt-2 border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 10px)" }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedChat(null);
+            setActiveFilter("all");
+          }}
+          className="flex flex-col items-center gap-0.5 py-1 text-zinc-900 dark:text-white active:scale-95 transition-transform"
+        >
+          <span className="relative flex items-center justify-center w-12 h-7 rounded-full bg-zinc-900/[0.07] dark:bg-white/10">
+            <span className="material-symbols-outlined text-[20px]">chat</span>
+            {totalUnreadCount > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold flex items-center justify-center shadow">
+                {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
+              </span>
+            )}
+          </span>
+          <span className="text-[10px] font-semibold">Chats</span>
+        </button>
+
+        {onOpenStatus && (
+          <button
+            type="button"
+            onClick={onOpenStatus}
+            className="flex flex-col items-center gap-0.5 py-1 text-zinc-500 dark:text-zinc-400 active:scale-95 transition-transform"
+          >
+            <span className="flex items-center justify-center w-12 h-7">
+              <span className="material-symbols-outlined text-[20px]">motion_photos_on</span>
+            </span>
+            <span className="text-[10px] font-medium">Updates</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleOpenGroupModal}
+          className="flex flex-col items-center gap-0.5 py-1 text-zinc-500 dark:text-zinc-400 active:scale-95 transition-transform"
+        >
+          <span className="flex items-center justify-center w-12 h-7">
+            <span className="material-symbols-outlined text-[20px]">group_add</span>
+          </span>
+          <span className="text-[10px] font-medium">Groups</span>
+        </button>
+
+        {onOpenCalls && (
+          <button
+            type="button"
+            onClick={onOpenCalls}
+            className="flex flex-col items-center gap-0.5 py-1 text-zinc-500 dark:text-zinc-400 active:scale-95 transition-transform"
+          >
+            <span className="flex items-center justify-center w-12 h-7">
+              <span className="material-symbols-outlined text-[20px]">call_log</span>
+            </span>
+            <span className="text-[10px] font-medium">Calls</span>
+          </button>
+        )}
+      </nav>
     </section>
   );
 };

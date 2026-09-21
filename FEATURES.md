@@ -95,6 +95,7 @@ This document serves as the central source of truth for all features currently i
 - **Desktop/In-App Notifications:** Real-time push notifications for new messages.
 - **Mute / Unmute Chats:** Ability to silence notifications for specific chats or groups.
 - **Mobile Swipe Gestures:** Swipeable navigation and interactions for a native app feel on mobile devices.
+- **Mobile Bottom Navigation:** WhatsApp-style Chats / Updates / Groups / Calls tab bar on phones with unread badges and safe-area support.
 - **Floating "Unread" & Smart Scroll Button:** A floating button that appears when scrolled up, displaying the unread message count and smoothly scrolling back to the latest messages.
 - **PWA Support:** Install the application as a Progressive Web App directly to the user's home screen.
 - **App Settings:** Configure general application preferences.

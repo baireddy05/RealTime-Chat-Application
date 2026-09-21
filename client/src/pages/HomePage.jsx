@@ -535,6 +535,7 @@ const HomePage = () => {
           onOpenJoinGroup={() => setIsJoinGroupOpen(true)}
           onOpenBroadcast={() => setIsBroadcastOpen(true)}
           onOpenCalls={() => setIsCallsOpen(true)}
+          onOpenCalls={() => setIsCallsOpen(true)}
           onOpenStatus={() => setIsStatusStoriesOpen(true)}
           onOpenStarred={() => setIsStarredOpen(true)}
           authUser={authUser}
