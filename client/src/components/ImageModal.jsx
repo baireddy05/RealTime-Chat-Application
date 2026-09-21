@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { downloadFile } from "../lib/download";
 
 const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
@@ -39,6 +40,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
 
   const { rooms, forwardMessage } = useChatStore();
   const { friends } = useFriendStore();
+  const { authUser } = useAuthStore();
   const users = friends;
 
   useEffect(() => {
@@ -117,6 +119,14 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
   const filteredUsers = (users || []).filter((u) =>
     (u.username || "").toLowerCase().includes(forwardSearch.toLowerCase())
   );
+
+  // Saved Messages (self-chat) pinned at the top, like the sidebar
+  const showSelfShare =
+    !forwardSearch.trim() ||
+    "saved messages".includes(forwardSearch.trim().toLowerCase()) ||
+    (authUser?.username || "").toLowerCase().includes(forwardSearch.trim().toLowerCase());
+  const isSelfShareSelected =
+    !!authUser?._id && selectedTarget?.type === "user" && selectedTarget?.id === authUser._id;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
@@ -298,6 +308,40 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {showSelfShare && authUser?._id && (
+                <div>
+                  <h4 className="text-[10px] font-semibold text-theme-muted uppercase tracking-wider px-2 mb-1.5">
+                    Yourself
+                  </h4>
+                  <button
+                    onClick={() =>
+                      setSelectedTarget({ id: authUser._id, type: "user", name: "Saved Messages" })
+                    }
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all text-xs ${
+                      isSelfShareSelected
+                        ? "bg-accent-primary/20 border border-accent-primary/40 text-accent-primary font-medium"
+                        : "hover:bg-[var(--glass-hover)] text-theme-main"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={
+                          authUser.profilePic ||
+                          `https://ui-avatars.com/api/?name=Saved&background=3b82f6&color=ffffff`
+                        }
+                        alt="Saved Messages"
+                        className="w-6 h-6 rounded-full bg-white/10 object-cover"
+                      />
+                      <span className="font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">bookmark</span>
+                        Saved Messages (You)
+                      </span>
+                    </div>
+                    {isSelfShareSelected && <Check size={14} className="text-accent-primary" />}
+                  </button>
+                </div>
+              )}
+
               {filteredRooms.length > 0 && (
                 <div>
                   <h4 className="text-[10px] font-semibold text-theme-muted uppercase tracking-wider px-2 mb-1.5">
@@ -361,7 +405,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
                 </div>
               )}
 
-              {filteredRooms.length === 0 && filteredUsers.length === 0 && (
+              {!showSelfShare && filteredRooms.length === 0 && filteredUsers.length === 0 && (
                 <div className="text-center text-theme-muted py-6 text-xs">
                   No matches found for "{forwardSearch}"
                 </div>

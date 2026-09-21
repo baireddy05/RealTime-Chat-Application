@@ -1,6 +1,8 @@
 import { generateToken } from "../lib/utils.js";
 import User from "../models/User.model.js";
+import Room from "../models/Room.model.js";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 import { io } from "../lib/socket.js";
 
 export const signup = async (req, res) => {
@@ -118,6 +120,61 @@ export const checkAuth = (req, res) => {
     });
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Public contact profile for the WhatsApp-style contact info view:
+// identity, presence text, friendship/block state and shared groups.
+export const getPublicProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    const user = await User.findById(id)
+      .select("username email profilePic bio status friends blockedUsers")
+      .lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Blocked contacts (either direction) get no profile details
+    const blockedPair = await User.findOne({
+      $or: [
+        { _id: myId, blockedUsers: id },
+        { _id: id, blockedUsers: myId },
+      ],
+    })
+      .select("_id")
+      .lean();
+    if (blockedPair) {
+      return res.status(403).json({ message: "Profile unavailable" });
+    }
+
+    const myRooms = await Room.find({ members: { $all: [myId, id] } })
+      .select("name avatar")
+      .lean();
+
+    const isSelf = myId.toString() === id.toString();
+    res.status(200).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      profilePic: user.profilePic,
+      bio: user.bio,
+      status: user.status,
+      isSelf,
+      isFriend: (user.friends || []).some((f) => f.toString() === myId.toString()),
+      sharedGroups: (myRooms || []).map((r) => ({
+        _id: r._id,
+        name: r.name,
+        avatar: r.avatar,
+      })),
+    });
+  } catch (error) {
+    console.log("Error in getPublicProfile controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

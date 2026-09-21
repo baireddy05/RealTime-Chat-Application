@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { login, logout, signup, checkAuth, updateProfile } from "../controllers/auth.controller.js";
+import { login, logout, signup, checkAuth, updateProfile, getPublicProfile } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -20,5 +20,6 @@ router.post("/logout", logout);
 
 router.get("/check", protectRoute, checkAuth);
 router.put("/update-profile", protectRoute, updateProfile);
+router.get("/user/:id", protectRoute, getPublicProfile);
 
 export default router;

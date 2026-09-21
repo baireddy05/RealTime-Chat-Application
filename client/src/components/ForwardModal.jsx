@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Search, Send, Forward, Check } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { isEncryptedMessage } from "../lib/crypto";
 
 const ForwardModal = ({ message, messages, onClose }) => {
@@ -12,6 +13,7 @@ const ForwardModal = ({ message, messages, onClose }) => {
 
   const { rooms, forwardMessage, forwardMessages } = useChatStore();
   const { friends } = useFriendStore();
+  const { authUser } = useAuthStore();
 
   // Single message (legacy prop) or a list (bulk select like WhatsApp)
   const messageList = Array.isArray(messages) && messages.length > 0
@@ -27,6 +29,22 @@ const ForwardModal = ({ message, messages, onClose }) => {
   const filteredFriends = friends.filter((f) =>
     f.username.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Saved Messages (self-chat) pinned at the top, like the sidebar
+  const selfEntry = authUser?._id
+    ? {
+        id: authUser._id,
+        type: "user",
+        name: "Saved Messages",
+        profilePic: authUser.profilePic,
+      }
+    : null;
+  const showSelf =
+    !!selfEntry &&
+    (!search.trim() ||
+      "saved messages".includes(search.trim().toLowerCase()) ||
+      (authUser.username || "").toLowerCase().includes(search.trim().toLowerCase()));
+  const isSelfSelected = !!selfEntry && selectedTarget?.id === selfEntry.id && selectedTarget?.type === "user";
 
   const handleForward = async () => {
     if (!selectedTarget || messageList.length === 0) return;
@@ -115,6 +133,48 @@ const ForwardModal = ({ message, messages, onClose }) => {
             </div>
           ) : (
             <>
+              {/* Saved Messages (self-chat) */}
+              {showSelf && (
+                <div>
+                  <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider block mb-1.5">
+                    Yourself
+                  </span>
+                  <div
+                    onClick={() => setSelectedTarget({ ...selfEntry })}
+                    className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
+                      isSelfSelected
+                        ? "bg-accent-primary/20 border border-accent-primary/40 text-theme-main font-medium"
+                        : "hover:bg-[var(--glass-hover)] text-theme-main"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={
+                          selfEntry.profilePic ||
+                          `https://ui-avatars.com/api/?name=Saved&background=3b82f6&color=ffffff`
+                        }
+                        alt="Saved Messages"
+                        className="w-7 h-7 rounded-full object-cover border border-[var(--glass-border)]"
+                      />
+                      <span className="text-xs font-medium truncate text-theme-main flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">bookmark</span>
+                        Saved Messages (You)
+                      </span>
+                    </div>
+
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                        isSelfSelected
+                          ? "border-accent-primary bg-accent-primary text-white"
+                          : "border-[var(--glass-border)]"
+                      }`}
+                    >
+                      {isSelfSelected && <Check size={10} strokeWidth={3} />}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Groups section */}
               {filteredRooms.length > 0 && (
                 <div>
@@ -219,7 +279,7 @@ const ForwardModal = ({ message, messages, onClose }) => {
                 </div>
               )}
 
-              {filteredRooms.length === 0 && filteredFriends.length === 0 && (
+              {!showSelf && filteredRooms.length === 0 && filteredFriends.length === 0 && (
                 <div className="py-12 text-center text-xs text-theme-muted">
                   No contacts or groups found matching "{search}"
                 </div>

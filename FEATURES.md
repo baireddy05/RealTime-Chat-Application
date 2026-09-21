@@ -78,6 +78,7 @@ This document serves as the central source of truth for all features currently i
 
 ## 6. Organization, UI, & Customization
 - **User Profiles:** Customizable profiles with avatars and bio.
+- **Contact Info View:** Tap any person's name or avatar in a DM header for a WhatsApp-style details sheet — presence, status, about, email, groups in common (tap to jump), instant voice/video call buttons, and block/report actions.
 - **Ghost Mode / Invisible Status:** Ability to hide online status from the network while remaining logged in and active.
 - **Custom Statuses:** Ability to set custom text statuses.
 - **Friends System:** Send, accept, or reject friend requests to build a contacts list.

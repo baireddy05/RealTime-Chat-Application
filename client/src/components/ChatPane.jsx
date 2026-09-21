@@ -11,6 +11,7 @@ import ForwardModal from "./ForwardModal";
 import StarredDrawer from "./StarredDrawer";
 import TasksDrawer from "./TasksDrawer";
 import GroupInfoModal from "./GroupInfoModal";
+import ContactInfoModal from "./ContactInfoModal";
 // Reaction picker is code-split: emoji-picker-react is ~200KB and only needed
 // when the user opens "More reactions".
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
@@ -189,6 +190,7 @@ const ChatPane = ({ onBack }) => {
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [infoModalMessage, setInfoModalMessage] = useState(null);
+  const [contactInfoUserId, setContactInfoUserId] = useState(null);
   const [remindMessage, setRemindMessage] = useState(null);
   const [taskPrefill, setTaskPrefill] = useState(null);
   const [showChatOptions, setShowChatOptions] = useState(false);
@@ -234,6 +236,7 @@ const ChatPane = ({ onBack }) => {
   useBackHandler(!!forwardingMessage, () => setForwardingMessage(null), "chat-modal-forward");
   useBackHandler(!!bulkForwardMessages, () => setBulkForwardMessages(null), "chat-modal-bulk-forward");
   useBackHandler(isGroupInfoOpen, () => setIsGroupInfoOpen(false), "chat-modal-group-info");
+  useBackHandler(!!contactInfoUserId, () => setContactInfoUserId(null), "chat-modal-contact-info");
   useBackHandler(isScheduledOpen, () => setIsScheduledOpen(false), "chat-modal-scheduled");
   useBackHandler(isThreadOpen, () => closeThread(), "chat-drawer-thread");
   useBackHandler(!!infoModalMessage, () => setInfoModalMessage(null), "chat-modal-message-info");
@@ -483,6 +486,7 @@ const ChatPane = ({ onBack }) => {
       setSearchQuery("");
       setSearchMatchIndex(0);
       setShowChatOptions(false);
+      setContactInfoUserId(null);
       setOpenMenuMessageId(null);
       setMenuAnchor(null);
       setActivePickerId(null);
@@ -1027,9 +1031,13 @@ const ChatPane = ({ onBack }) => {
           </div>
         ) : (
           <>
-            <div 
-              onClick={() => selectedChat.type === "room" && setIsGroupInfoOpen(true)}
-              className={`flex items-center gap-2.5 sm:gap-3 min-w-0 ${selectedChat.type === "room" ? "cursor-pointer group select-none" : ""}`}
+            <div
+              onClick={() => {
+                if (selectedChat.type === "room") setIsGroupInfoOpen(true);
+                else setContactInfoUserId(selectedChat.id);
+              }}
+              title={selectedChat.type === "room" ? "Group info" : "Contact info"}
+              className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group select-none"
             >
               {onBack && (
                 <button onClick={(e) => { e.stopPropagation(); onBack(); }}
@@ -1643,6 +1651,9 @@ const ChatPane = ({ onBack }) => {
       {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
       {isGroupInfoOpen && selectedChat.type === "room" && (
         <GroupInfoModal group={selectedChat} onClose={() => setIsGroupInfoOpen(false)} onSelectUser={(userChat) => setSelectedChat(userChat)} />
+      )}
+      {contactInfoUserId && selectedChat.type === "user" && (
+        <ContactInfoModal userId={contactInfoUserId} onClose={() => setContactInfoUserId(null)} />
       )}
       {isScheduledOpen && <ScheduledMessagesModal isOpen={isScheduledOpen} onClose={() => setIsScheduledOpen(false)} />}
       {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
