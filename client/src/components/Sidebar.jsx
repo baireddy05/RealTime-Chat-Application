@@ -5,7 +5,9 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import CreateGroupModal from "./CreateGroupModal";
 import LabelsManagerModal from "./LabelsManagerModal";
+import ChannelsModal from "./ChannelsModal";
 import MessageTicks from "./MessageTicks";
+import { soundManager, CHAT_TONES } from "../lib/sound";
 import { isChatLocked, setChatLocked, hasChatPin } from "../lib/chatLock";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
@@ -107,6 +109,8 @@ const Sidebar = ({
   const rooms = useChatStore((s) => s.rooms);
   const users = useChatStore((s) => s.users);
   const getRooms = useChatStore((s) => s.getRooms);
+  const channels = useChatStore((s) => s.channels);
+  const getChannels = useChatStore((s) => s.getChannels);
   const selectedChat = useChatStore((s) => s.selectedChat);
   const setSelectedChat = useChatStore((s) => s.setSelectedChat);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
@@ -121,6 +125,7 @@ const Sidebar = ({
   const setChatLabels = useChatStore((s) => s.setChatLabels);
   const toggleArchiveChat = useChatStore((s) => s.toggleArchiveChat);
   const togglePinChat = useChatStore((s) => s.togglePinChat);
+  const setChatTone = useChatStore((s) => s.setChatTone);
   const markMessagesAsRead = useChatStore((s) => s.markMessagesAsRead);
   const setIsGroupInfoOpen = useChatStore((s) => s.setIsGroupInfoOpen);
   const globalSearchResults = useChatStore((s) => s.globalSearchResults);
@@ -148,6 +153,28 @@ const Sidebar = ({
   const reportUser = useFriendStore((s) => s.reportUser);
   const blockedUsers = useFriendStore((s) => s.blockedUsers);
   const getBlockedUsers = useFriendStore((s) => s.getBlockedUsers);
+  const networkStatuses = useChatStore((s) => s.networkStatuses);
+
+  // Users with stories I haven't opened yet (for presence rings)
+  const [storyTick, setStoryTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setStoryTick((t) => t + 1);
+    window.addEventListener("pulse:story-viewed", bump);
+    return () => window.removeEventListener("pulse:story-viewed", bump);
+  }, []);
+  const unviewedStoryUsers = useMemo(() => {
+    let viewed = [];
+    try {
+      viewed = JSON.parse(localStorage.getItem("viewedStories") || "[]");
+    } catch {}
+    const viewedSet = new Set(viewed);
+    const ids = new Set();
+    (networkStatuses || []).forEach((p) => {
+      if ((p.stories || []).some((s) => !viewedSet.has(s.id))) ids.add(p.id?.toString());
+    });
+    return ids;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [networkStatuses, storyTick]);
   const unlockedChats = useChatStore((s) => s.unlockedChats);
   const relockChat = useChatStore((s) => s.relockChat);
 
@@ -168,6 +195,7 @@ const Sidebar = ({
   const cardLongPressFiredRef = useRef(false);
   const [openMenuChat, setOpenMenuChat] = useState(null); // { id, chatType: 'room'|'user', name, room? }
   const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
+  const [showChannelsModal, setShowChannelsModal] = useState(false);
 
   // Close options dropdown on outside click / tap, anywhere on screen.
   // Document-level capture listener (not an overlay div): overlay divs get
@@ -201,6 +229,7 @@ const Sidebar = ({
   }, []);
 
   useBackHandler(!!openMenuChat, closeChatMenu, "sidebar-chat-menu");
+  useBackHandler(showChannelsModal, () => setShowChannelsModal(false), "sidebar-channels");
 
   const getChatMenuStyle = () => {
     const menuWidth = 248;
@@ -315,6 +344,15 @@ const Sidebar = ({
     closeChatMenu();
   };
 
+  const handleMenuTone = async (toneId) => {
+    if (!openMenuChat) return;
+    try {
+      soundManager.initContext();
+    } catch {}
+    soundManager.playReceiveSound(toneId);
+    await setChatTone(openMenuChat.id, toneId);
+  };
+
   // ---- Filter-tabs overflow: arrows + mouse-wheel support for laptop
   // The tabs strip hides its scrollbar, so without affordances laptop users
   // can never reach overflowed tabs (e.g. Archived). Track both ends and
@@ -370,6 +408,7 @@ const Sidebar = ({
 
   useEffect(() => {
     getRooms();
+    getChannels();
     getFriends();
     getFriendRequests();
     getLabels();
@@ -378,7 +417,7 @@ const Sidebar = ({
     return () => {
       unsubscribeFromFriendEvents();
     };
-  }, [getRooms, getFriends, getFriendRequests, getLabels, getBlockedUsers, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
+  }, [getRooms, getChannels, getFriends, getFriendRequests, getLabels, getBlockedUsers, subscribeToFriendEvents, unsubscribeFromFriendEvents, socket]);
 
   // Keyboard shortcut: Command+K or Ctrl+K focuses the search input
   useEffect(() => {
@@ -412,6 +451,26 @@ const Sidebar = ({
 
   const selectChat = (chat) => {
     setSelectedChat(chat);
+    onChatSelect?.();
+  };
+
+  const openChannelChat = (room) => {
+    const rid = (room._id || room.id)?.toString();
+    if (!rid) return;
+    selectChat({
+      id: rid,
+      _id: room._id || rid,
+      name: room.name,
+      type: "room",
+      description: room.description,
+      members: room.members,
+      createdBy: room.createdBy,
+      admins: room.admins,
+      avatar: room.avatar,
+      profilePic: room.profilePic,
+      isChannel: true,
+    });
+    setShowChannelsModal(false);
     onChatSelect?.();
   };
 
@@ -520,9 +579,22 @@ const Sidebar = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredFriends, lastMessages, authUser?.pinnedChats]);
 
+  const filteredChannels = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const list = channels || [];
+    if (!q) return list;
+    return list.filter((r) => (r.name || "").toLowerCase().includes(q));
+  }, [channels, searchQuery]);
+
+  const sortedChannels = useMemo(() => {
+    return pinFirst([...filteredChannels].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredChannels, lastMessages, authUser?.pinnedChats]);
+
   // Unified all chats stream (Groups + Direct combined, sorted by recent messages)
   const allChats = useMemo(() => {
     const roomItems = filteredRooms.map((r) => ({ ...r, chatType: "room" }));
+    const channelItems = filteredChannels.map((r) => ({ ...r, chatType: "room" }));
     const friendItems = filteredFriends.map((f) => ({ ...f, chatType: "user" }));
 
     // Add Saved Messages (Self Chat)
@@ -534,9 +606,9 @@ const Sidebar = ({
       });
     }
 
-    return pinFirst([...roomItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
+    return pinFirst([...roomItems, ...channelItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredRooms, filteredFriends, lastMessages, authUser, authUser?.pinnedChats]);
+  }, [filteredRooms, filteredChannels, filteredFriends, lastMessages, authUser, authUser?.pinnedChats]);
 
   // Compute Unread lists
   const unreadChats = useMemo(() => {
@@ -568,7 +640,8 @@ const Sidebar = ({
   const totalUnreadCount = unreadChats.length;
   const roomsCount = filteredRooms.length;
   const directCount = filteredFriends.length;
-  const allCount = roomsCount + directCount;
+  const channelsCount = filteredChannels.length;
+  const allCount = roomsCount + directCount + channelsCount;
 
   const topPendingRequest = incomingRequests && incomingRequests.length > 0 ? incomingRequests[0] : null;
 
@@ -614,6 +687,7 @@ const Sidebar = ({
             admins: room.admins,
             avatar: room.avatar,
             profilePic: room.profilePic,
+            isChannel: !!room.isChannel,
           })
         }
         onClickCapture={guardCardClick}
@@ -647,7 +721,7 @@ const Sidebar = ({
               : "bg-black/5 border border-black/10 text-zinc-600 group-hover:text-zinc-900 group-hover:scale-105 dark:bg-white/5 dark:border-white/10 dark:text-zinc-400 dark:group-hover:text-white"
           }`}
         >
-          <span className="material-symbols-outlined text-xl">groups</span>
+          <span className="material-symbols-outlined text-xl">{room.isChannel ? "campaign" : "groups"}</span>
         </div>
 
         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
@@ -693,7 +767,7 @@ const Sidebar = ({
                   <span className="truncate">{previewText}</span>
                 </>
               ) : (
-                <span className="truncate opacity-75">{room.description || "Group chat"}</span>
+                <span className="truncate opacity-75">{room.description || (room.isChannel ? "Channel" : "Group chat")}</span>
               )}
             </div>
           </div>
@@ -786,7 +860,9 @@ const Sidebar = ({
         </button>
         <div className="relative shrink-0 w-10 h-10">
           <img
-            className="w-full h-full rounded-full object-cover bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
+            className={`w-full h-full rounded-full object-cover bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 ${
+              unviewedStoryUsers.has(friendId) ? "ring-2 ring-emerald-500 ring-offset-1 ring-offset-transparent" : ""
+            }`}
             alt={isSelfChat ? "Saved Messages" : friend.username}
             src={
               isSelfChat
@@ -1162,6 +1238,19 @@ const Sidebar = ({
           >
             <span>Groups</span>
             <span className="text-[10px] opacity-75 font-mono">({roomsCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter("channels")}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
+              activeFilter === "channels"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
+                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
+            }`}
+            type="button"
+          >
+            <span>Channels</span>
+            <span className="text-[10px] opacity-75 font-mono">({channelsCount})</span>
           </button>
 
           <button
@@ -1691,10 +1780,34 @@ const Sidebar = ({
             sortedFriends.map(renderFriendCard)
           )
         )}
+
+        {/* CHANNELS TAB: Followed broadcast channels + discovery */}
+        {activeFilter === "channels" && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowChannelsModal(true)}
+              className="w-full flex items-center justify-center gap-1.5 p-2.5 mb-1 rounded-2xl text-xs font-bold text-accent-primary bg-accent-primary/10 border border-accent-primary/25 hover:bg-accent-primary/20 transition-all"
+            >
+              <span className="material-symbols-outlined text-[16px]">travel_explore</span>
+              Discover channels
+            </button>
+            {sortedChannels.length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 text-xs">
+                No followed channels yet.
+              </div>
+            ) : (
+              sortedChannels.map(renderRoomCard)
+            )}
+          </>
+        )}
       </div>
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
       {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
+      {showChannelsModal && (
+        <ChannelsModal onClose={() => setShowChannelsModal(false)} onOpenChannel={openChannelChat} />
+      )}
 
       {/* Per-chat context menu (⋮ / right-click / long-press) */}
       {openMenuChat && typeof document !== "undefined" && createPortal(
@@ -1715,6 +1828,33 @@ const Sidebar = ({
               <p className="text-[10px] text-theme-muted">
                 {openMenuChat.chatType === "room" ? "Group" : "Direct chat"}
               </p>
+            </div>
+
+              <div className="px-2 pb-1">
+              <p className="px-2 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-theme-muted">
+                Notification tone
+              </p>
+              <div className="flex flex-wrap gap-1.5 px-2 pb-1">
+                {CHAT_TONES.map((t) => {
+                  const active =
+                    (authUser?.chatPreferences?.[openMenuChat.id]?.tone || "chime") === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => handleMenuTone(t.id)}
+                      title={`Preview & set ${t.name}`}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                        active
+                          ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
+                          : "border-[var(--glass-border)] text-theme-muted hover:text-theme-main"
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="px-2 pb-1">

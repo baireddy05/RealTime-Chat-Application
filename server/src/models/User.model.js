@@ -52,6 +52,7 @@ const userSchema = new mongoose.Schema(
         theme: String,
         archived: Boolean,
         disappearing: Number,
+        tone: String,
       }, { _id: false }),
       default: {},
     },

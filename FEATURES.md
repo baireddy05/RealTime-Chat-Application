@@ -98,6 +98,8 @@ This document serves as the central source of truth for all features currently i
 - **Mathematical Audio Synthesis:** Chat sound effects (message sent, chime received, ringing) are mathematically synthesized on-the-fly using the Web Audio API without needing external `.mp3` assets.
 - **Native Mobile Navigation Interception:** The browser's History API is hijacked to map Android physical back buttons and iOS swipe gestures to intuitively close modals and drawers in order, giving a true native-app feel.
 - **Desktop/In-App Notifications:** Real-time push notifications for new messages.
+- **Background Push Notifications:** Web Push (VAPID) for browsers/PWA plus FCM for the native Android app — message and incoming-call alerts arrive with the app closed; tap deep-links into the chat. Dead endpoints auto-prune.
+- **Android APK via Capacitor:** Native shell (`com.pulse.messenger`) with generated icons/splash, FCM push-notifications plugin, and Bearer-token auth that works inside WebViews. See `ANDROID_APK.md`.
 - **Mute / Unmute Chats:** Ability to silence notifications for specific chats or groups.
 - **Mobile Swipe Gestures:** Swipeable navigation and interactions for a native app feel on mobile devices.
 - **Mobile Bottom Navigation:** WhatsApp-style Chats / Updates / Groups / Calls tab bar on phones with unread badges and safe-area support.

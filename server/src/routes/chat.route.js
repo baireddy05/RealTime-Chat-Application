@@ -26,6 +26,14 @@ import {
   joinRoomByCode,
   leaveRoom,
   deleteRoom,
+  toggleJoinApproval,
+  getJoinRequests,
+  resolveJoinRequest,
+  createChannel,
+  getChannels,
+  getPublicChannels,
+  followChannel,
+  unfollowChannel,
   updateLiveLocation,
   stopLiveLocation,
   getThreadReplies,
@@ -69,6 +77,11 @@ const router = express.Router();
 
 router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/rooms", protectRoute, getRooms);
+router.get("/channels", protectRoute, getChannels);
+router.get("/channels/directory", protectRoute, getPublicChannels);
+router.post("/channels", protectRoute, createChannel);
+router.post("/channels/:roomId/follow", protectRoute, followChannel);
+router.post("/channels/:roomId/unfollow", protectRoute, unfollowChannel);
 router.post("/rooms", protectRoute, createRoom);
 router.put("/rooms/:roomId", protectRoute, updateRoom);
 router.delete("/rooms/:roomId/members/:userId", protectRoute, kickRoomMember);
@@ -78,6 +91,9 @@ router.delete("/rooms/:roomId/invite", protectRoute, revokeInvite);
 router.post("/rooms/join/:code", protectRoute, joinRoomByCode);
 router.post("/rooms/:roomId/leave", protectRoute, leaveRoom);
 router.delete("/rooms/:roomId", protectRoute, deleteRoom);
+router.put("/rooms/:roomId/approval", protectRoute, toggleJoinApproval);
+router.get("/rooms/:roomId/requests", protectRoute, getJoinRequests);
+router.post("/rooms/:roomId/requests/:userId", protectRoute, resolveJoinRequest);
 router.post("/rooms/:roomId/admins", protectRoute, toggleRoomAdmin);
 router.put("/message/:messageId/location", protectRoute, updateLiveLocation);
 router.post("/message/:messageId/stop-live", protectRoute, stopLiveLocation);

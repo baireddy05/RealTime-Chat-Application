@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   Sparkles,
@@ -13,6 +13,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { isNativeApp, ensurePushTransports } from "../lib/push";
 import { hasChatPin, setChatPin, clearChatPin, verifyChatPin, getLockedChats } from "../lib/chatLock";
 
 // Chat Lock PIN management (device-local, Privacy tab)
@@ -155,14 +156,56 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [notificationsAllowed, setNotificationsAllowed] = useState(
     typeof Notification !== "undefined" && Notification.permission === "granted"
   );
+  const [pushStatus, setPushStatus] = useState(null); // null | "on" | "off" | "unsupported" | "unconfigured"
+
+  const refreshPushStatus = async () => {
+    try {
+      const { axiosInstance } = await import("../lib/axios");
+      const { data } = await axiosInstance.get("/api/push/config");
+      if (isNativeApp()) {
+        setPushStatus("on");
+        return;
+      }
+      if (!data?.vapidPublicKey) {
+        setPushStatus("unconfigured");
+        return;
+      }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setPushStatus("unsupported");
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setPushStatus(sub ? "on" : "off");
+    } catch {
+      setPushStatus("off");
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) refreshPushStatus();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleRequestNotification = async () => {
-    if (typeof Notification !== "undefined") {
+  const handleRequestNotification = async () => {    if (typeof Notification !== "undefined") {
       const perm = await Notification.requestPermission();
       setNotificationsAllowed(perm === "granted");
+      if (perm === "granted") {
+        await ensurePushTransports().catch(() => {});
+        refreshPushStatus();
+      }
     }
+  };
+
+  const handleEnablePush = async () => {
+    if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+      const perm = await Notification.requestPermission();
+      setNotificationsAllowed(perm === "granted");
+      if (perm !== "granted") return;
+    }
+    await ensurePushTransports().catch(() => {});
+    refreshPushStatus();
   };
 
   return (
@@ -418,6 +461,42 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </button>
                 ) : (
                   <span className="text-xs font-semibold text-emerald-500">Allowed</span>
+                )}
+              </div>
+
+              {/* Background Push (phone-off / app-closed notifications) */}
+              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                    <Bell size={15} />
+                    <span>Background Push Notifications</span>
+                  </div>
+                  <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
+                    {isNativeApp()
+                      ? "Get message and call alerts on this device even when the app is closed."
+                      : "Get message and call alerts even when the browser tab is closed."}
+                  </p>
+                  {pushStatus === "unconfigured" && (
+                    <p className="text-[11px] text-amber-500">
+                      Server push is not configured yet (missing VAPID keys).
+                    </p>
+                  )}
+                  {pushStatus === "unsupported" && (
+                    <p className="text-[11px] text-amber-500">
+                      This browser does not support background push.
+                    </p>
+                  )}
+                </div>
+
+                {pushStatus === "on" ? (
+                  <span className="text-xs font-semibold text-emerald-500 shrink-0">On</span>
+                ) : (
+                  <button
+                    onClick={handleEnablePush}
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm shrink-0"
+                  >
+                    Enable
+                  </button>
                 )}
               </div>
 

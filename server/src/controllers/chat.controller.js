@@ -7,6 +7,7 @@ import Task from "../models/Task.model.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+import { notifyNewMessage } from "../lib/notify.js";
 
 // Shared helper: room membership + admin checks for collaboration endpoints
 const getRoomRole = async (roomId, userId) => {
@@ -178,15 +179,14 @@ export const getUsersForSidebar = async (req, res) => {
   }
 };
 
-export const getRooms = async (req, res) => {
+const fetchRoomsWithMeta = async (loggedInUserId, extraFilter = {}) => {
   try {
-    const loggedInUserId = req.user._id;
-    const rooms = await Room.find({ members: loggedInUserId })
-      .populate("members", "username profilePic status")
-      .populate("createdBy", "username profilePic")
-      .populate("admins", "username profilePic")
-      .lean();
-    if (rooms.length === 0) return res.status(200).json([]);
+    const rooms = await Room.find({ members: loggedInUserId, ...extraFilter })
+    .populate("members", "username profilePic status")
+    .populate("createdBy", "username profilePic")
+    .populate("admins", "username profilePic")
+    .lean();
+  if (rooms.length === 0) return [];
 
     const roomIds = rooms.map((r) => r._id);
 
@@ -250,15 +250,47 @@ export const getRooms = async (req, res) => {
     const lastByRoom = new Map(lastMsgs.map((m) => [m.roomId.toString(), m]));
     const unreadByRoom = new Map(unreadAgg.map((u) => [u._id.toString(), u.count]));
 
-    const roomsWithMeta = rooms.map((roomObj) => ({
-      ...roomObj,
-      lastMessage: lastByRoom.get(roomObj._id.toString()) || null,
-      unreadCount: unreadByRoom.get(roomObj._id.toString()) || 0,
-    }));
+    const uid = loggedInUserId.toString();
+    const roomsWithMeta = rooms.map((roomObj) => {
+      const meta = {
+        ...roomObj,
+        lastMessage: lastByRoom.get(roomObj._id.toString()) || null,
+        unreadCount: unreadByRoom.get(roomObj._id.toString()) || 0,
+      };
+      // Invite codes and pending requests are admin eyes only
+      const creatorId = (roomObj.createdBy?._id || roomObj.createdBy)?.toString();
+      const isAdmin =
+        creatorId === uid ||
+        (roomObj.admins || []).some((a) => (a?._id || a)?.toString() === uid);
+      if (!isAdmin) {
+        delete meta.inviteCode;
+        delete meta.joinRequests;
+      }
+      return meta;
+    });
 
-    res.status(200).json(roomsWithMeta);
+    return roomsWithMeta;
+  } catch (error) {
+    console.error("Error in fetchRoomsWithMeta: ", error.message);
+    throw error;
+  }
+};
+
+export const getRooms = async (req, res) => {
+  try {
+    // Groups only — followed channels come from getChannels
+    res.status(200).json(await fetchRoomsWithMeta(req.user._id, { isChannel: { $ne: true } }));
   } catch (error) {
     console.error("Error in getRooms: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getChannels = async (req, res) => {
+  try {
+    res.status(200).json(await fetchRoomsWithMeta(req.user._id, { isChannel: true }));
+  } catch (error) {
+    console.error("Error in getChannels: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -502,7 +534,7 @@ export const sendMessage = async (req, res) => {
 
     let newMessage;
     if (roomId) {
-      const room = await Room.findById(roomId).select("members admins createdBy").lean();
+      const room = await Room.findById(roomId).select("name members admins createdBy isChannel").lean();
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
       }
@@ -511,6 +543,17 @@ export const sendMessage = async (req, res) => {
       );
       if (!isMember) {
         return res.status(403).json({ error: "You are not a member of this room" });
+      }
+
+      // Broadcast channels are admin-post-only (followers read)
+      if (room.isChannel) {
+        const uid = senderId.toString();
+        const isAdmin =
+          room.createdBy?.toString() === uid ||
+          (room.admins || []).some((a) => a.toString() === uid);
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only channel admins can post" });
+        }
       }
 
       // Announcements are admin-only broadcasts
@@ -559,6 +602,12 @@ export const sendMessage = async (req, res) => {
       // Broadcast to room immediately only if NOT scheduled
       if (!isScheduled) {
         io.to(roomId.toString()).emit("newMessage", newMessage);
+        // Background push for members with no live socket (fire-and-forget)
+        notifyNewMessage({
+          message: newMessage,
+          senderName: newMessage.senderId?.username,
+          room: { _id: roomId, name: room?.name, members: room?.members || [] },
+        });
       }
     } else {
       if (isAnnouncement) {
@@ -597,6 +646,12 @@ export const sendMessage = async (req, res) => {
       if (!isScheduled && receiverId && senderId) {
         io.to(receiverId.toString()).emit("newMessage", newMessage);
         io.to(senderId.toString()).emit("newMessage", newMessage);
+        // Background push when the recipient has no live socket (fire-and-forget)
+        notifyNewMessage({
+          message: newMessage,
+          senderName: newMessage.senderId?.username,
+          receiverId,
+        });
       }
     }
 
@@ -654,8 +709,20 @@ export const deleteMessage = async (req, res) => {
       return res.status(404).json({ error: "Message not found" });
     }
 
-    if (message.senderId.toString() !== userId.toString()) {
-      return res.status(403).json({ error: "You can only delete your own messages" });
+    const isSender = message.senderId.toString() === userId.toString();
+    if (!isSender) {
+      // Group/channel admins may remove anyone's message (WhatsApp-style)
+      if (!message.roomId) {
+        return res.status(403).json({ error: "You can only delete your own messages" });
+      }
+      const room = await Room.findById(message.roomId).select("admins createdBy").lean();
+      if (!room) return res.status(404).json({ error: "Room not found" });
+      const isAdmin =
+        room.createdBy?.toString() === userId.toString() ||
+        (room.admins || []).some((a) => a.toString() === userId.toString());
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Only admins can delete this message" });
+      }
     }
 
     message.isDeleted = true;
@@ -1360,6 +1427,7 @@ export const kickRoomMember = async (req, res) => {
 
     room.members = room.members.filter((m) => m.toString() !== userId.toString());
     room.admins = (room.admins || []).filter((a) => a.toString() !== userId.toString());
+    room.followers = (room.followers || []).filter((f) => f.toString() !== userId.toString());
 
     await room.save();
     await room.populate("members", "username profilePic status");
@@ -1543,6 +1611,23 @@ export const joinRoomByCode = async (req, res) => {
     if (!room) return res.status(404).json({ error: "Invalid or expired invite link" });
 
     const alreadyMember = (room.members || []).some((m) => m.toString() === myId.toString());
+    if (alreadyMember) {
+      await room.populate("members", "username profilePic status");
+      await room.populate("createdBy", "username profilePic");
+      await room.populate("admins", "username profilePic");
+      return res.status(200).json(room.toObject());
+    }
+
+    // Groups with approval enabled queue a request instead of instant join
+    if (room.requireApproval && !room.isChannel) {
+      await Room.updateOne({ _id: room._id }, { $addToSet: { joinRequests: myId } });
+      const admins = [...(room.admins || []).map((a) => a.toString())];
+      if (room.createdBy) admins.push(room.createdBy.toString());
+      [...new Set(admins)].forEach((adminId) => {
+        io.to(adminId).emit("joinRequestReceived", { roomId: room._id, userId: myId });
+      });
+      return res.status(202).json({ success: true, requested: true, roomId: room._id, name: room.name });
+    }
     if (!alreadyMember) {
       room.members.push(myId);
       await room.save();
@@ -1551,11 +1636,16 @@ export const joinRoomByCode = async (req, res) => {
     await room.populate("createdBy", "username profilePic");
     await room.populate("admins", "username profilePic");
 
+    // Strip the invite code from what the joiner receives (admins manage it)
+    const roomObj = room.toObject();
+    delete roomObj.inviteCode;
+    delete roomObj.joinRequests;
+
     io.in(myId.toString()).socketsJoin(room._id.toString());
     io.to(myId.toString()).emit("newRoom", room);
     emitRoomUpdated(room);
 
-    res.status(200).json(room);
+    res.status(200).json(roomObj);
   } catch (error) {
     console.error("Error in joinRoomByCode:", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -1596,11 +1686,11 @@ export const leaveRoom = async (req, res) => {
       adminsSet.delete(myId.toString());
       adminsSet.add(newCreator);
       update = {
-        $pull: { members: myId },
+        $pull: { members: myId, followers: myId },
         $set: { createdBy: newCreator, admins: [...adminsSet] },
       };
     } else {
-      update = { $pull: { members: myId, admins: myId } };
+      update = { $pull: { members: myId, admins: myId, followers: myId } };
     }
     const updated = await Room.findByIdAndUpdate(roomId, update, { new: true });
     await updated.populate("members", "username profilePic status");
@@ -1639,6 +1729,225 @@ export const deleteRoom = async (req, res) => {
     res.status(200).json({ success: true, roomId });
   } catch (error) {
     console.error("Error in deleteRoom:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Broadcast channels (public, admin-post-only rooms) ----
+
+export const createChannel = async (req, res) => {
+  try {
+    const { name, description, avatar } = req.body;
+    const userId = req.user._id;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Channel name is required" });
+    }
+    const formattedName = name.startsWith("#") ? name.trim() : `#${name.trim()}`;
+    const existingRoom = await Room.findOne({ name: formattedName });
+    if (existingRoom) {
+      return res.status(400).json({ error: "A group or channel with this name already exists" });
+    }
+
+    const newRoom = new Room({
+      name: formattedName,
+      description: description || "",
+      avatar: avatar || "",
+      members: [userId],
+      followers: [userId],
+      createdBy: userId,
+      admins: [userId],
+      isChannel: true,
+    });
+
+    await newRoom.save();
+
+    const populated = await Room.findById(newRoom._id)
+      .populate("members", "username profilePic status")
+      .populate("createdBy", "username profilePic")
+      .populate("admins", "username profilePic")
+      .lean();
+
+    io.in(userId.toString()).socketsJoin(populated._id.toString());
+    io.to(userId.toString()).emit("newRoom", populated);
+
+    res.status(201).json(populated);
+  } catch (error) {
+    console.error("Error in createChannel controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Public directory: every channel with follower counts + my follow state
+export const getPublicChannels = async (req, res) => {
+  try {
+    const myId = req.user._id.toString();
+    const q = (req.query.q || "").trim().slice(0, 50);
+    const filter = { isChannel: true };
+    if (q) {
+      filter.name = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    }
+    const channels = await Room.find(filter)
+      .select("name description avatar createdBy createdAt members followers")
+      .populate("createdBy", "username")
+      .sort({ updatedAt: -1 })
+      .limit(100)
+      .lean();
+    res.status(200).json(
+      channels.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        description: c.description,
+        avatar: c.avatar,
+        createdBy: c.createdBy,
+        createdAt: c.createdAt,
+        followersCount: (c.followers || []).length,
+        followed: (c.followers || []).some((f) => (f?._id || f)?.toString() === myId),
+      }))
+    );
+  } catch (error) {
+    console.error("Error in getPublicChannels:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const followChannel = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+
+    const room = await Room.findById(roomId);
+    if (!room || !room.isChannel) {
+      return res.status(404).json({ error: "Channel not found" });
+    }
+    await Room.updateOne(
+      { _id: roomId },
+      { $addToSet: { members: myId, followers: myId } }
+    );
+    const updated = await Room.findById(roomId)
+      .populate("members", "username profilePic status")
+      .populate("createdBy", "username profilePic")
+      .populate("admins", "username profilePic")
+      .lean();
+
+    io.in(myId.toString()).socketsJoin(roomId.toString());
+    io.to(myId.toString()).emit("newRoom", updated);
+    emitRoomUpdated(updated);
+
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error("Error in followChannel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const unfollowChannel = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+
+    const room = await Room.findById(roomId).select("isChannel admins createdBy").lean();
+    if (!room || !room.isChannel) {
+      return res.status(404).json({ error: "Channel not found" });
+    }
+    // Admins/creator keep their seat; use Leave for ownership changes
+    await Room.updateOne(
+      { _id: roomId },
+      { $pull: { members: myId, followers: myId } }
+    );
+    io.to(myId.toString()).emit("roomDeleted", { roomId });
+
+    res.status(200).json({ success: true, roomId });
+  } catch (error) {
+    console.error("Error in unfollowChannel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Toggle "approve new members" (admin-only). When on, invite-code joins
+// become requests instead of instant joins.
+export const toggleJoinApproval = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const { room, isAdmin } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isAdmin) return res.status(403).json({ error: "Only group admins can change this setting" });
+    if (room.isChannel) {
+      return res.status(400).json({ error: "Channels are public — approval does not apply" });
+    }
+
+    const updated = await Room.findByIdAndUpdate(
+      roomId,
+      { $set: { requireApproval: !room.requireApproval } },
+      { new: true }
+    )
+      .populate("members", "username profilePic status")
+      .populate("createdBy", "username profilePic")
+      .populate("admins", "username profilePic")
+      .lean();
+    emitRoomUpdated(updated);
+
+    res.status(200).json({ success: true, requireApproval: updated.requireApproval, room: updated });
+  } catch (error) {
+    console.error("Error in toggleJoinApproval:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Admin-only: pending join requests with requester profiles
+export const getJoinRequests = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const myId = req.user._id;
+    const { room, isAdmin } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isAdmin) return res.status(403).json({ error: "Only group admins can view requests" });
+
+    const full = await Room.findById(roomId)
+      .select("joinRequests")
+      .populate("joinRequests", "username profilePic status")
+      .lean();
+    res.status(200).json(full?.joinRequests || []);
+  } catch (error) {
+    console.error("Error in getJoinRequests:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Admin-only: approve (joins + live sync) or deny a join request
+export const resolveJoinRequest = async (req, res) => {
+  try {
+    const { roomId, userId } = req.params;
+    const { action } = req.body || {};
+    const myId = req.user._id;
+    const { room, isAdmin } = await getRoomRole(roomId, myId);
+    if (!room) return res.status(404).json({ error: "Room not found" });
+    if (!isAdmin) return res.status(403).json({ error: "Only group admins can resolve requests" });
+    if (!["approve", "deny"].includes(action)) {
+      return res.status(400).json({ error: "action must be approve or deny" });
+    }
+
+    if (action === "approve") {
+      await Room.updateOne(
+        { _id: roomId },
+        { $addToSet: { members: userId }, $pull: { joinRequests: userId } }
+      );
+      const updated = await Room.findById(roomId)
+        .populate("members", "username profilePic status")
+        .populate("createdBy", "username profilePic")
+        .populate("admins", "username profilePic")
+        .lean();
+      io.in(userId.toString()).socketsJoin(roomId.toString());
+      io.to(userId.toString()).emit("newRoom", updated);
+      emitRoomUpdated(updated);
+      return res.status(200).json({ success: true, approved: true, room: updated });
+    }
+
+    await Room.updateOne({ _id: roomId }, { $pull: { joinRequests: userId } });
+    res.status(200).json({ success: true, approved: false });
+  } catch (error) {
+    console.error("Error in resolveJoinRequest:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -1878,12 +2187,12 @@ export const toggleArchiveChat = async (req, res) => {
   }
 };
 
-// Merge per-chat preferences (currently: default disappearing timer).
-// Pass { disappearing: null } to clear the chat default.
+// Merge per-chat preferences (currently: default disappearing timer,
+// notification tone). Pass null values to clear individual settings.
 export const setChatPreferences = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { disappearing } = req.body || {};
+    const { disappearing, tone } = req.body || {};
     const userId = req.user._id;
 
     if (!chatId || typeof chatId !== "string" || chatId.length > 64) {
@@ -1891,6 +2200,9 @@ export const setChatPreferences = async (req, res) => {
     }
     if (disappearing !== null && disappearing !== undefined && ![5, 60, 3600, 86400].includes(Number(disappearing))) {
       return res.status(400).json({ error: "Invalid disappearing timer value" });
+    }
+    if (tone !== null && tone !== undefined && !["chime", "bell", "pop", "marimba"].includes(tone)) {
+      return res.status(400).json({ error: "Invalid notification tone" });
     }
 
     const user = await User.findById(userId);
@@ -1901,10 +2213,10 @@ export const setChatPreferences = async (req, res) => {
     }
 
     const currentPrefs = user.chatPreferences.get(chatId) || {};
-    user.chatPreferences.set(chatId, {
-      ...currentPrefs,
-      disappearing: disappearing === undefined ? currentPrefs.disappearing ?? null : disappearing,
-    });
+    const nextPrefs = { ...currentPrefs };
+    if (disappearing !== undefined) nextPrefs.disappearing = disappearing;
+    if (tone !== undefined) nextPrefs.tone = tone;
+    user.chatPreferences.set(chatId, nextPrefs);
 
     await user.save();
 

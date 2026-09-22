@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "gen:vapid": "node scripts/gen-vapid.js",
+    "test:push": "node test_push.mjs",
+    "test:calls": "node test_calls_offline.mjs"
   },
   "keywords": [],
   "author": "",
@@ -21,13 +24,17 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
+    "firebase-admin": "^14.4.0",
     "jsonwebtoken": "^9.0.3",
     "link-preview-js": "^5.0.0",
     "mongoose": "^9.9.4",
     "multer": "^2.4.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "mongodb-memory-server": "^11.2.0"
+    "mongodb-memory-server": "^11.2.0",
+    "selfsigned": "^5.5.0",
+    "socket.io-client": "^4.8.3"
   }
 }

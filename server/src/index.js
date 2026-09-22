@@ -11,6 +11,7 @@ import uploadRoutes from "./routes/upload.route.js";
 import friendRoutes from "./routes/friend.route.js";
 import statusRoutes from "./routes/status.route.js";
 import callRoutes from "./routes/call.route.js";
+import pushRoutes from "./routes/push.route.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -49,6 +50,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/statuses", statusRoutes);
 app.use("/api/calls", callRoutes);
+app.use("/api/push", pushRoutes);
 
 import { startMessageScheduler } from "./lib/messageScheduler.js";
 

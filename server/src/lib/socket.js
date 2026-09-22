@@ -8,6 +8,7 @@ import Message from "../models/Message.model.js";
 import CallLog from "../models/CallLog.model.js";
 import User from "../models/User.model.js";
 import { isOriginAllowed } from "./corsConfig.js";
+import { notifyIncomingCall } from "./notify.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -139,6 +140,27 @@ io.on("connection", (socket) => {
       .catch((err) => {
         console.error("Error auto-joining user rooms on socket connect:", err.message);
       });
+
+    // Re-ring pending incoming calls when this is the user's ONLY socket
+    // (e.g. they tapped an incoming-call push notification and the app just
+    // launched). Skipped when other devices are already ringing/connected.
+    try {
+      if (userSocketMap[userId] && userSocketMap[userId].size === 1) {
+        for (const pending of pendingCalls.values()) {
+          if (pending?.receiverId === userId && pending?.signalData) {
+            socket.emit("incomingCall", {
+              signal: pending.signalData,
+              from: pending.callerId,
+              callType: pending.callType || "video",
+              callerInfo: pending.callerInfo || { _id: pending.callerId },
+              deviceInfo: pending.deviceInfo || null,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error re-emitting pending calls:", err.message);
+    }
   }
 
   // Room logic
@@ -211,10 +233,11 @@ io.on("connection", (socket) => {
       }
     } catch {}
     const targetSockets = userSocketMap[userToCall.toString()];
-    if (targetSockets && targetSockets.size > 0) {
-      const type = callType || "video";
-      // Log BEFORE emitting: the callee can answer instantly, and the
-      // answer/end handlers need the pending entry to already exist.
+    const type = callType || "video";
+    const callerName = callerInfo?.name || callerInfo?.username || "Someone";
+    // Log BEFORE emitting: the callee can answer instantly, and the
+    // answer/end handlers need the pending entry to already exist.
+    const startPendingCall = async () => {
       try {
         const key = pendingCallKey(userId, userToCall);
         await settlePendingCall(key, {});
@@ -225,15 +248,31 @@ io.on("connection", (socket) => {
           status: "missed",
         });
         const timer = setTimeout(async () => {
-          // Still unanswered after 45s: keep "missed" and post in-chat notice
+          // Still unanswered after 45s: keep "missed", post in-chat notice,
+          // and stop the caller ringing (WhatsApp-style unanswered timeout).
           if (!pendingCalls.has(key)) return;
           pendingCalls.delete(key);
           await postMissedCallMessage(userId, userToCall.toString(), type);
+          io.to(userId.toString()).emit("callEnded");
         }, CALL_ANSWER_TIMEOUT_MS);
-        pendingCalls.set(key, { logId: log._id, timer });
+        // Signal payload is retained so a callee opening the app from a push
+        // notification can still be rung live while the call is pending.
+        pendingCalls.set(key, {
+          logId: log._id,
+          timer,
+          callerId: userId,
+          receiverId: userToCall.toString(),
+          signalData,
+          callType: type,
+          callerInfo: callerInfo || { _id: userId },
+          deviceInfo: deviceInfo || callerInfo?.deviceInfo || null,
+        });
       } catch (err) {
         console.error("Error logging call attempt:", err.message);
       }
+    };
+    if (targetSockets && targetSockets.size > 0) {
+      await startPendingCall();
       io.to(userToCall.toString()).emit("incomingCall", {
         signal: signalData,
         from: userId,
@@ -242,7 +281,16 @@ io.on("connection", (socket) => {
         deviceInfo: deviceInfo || callerInfo?.deviceInfo || null,
       });
     } else {
-      socket.emit("callUnavailable", { message: "User is currently offline" });
+      // Callee is offline: keep ringing server-side (logged as missed if
+      // unanswered) and wake them with a push notification instead of
+      // immediately telling the caller they are offline.
+      await startPendingCall();
+      notifyIncomingCall({
+        callerId: userId,
+        callerName,
+        receiverId: userToCall.toString(),
+        callType: type,
+      });
     }
   });
 

@@ -254,6 +254,12 @@ const MessageBubble = memo(({
   const isMine = (message.senderId?._id || message.senderId) === authUser._id || message.senderId?._id === authUser._id;
   const sender = message.senderId || {};
 
+  // @mention highlight names for group chats (render-time only, E2EE-safe)
+  const mentionNames =
+    selectedChat?.type === "room"
+      ? (selectedChat.members || []).map((m) => m?.username).filter(Boolean)
+      : [];
+
   // View-once media: recipients see a placeholder until they tap to open.
   // Opening fetches the one-time URL and immediately hides the payload locally
   // (the server tombstones it and notifies everyone else over sockets).
@@ -855,7 +861,7 @@ const MessageBubble = memo(({
                         <div className="flex flex-col max-w-full min-w-0">
                           <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1 max-w-full min-w-0">
                             <div className={`${isJustEmoji ? "text-[42px] leading-tight emoji-text drop-shadow-md" : "text-[15.5px] leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap font-normal min-w-0 max-w-full"}`}>
-                              <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} />
+                              <FormattedMessageText text={message.decryptedText || message.text} isMine={isMine} searchQuery={searchQuery} highlightNames={mentionNames} />
                             </div>
                             <div className="inline-flex items-center gap-1 text-[10px] select-none ml-auto self-end flex-shrink-0 -mb-0.5 pb-0.5 opacity-70">
                               {message.isEdited && <span className="italic text-[9px] opacity-75">(edited)</span>}

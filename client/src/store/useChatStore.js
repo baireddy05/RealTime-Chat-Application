@@ -41,6 +41,7 @@ export const useChatStore = create((set, get) => ({
   messages: [],
   users: [],
   rooms: [],
+  joinRequestPing: null, // { roomId, at } — nudges GroupInfoModal to refetch requests
   selectedChat: null, // { id: string, type: 'user' | 'room', name: string, members?: [], description?: string }
   typingUsers: {}, // { [chatId]: [username1, username2] }
   isUsersLoading: false,
@@ -138,6 +139,27 @@ export const useChatStore = create((set, get) => ({
       return { success: true, preferences: prefs };
     } catch (error) {
       console.error("Error setting chat disappearing default:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  setChatTone: async (chatId, tone) => {
+    try {
+      const res = await axiosInstance.put(`/chat/preferences/${chatId}`, { tone });
+      const prefs = res.data?.preferences;
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        const prev = authState.authUser.chatPreferences || {};
+        useAuthStore.setState({
+          authUser: {
+            ...authState.authUser,
+            chatPreferences: { ...prev, [chatId]: { ...(prev[chatId] || {}), tone: prefs?.tone ?? tone } },
+          },
+        });
+      }
+      return { success: true, preferences: prefs };
+    } catch (error) {
+      console.error("Error setting chat tone:", error);
       return { success: false, error: error.response?.data?.error || error.message };
     }
   },
@@ -267,6 +289,9 @@ export const useChatStore = create((set, get) => ({
           time: new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           text: s.text,
           bg: s.bg,
+          mediaUrl: s.mediaUrl || null,
+          mediaType: s.mediaType || null,
+          viewersCount: (s.viewers || []).length,
         });
       });
       
@@ -276,6 +301,9 @@ export const useChatStore = create((set, get) => ({
           time: new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           text: s.text,
           bg: s.bg,
+          mediaUrl: s.mediaUrl || null,
+          mediaType: s.mediaType || null,
+          viewersCount: (s.viewers || []).length,
         })),
         networkStatuses: Object.values(networkMap) 
       });
@@ -284,9 +312,14 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  uploadStatus: async (text, bg) => {
+  uploadStatus: async (text, bg, media) => {
     try {
-      const res = await axiosInstance.post("/statuses", { text, bg });
+      const res = await axiosInstance.post("/statuses", {
+        text,
+        bg,
+        mediaUrl: media?.mediaUrl || undefined,
+        mediaType: media?.mediaType || undefined,
+      });
       const authUser = useAuthStore.getState().authUser;
       
       const newStory = {
@@ -294,6 +327,9 @@ export const useChatStore = create((set, get) => ({
         time: new Date(res.data.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         text: res.data.text,
         bg: res.data.bg,
+        mediaUrl: res.data.mediaUrl || null,
+        mediaType: res.data.mediaType || null,
+        viewersCount: 0,
       };
       
       set((state) => ({
@@ -303,6 +339,26 @@ export const useChatStore = create((set, get) => ({
     } catch (error) {
       console.error("Error uploading status:", error);
       throw error;
+    }
+  },
+
+  viewStatus: async (statusId) => {
+    try {
+      const res = await axiosInstance.post(`/statuses/${statusId}/view`);
+      return { success: true, viewersCount: res.data?.viewersCount ?? 0 };
+    } catch (error) {
+      console.error("Error recording status view:", error);
+      return { success: false };
+    }
+  },
+
+  getStatusViewers: async (statusId) => {
+    try {
+      const res = await axiosInstance.get(`/statuses/${statusId}/viewers`);
+      return res.data || [];
+    } catch (error) {
+      console.error("Error fetching status viewers:", error);
+      return [];
     }
   },
 
@@ -976,6 +1032,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageEdited");
     socket.off("roomUpdated");
     socket.off("newRoom");
+    socket.off("joinRequestReceived");
     socket.off("messageReaction");
     socket.off("userTyping");
     socket.off("userStoppedTyping");
@@ -1092,14 +1149,23 @@ export const useChatStore = create((set, get) => ({
               senderId: processedMessage.senderId?._id || processedMessage.senderId
             });
           }
-          soundManager.playReceiveSound();
+          soundManager.playReceiveSound(
+            useAuthStore.getState().authUser?.chatPreferences?.[selectedChat.id]?.tone
+          );
           const senderName = processedMessage.senderId?.username || "Pulse User";
           const title = selectedChat.type === "room"
             ? `${selectedChat.name} • ${senderName}`
             : senderName;
           const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎 ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const myUsername = useAuthStore.getState().authUser?.username || "";
+          const mentioned =
+            selectedChat.type === "room" &&
+            !!myUsername &&
+            new RegExp(`@${myUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(
+              typeof body === "string" ? body : ""
+            );
           notificationManager.sendNotification({
-            title,
+            title: mentioned ? `${senderName} mentioned you in ${selectedChat.name}` : title,
             body,
             icon: processedMessage.senderId?.profilePic || "/favicon.png",
           });
@@ -1124,12 +1190,21 @@ export const useChatStore = create((set, get) => ({
               [chatId]: (state.unreadCounts[chatId] || 0) + 1,
             },
           }));
-          soundManager.playReceiveSound();
+          soundManager.playReceiveSound(
+            useAuthStore.getState().authUser?.chatPreferences?.[chatId]?.tone
+          );
           const senderName = processedMessage.senderId?.username || "Pulse User";
           const title = newMessage.roomId ? "New Group Message" : senderName;
           const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎 ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const myUsername = useAuthStore.getState().authUser?.username || "";
+          const mentioned =
+            !!newMessage.roomId &&
+            !!myUsername &&
+            new RegExp(`@${myUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(
+              typeof body === "string" ? body : ""
+            );
           notificationManager.sendNotification({
-            title,
+            title: mentioned ? `${senderName} mentioned you` : title,
             body,
             icon: processedMessage.senderId?.profilePic || "/favicon.png",
           });
@@ -1204,6 +1279,9 @@ export const useChatStore = create((set, get) => ({
           time: new Date(status.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           text: status.text,
           bg: status.bg,
+          mediaUrl: status.mediaUrl || null,
+          mediaType: status.mediaType || null,
+          viewersCount: (status.viewers || []).length,
         };
 
         if (personIndex >= 0) {
@@ -1285,31 +1363,32 @@ export const useChatStore = create((set, get) => ({
     // Real-time room updates (name, avatar, description, members, admins)
     socket.on("roomUpdated", (updatedRoom) => {
       if (!updatedRoom?._id) return;
-      const { rooms, selectedChat } = get();
+      const { rooms, channels, selectedChat } = get();
       const myId = useAuthStore.getState().authUser?._id?.toString();
       const stillMember = (updatedRoom.members || []).some(
         (m) => (m?._id || m)?.toString() === myId
       );
-      const known = rooms.some((r) => (r._id || r.id)?.toString() === updatedRoom._id?.toString());
-      const isOpen = selectedChat?.id?.toString() === updatedRoom._id?.toString();
+      const idStr = updatedRoom._id?.toString();
+      const list = updatedRoom.isChannel ? channels : rooms;
+      const setList = (next) =>
+        updatedRoom.isChannel ? set({ channels: next }) : set({ rooms: next });
+      const known = list.some((r) => (r._id || r.id)?.toString() === idStr);
+      const isOpen = selectedChat?.id?.toString() === idStr;
 
       if (!stillMember) {
         // I was removed (or this was never mine): drop it, and close it if open.
         if (!known && !isOpen) return;
-        set({
-          rooms: rooms.filter((r) => (r._id || r.id)?.toString() !== updatedRoom._id?.toString()),
-          selectedChat: isOpen ? null : selectedChat,
-        });
+        setList(list.filter((r) => (r._id || r.id)?.toString() !== idStr));
+        if (isOpen) set({ selectedChat: null });
         return;
       }
 
       if (!known) {
-        // I was just added: insert the group live and join its socket room.
-        set({ rooms: [updatedRoom, ...rooms] });
+        // I was just added: insert live and join its socket room.
+        setList([updatedRoom, ...list]);
         socket.emit("joinRoom", updatedRoom._id);
       } else {
-        const updatedRooms = rooms.map((r) => (r._id === updatedRoom._id ? { ...r, ...updatedRoom } : r));
-        set({ rooms: updatedRooms });
+        setList(list.map((r) => ((r._id || r.id)?.toString() === idStr ? { ...r, ...updatedRoom } : r)));
       }
       if (isOpen) {
         set({
@@ -1335,11 +1414,24 @@ export const useChatStore = create((set, get) => ({
         (m) => (m._id || m)?.toString() === myId
       );
       if (!isMember) return;
-      const { rooms } = get();
-      if (!rooms.some((r) => r._id === newRoom._id)) {
-        set({ rooms: [newRoom, ...rooms] });
+      if (newRoom.isChannel) {
+        const { channels } = get();
+        if (!channels.some((r) => (r._id || r.id)?.toString() === newRoom._id?.toString())) {
+          set({ channels: [newRoom, ...channels] });
+        }
+      } else {
+        const { rooms } = get();
+        if (!rooms.some((r) => r._id === newRoom._id)) {
+          set({ rooms: [newRoom, ...rooms] });
+        }
       }
       socket.emit("joinRoom", newRoom._id);
+    });
+
+    // Admins learn about incoming join requests live
+    socket.on("joinRequestReceived", ({ roomId }) => {
+      if (!roomId) return;
+      set({ joinRequestPing: { roomId: roomId.toString(), at: Date.now() } });
     });
 
     // Real-time reactions
@@ -1521,10 +1613,11 @@ export const useChatStore = create((set, get) => ({
     // Real-time group deletion (leave-last-out, creator delete, kick cleanup)
     socket.on("roomDeleted", ({ roomId }) => {
       if (!roomId) return;
-      const { rooms, selectedChat } = get();
+      const { rooms, channels, selectedChat } = get();
       const idStr = roomId.toString();
       set({
         rooms: (rooms || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
+        channels: (channels || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
         selectedChat: selectedChat?.id?.toString() === idStr ? null : selectedChat,
       });
     });
@@ -1608,6 +1701,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageReaction");
     socket.off("messageEdited");
     socket.off("newRoom");
+    socket.off("joinRequestReceived");
     socket.off("userTyping");
     socket.off("userStoppedTyping");
     socket.off("messagesRead");
@@ -1718,9 +1812,9 @@ export const useChatStore = create((set, get) => ({
 
     let target = null;
     if (roomId) {
-      const room = (state.rooms || []).find(
-        (r) => (r._id || r.id)?.toString() === roomId
-      );
+      const room =
+        (state.rooms || []).find((r) => (r._id || r.id)?.toString() === roomId) ||
+        (state.channels || []).find((r) => (r._id || r.id)?.toString() === roomId);
       target = {
         id: roomId,
         _id: roomId,
@@ -1732,6 +1826,7 @@ export const useChatStore = create((set, get) => ({
         admins: room?.admins,
         avatar: room?.avatar,
         profilePic: room?.profilePic,
+        isChannel: !!room?.isChannel,
       };
     } else if (msg && typeof msg === "object") {
       const senderId = (msg.senderId?._id || msg.senderId)?.toString();
@@ -1985,6 +2080,131 @@ export const useChatStore = create((set, get) => ({
       return { success: true };
     } catch (error) {
       console.error("Error deleting group:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Broadcast channels ----
+  channels: [],
+  publicChannels: [],
+  isChannelsLoading: false,
+
+  getChannels: async () => {
+    try {
+      const res = await axiosInstance.get("/chat/channels");
+      set({ channels: res.data || [] });
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+      return [];
+    }
+  },
+
+  getPublicChannels: async (q = "") => {
+    set({ isChannelsLoading: true });
+    try {
+      const res = await axiosInstance.get(`/chat/channels/directory${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      set({ publicChannels: res.data || [] });
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching channel directory:", error);
+      return [];
+    } finally {
+      set({ isChannelsLoading: false });
+    }
+  },
+
+  createChannel: async ({ name, description }) => {
+    try {
+      const res = await axiosInstance.post("/chat/channels", { name, description });
+      const room = res.data;
+      const { channels } = get();
+      if (room?._id && !channels.some((r) => (r._id || r.id)?.toString() === room._id.toString())) {
+        set({ channels: [room, ...channels] });
+      }
+      return { success: true, room };
+    } catch (error) {
+      console.error("Error creating channel:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  followChannel: async (roomId) => {
+    try {
+      const res = await axiosInstance.post(`/chat/channels/${roomId}/follow`);
+      const room = res.data;
+      const { channels } = get();
+      if (room?._id && !channels.some((r) => (r._id || r.id)?.toString() === room._id.toString())) {
+        set({ channels: [room, ...channels] });
+      }
+      return { success: true, room };
+    } catch (error) {
+      console.error("Error following channel:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  unfollowChannel: async (roomId) => {
+    try {
+      await axiosInstance.post(`/chat/channels/${roomId}/unfollow`);
+      const { channels, selectedChat } = get();
+      const idStr = roomId?.toString();
+      set({
+        channels: (channels || []).filter((r) => (r._id || r.id)?.toString() !== idStr),
+        selectedChat: selectedChat?.id?.toString() === idStr ? null : selectedChat,
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error unfollowing channel:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ---- Membership approval ----
+  toggleJoinApproval: async (roomId) => {
+    try {
+      const res = await axiosInstance.put(`/chat/rooms/${roomId}/approval`);
+      const updatedRoom = res.data?.room;
+      if (updatedRoom) {
+        const { rooms, selectedChat } = get();
+        const idStr = roomId?.toString();
+        set({
+          rooms: (rooms || []).map((r) => ((r._id || r.id)?.toString() === idStr ? updatedRoom : r)),
+          selectedChat: selectedChat?.id?.toString() === idStr ? { ...selectedChat, ...updatedRoom } : selectedChat,
+        });
+      }
+      return { success: true, requireApproval: res.data?.requireApproval, room: updatedRoom };
+    } catch (error) {
+      console.error("Error toggling join approval:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getJoinRequests: async (roomId) => {
+    try {
+      const res = await axiosInstance.get(`/chat/rooms/${roomId}/requests`);
+      return res.data || [];
+    } catch (error) {
+      console.error("Error fetching join requests:", error);
+      return [];
+    }
+  },
+
+  resolveJoinRequest: async (roomId, userId, action) => {
+    try {
+      const res = await axiosInstance.post(`/chat/rooms/${roomId}/requests/${userId}`, { action });
+      if (res.data?.approved && res.data?.room) {
+        const updatedRoom = res.data.room;
+        const { rooms, selectedChat } = get();
+        const idStr = roomId?.toString();
+        set({
+          rooms: (rooms || []).map((r) => ((r._id || r.id)?.toString() === idStr ? updatedRoom : r)),
+          selectedChat: selectedChat?.id?.toString() === idStr ? { ...selectedChat, ...updatedRoom } : selectedChat,
+        });
+      }
+      return { success: true, ...res.data };
+    } catch (error) {
+      console.error("Error resolving join request:", error);
       return { success: false, error: error.response?.data?.error || error.message };
     }
   },

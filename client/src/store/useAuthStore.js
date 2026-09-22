@@ -39,6 +39,8 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
+      // Best-effort: (re)register push transports if permission was granted
+      import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
     } catch {
       localStorage.removeItem("pulse-token");
       set({ authUser: null });
@@ -56,6 +58,7 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
+      import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
       return true;
     } catch (error) {
       console.error(error.response?.data?.message || "Signup failed");
@@ -74,6 +77,7 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
+      import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
       return true;
     } catch (error) {
       console.error(error.response?.data?.message || "Login failed");
@@ -92,6 +96,8 @@ export const useAuthStore = create((set, get) => ({
       localStorage.removeItem("pulse-token");
       set({ authUser: null });
       get().disconnectSocket();
+      // Stop push delivery to this device (best effort, never blocks logout)
+      import("../lib/push").then(({ disablePushTransports }) => disablePushTransports().catch(() => {}));
       // Clear chat + call state so next login starts fresh
       try {
         const { useChatStore } = await import("./useChatStore");

@@ -1,0 +1,16 @@
+{
+  "appId": "com.pulse.messenger",
+  "appName": "Pulse Messenger",
+  "webDir": "dist",
+  "backgroundColor": "#050b14",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#050b14",
+      "showSpinner": false
+    }
+  }
+}

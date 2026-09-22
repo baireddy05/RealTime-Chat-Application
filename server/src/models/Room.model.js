@@ -30,6 +30,26 @@ const roomSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    isChannel: {
+      type: Boolean,
+      default: false,
+    },
+    requireApproval: {
+      type: Boolean,
+      default: false,
+    },
+    joinRequests: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    followers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     inviteCode: {
       type: String,
       default: undefined,
@@ -39,6 +59,7 @@ const roomSchema = new mongoose.Schema(
 );
 
 roomSchema.index({ members: 1 });
+roomSchema.index({ isChannel: 1, followers: 1 });
 roomSchema.index({ inviteCode: 1 }, { unique: true, sparse: true });
 
 const Room = mongoose.model("Room", roomSchema);

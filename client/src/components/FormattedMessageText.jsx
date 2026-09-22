@@ -72,9 +72,40 @@ export const SpoilerSpan = memo(({ children }) => {
   );
 });
 
-// Helper to recursively parse text nodes for Spoiler, Emoji, URLs, and Search Highlights
-const processText = (textStr, searchQuery) => {
+// Helper to recursively parse text nodes for Spoiler, Emoji, URLs, Mentions
+// and Search Highlights. highlightNames lists group member usernames whose
+// @mentions render as accent pills (E2EE-safe: pure render-time matching).
+const processText = (textStr, searchQuery, highlightNames = []) => {
   if (typeof textStr !== "string") return textStr;
+
+  const mentionSet = new Set((highlightNames || []).filter(Boolean).map((n) => String(n).toLowerCase()));
+  const renderWithMentions = (raw, keyPrefix) => {
+    if (mentionSet.size === 0) {
+      return (
+        <span key={keyPrefix} dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(raw) }} />
+      );
+    }
+    const parts = String(raw).split(/(@[\w.-]+)/g);
+    return parts.map((chunk, k) => {
+      const name = chunk.startsWith("@") ? chunk.slice(1).toLowerCase() : "";
+      if (name && mentionSet.has(name)) {
+        return (
+          <span
+            key={`${keyPrefix}-m-${k}`}
+            className="font-bold text-accent-primary bg-accent-primary/15 border border-accent-primary/30 px-1 rounded-md whitespace-nowrap"
+          >
+            {chunk}
+          </span>
+        );
+      }
+      return (
+        <span
+          key={`${keyPrefix}-t-${k}`}
+          dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(chunk) }}
+        />
+      );
+    });
+  };
   
   // Format Spoilers: ||spoiler||
   const spoilerRegex = /(\|\|[\s\S]+?\|\|)/g;
@@ -85,7 +116,7 @@ const processText = (textStr, searchQuery) => {
       const spoilerInner = part.slice(2, -2);
       return (
         <SpoilerSpan key={`spoiler-${sIdx}`}>
-          {processText(spoilerInner, searchQuery)}
+          {processText(spoilerInner, searchQuery, highlightNames)}
         </SpoilerSpan>
       );
     }
@@ -125,20 +156,12 @@ const processText = (textStr, searchQuery) => {
               dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
             />
           ) : (
-            <span
-              key={k}
-              dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(m) }}
-            />
+            <span key={k}>{renderWithMentions(m, `s-${sIdx}-${j}-${k}`)}</span>
           )
         );
       }
 
-      return (
-        <span
-          key={j}
-          dangerouslySetInnerHTML={{ __html: parseEmojiToHtml(urlSub) }}
-        />
-      );
+      return renderWithMentions(urlSub, `p-${sIdx}-${j}`);
     });
   });
 };
@@ -149,7 +172,7 @@ const processText = (textStr, searchQuery) => {
 // ReactMarkdown entirely and render through the lightweight processText.
 const MARKDOWN_HINT = /(\*\*|__|~~|`|#{1,6}\s|^\s*[-+*]\s|^\s*\d+\.\s|\[.+?\]\(.+?\)|^>\s|\|.+\||!\[)/m;
 
-export const FormattedMessageText = memo(({ text, isMine, searchQuery }) => {
+export const FormattedMessageText = memo(({ text, isMine, searchQuery, highlightNames }) => {
   const plain = useMemo(() => {
     if (typeof text !== "string") return false;
     if (text.includes("||")) return false; // spoiler syntax needs parser path
@@ -162,7 +185,7 @@ export const FormattedMessageText = memo(({ text, isMine, searchQuery }) => {
     return (
       <div className={`space-y-1 select-text break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full prose prose-sm ${isMine ? 'prose-invert' : ''} dark:prose-invert prose-p:my-1 prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0`}>
         <div className="whitespace-pre-wrap leading-relaxed my-1">
-          {processText(text, searchQuery)}
+          {processText(text, searchQuery, highlightNames)}
         </div>
       </div>
     );
@@ -204,11 +227,11 @@ export const FormattedMessageText = memo(({ text, isMine, searchQuery }) => {
                 {Array.isArray(children)
                   ? children.map((child, i) => (
                       <span key={i}>
-                        {typeof child === 'string' ? processText(child, searchQuery) : child}
+                        {typeof child === 'string' ? processText(child, searchQuery, highlightNames) : child}
                       </span>
                     ))
                   : typeof children === 'string'
-                  ? processText(children, searchQuery)
+                  ? processText(children, searchQuery, highlightNames)
                   : children}
               </div>
             );
@@ -219,11 +242,11 @@ export const FormattedMessageText = memo(({ text, isMine, searchQuery }) => {
                 {Array.isArray(children)
                   ? children.map((child, i) => (
                       <span key={i}>
-                        {typeof child === 'string' ? processText(child, searchQuery) : child}
+                        {typeof child === 'string' ? processText(child, searchQuery, highlightNames) : child}
                       </span>
                     ))
                   : typeof children === 'string'
-                  ? processText(children, searchQuery)
+                  ? processText(children, searchQuery, highlightNames)
                   : children}
               </li>
             );

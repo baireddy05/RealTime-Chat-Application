@@ -33,6 +33,12 @@ CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 CLIENT_URL=http://localhost:5173
+# Push notifications (background messages & calls). Generate with: npm run gen:vapid
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+# Optional: native Android (FCM) push for killed-app delivery. JSON string or file path.
+# FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
 ```
 
 Create a `.env` file in the `client` directory:
@@ -72,3 +78,6 @@ npm run dev
 cd client
 npm run dev
 ```
+
+### 6. Android App (PWA install or APK)
+Install on phones straight from the browser (Add to Home Screen), or build a real installable APK with Capacitor — push notifications, calls, splash screen and icons included. Full guide: [`ANDROID_APK.md`](./ANDROID_APK.md).

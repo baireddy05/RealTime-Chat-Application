@@ -31,7 +31,10 @@ const HomePage = () => {
   const selectedChat = useChatStore((s) => s.selectedChat);
   const setSelectedChat = useChatStore((s) => s.setSelectedChat);
   const rooms = useChatStore((s) => s.rooms);
+  const channels = useChatStore((s) => s.channels);
+  const users = useChatStore((s) => s.users);
   const getRooms = useChatStore((s) => s.getRooms);
+  const getChannels = useChatStore((s) => s.getChannels);
   const isChatThemeOpen = useChatStore((s) => s.isChatThemeOpen);
   const setIsChatThemeOpen = useChatStore((s) => s.setIsChatThemeOpen);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
@@ -234,9 +237,86 @@ const HomePage = () => {
 
   useEffect(() => {
     getRooms();
+    getChannels();
     getFriends();
     getFriendRequests();
-  }, [getRooms, getFriends, getFriendRequests]);
+  }, [getRooms, getChannels, getFriends, getFriendRequests]);
+
+  // Push-notification deep links: ?chat=<type>:<id> opens a conversation,
+  // ?callFrom=<userId> opens that user's DM. Runs again as lists load so a
+  // cold start from a tap still resolves once data arrives.
+  useEffect(() => {
+    const openDeepChat = (type, id) => {
+      const st = useChatStore.getState();
+      if (type === "room") {
+        const allRooms = [...(st.rooms || []), ...(st.channels || [])];
+        const r = allRooms.find((x) => (x._id || x.id)?.toString() === id);
+        if (!r) return false;
+        setSelectedChat({
+          id: (r._id || r.id).toString(),
+          _id: r._id || r.id,
+          name: r.name,
+          type: "room",
+          description: r.description,
+          members: r.members,
+          createdBy: r.createdBy,
+          admins: r.admins,
+          avatar: r.avatar,
+          profilePic: r.profilePic,
+          isChannel: !!r.isChannel,
+        });
+        return true;
+      }
+      const allUsers = [...(st.users || []), ...(friends || [])];
+      if (authUser && (authUser._id || authUser.id)?.toString() === id) {
+        setSelectedChat({ id, name: "Saved Messages", type: "user", profilePic: authUser.profilePic });
+        return true;
+      }
+      const u = allUsers.find((x) => (x._id || x.id)?.toString() === id);
+      if (!u) return false;
+      setSelectedChat({
+        id: (u._id || u.id).toString(),
+        name: u.username,
+        type: "user",
+        profilePic: u.profilePic,
+      });
+      return true;
+    };
+
+    const consumeParams = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const chat = params.get("chat");
+        const callFrom = params.get("callFrom");
+        let consumed = false;
+        if (chat && chat.includes(":")) {
+          const idx = chat.indexOf(":");
+          if (openDeepChat(chat.slice(0, idx), chat.slice(idx + 1))) consumed = true;
+        } else if (callFrom) {
+          if (openDeepChat("user", callFrom)) consumed = true;
+        }
+        if (consumed) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("chat");
+          url.searchParams.delete("callFrom");
+          window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+        }
+      } catch {}
+    };
+
+    consumeParams();
+    const onOpenChat = (e) => {
+      const d = e?.detail || {};
+      if (d.chatId) openDeepChat(d.chatType || "user", String(d.chatId));
+      else if (d.callerId) openDeepChat("user", String(d.callerId));
+    };
+    window.addEventListener("pulse:open-chat", onOpenChat);
+    window.addEventListener("pulse:open-call-from", onOpenChat);
+    return () => {
+      window.removeEventListener("pulse:open-chat", onOpenChat);
+      window.removeEventListener("pulse:open-call-from", onOpenChat);
+    };
+  }, [rooms, channels, users, friends, authUser, setSelectedChat]);
 
   // Extract status display
   const rawStatus = authUser?.status || "Coding: Available";

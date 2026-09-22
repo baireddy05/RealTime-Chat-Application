@@ -62,8 +62,9 @@ class SoundEffects {
     } catch {}
   }
 
-  // Apple-style Crystalline Glass Chime for incoming messages (C6 - E6 - G6 chord)
-  playReceiveSound() {
+  // Apple-style Crystalline Glass Chime for incoming messages.
+  // `tone` selects one of the per-chat notification tones (see CHAT_TONES).
+  playReceiveSound(tone = "chime") {
     if (this.muted) return;
     try {
       this.initContext();
@@ -88,10 +89,27 @@ class SoundEffects {
         osc.stop(now + delay + dur);
       };
 
-      // Crystalline triple-tone glass refraction
-      playChimeNote(1046.5, 0.00, 0.35, 0.08); // C6
-      playChimeNote(1318.5, 0.04, 0.40, 0.07); // E6
-      playChimeNote(1567.9, 0.08, 0.50, 0.09); // G6
+      // [freq, delaySec, durSec, vol]
+      const TONES = {
+        chime: [
+          [1046.5, 0.0, 0.35, 0.08], // C6
+          [1318.5, 0.04, 0.4, 0.07], // E6
+          [1567.9, 0.08, 0.5, 0.09], // G6
+        ],
+        bell: [
+          [880.0, 0.0, 0.45, 0.09],
+          [880.0, 0.28, 0.5, 0.06],
+        ],
+        pop: [
+          [660.0, 0.0, 0.08, 0.09],
+          [990.0, 0.06, 0.14, 0.09],
+        ],
+        marimba: [
+          [523.25, 0.0, 0.2, 0.09], // C5
+          [783.99, 0.12, 0.32, 0.08], // G5
+        ],
+      };
+      (TONES[tone] || TONES.chime).forEach(([f, d, dur, v]) => playChimeNote(f, d, dur, v));
     } catch {}
   }
 
@@ -222,3 +240,11 @@ class SoundEffects {
 }
 
 export const soundManager = new SoundEffects();
+
+// Per-chat notification tones (ids stored in chatPreferences.tone)
+export const CHAT_TONES = [
+  { id: "chime", name: "Glass Chime" },
+  { id: "bell", name: "Bell" },
+  { id: "pop", name: "Pop" },
+  { id: "marimba", name: "Marimba" },
+];

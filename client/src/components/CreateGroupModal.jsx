@@ -59,11 +59,11 @@ const CreateGroupModal = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center p-4 max-md:p-0 animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white/95 dark:bg-[#121117]/90 backdrop-blur-2xl border border-black/10 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-zinc-900 dark:text-white flex flex-col max-h-[85vh]"
+        className="bg-white/95 dark:bg-[#121117]/90 backdrop-blur-2xl border border-black/10 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn text-zinc-900 dark:text-white flex flex-col max-h-[85vh] max-md:max-w-none max-md:h-full max-md:max-h-full max-md:rounded-none max-md:border-0"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/5">

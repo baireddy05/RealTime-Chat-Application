@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { X, Plus, Send, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X, Plus, Send, ChevronRight, ChevronLeft, Trash2, Image as ImageIcon, Video, MessageCircle, Eye, Loader } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import { axiosInstance } from "../lib/axios";
 
 const STATUS_BG_COLORS = [
   "bg-gradient-to-tr from-sky-500 to-indigo-600",
@@ -13,7 +14,7 @@ const STATUS_BG_COLORS = [
 
 const StatusModal = ({ onClose }) => {
   const { authUser } = useAuthStore();
-  const { networkStatuses: networkPersons, myStatuses: myStories, uploadStatus, deleteStatus, getStatuses } = useChatStore();
+  const { networkStatuses: networkPersons, myStatuses: myStories, uploadStatus, deleteStatus, getStatuses, viewStatus, getStatusViewers, setSelectedChat } = useChatStore();
 
   useEffect(() => {
     getStatuses();
@@ -25,6 +26,17 @@ const StatusModal = ({ onClose }) => {
   const [isCreatingStatus, setIsCreatingStatus] = useState(false);
   const [newStatusText, setNewStatusText] = useState("");
   const [selectedBg, setSelectedBg] = useState(STATUS_BG_COLORS[0]);
+
+  // Photo/video status composer state
+  const [mediaFile, setMediaFile] = useState(null); // { file, preview, type: 'image'|'video' }
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const mediaInputRef = useRef(null);
+  const [mediaPickerType, setMediaPickerType] = useState("image");
+
+  // Viewers panel state (own stories)
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewersList, setViewersList] = useState([]);
+  const [viewersLoading, setViewersLoading] = useState(false);
 
   const activePerson = activeViewer
     ? activeViewer.type === "my"
@@ -147,6 +159,8 @@ const StatusModal = ({ onClose }) => {
           window.dispatchEvent(new Event("pulse:story-viewed"));
         }
       } catch (e) {}
+      // Record the view server-side for the owner's viewers list
+      viewStatus(activeStory.id);
     }
 
     const timer = setInterval(() => {
@@ -160,21 +174,100 @@ const StatusModal = ({ onClose }) => {
     }, 100);
 
     return () => clearInterval(timer);
-  }, [activeViewer, activeStory, isPaused, goToNextStory]);
+  }, [activeViewer, activeStory, isPaused, goToNextStory, viewStatus]);
+
+  // Reset the viewers panel whenever the viewed story changes
+  useEffect(() => {
+    setShowViewers(false);
+    setViewersList([]);
+  }, [activeStory?.id]);
 
   const handleCreateStatus = async (e) => {
     e.preventDefault();
-    if (!newStatusText.trim()) return;
+    if (!newStatusText.trim() && !mediaFile) return;
 
     setIsCreatingStatus(true);
     try {
-      await uploadStatus(newStatusText.trim(), selectedBg);
+      let media = null;
+      if (mediaFile) {
+        setIsUploadingMedia(true);
+        const mediaUrl = await uploadStatusMedia(mediaFile.file, mediaFile.type);
+        setIsUploadingMedia(false);
+        if (!mediaUrl) {
+          setIsCreatingStatus(false);
+          return;
+        }
+        media = { mediaUrl, mediaType: mediaFile.type };
+      }
+      await uploadStatus(newStatusText.trim(), selectedBg, media);
       setNewStatusText("");
+      setMediaFile(null);
     } catch (error) {
       console.error("Failed to upload status", error);
     } finally {
       setIsCreatingStatus(false);
+      setIsUploadingMedia(false);
     }
+  };
+
+  const uploadStatusMedia = async (file, type) => {
+    try {
+      const { data } = await axiosInstance.get("/upload/signature");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", data.apiKey);
+      formData.append("timestamp", data.timestamp);
+      formData.append("signature", data.signature);
+      const endpoint =
+        type === "video"
+          ? `https://api.cloudinary.com/v1_1/${data.cloudName}/video/upload`
+          : `https://api.cloudinary.com/v1_1/${data.cloudName}/image/upload`;
+      const res = await fetch(endpoint, { method: "POST", body: formData });
+      const uploadData = await res.json();
+      return uploadData.secure_url || null;
+    } catch (error) {
+      console.error("Status media upload failed", error);
+      return null;
+    }
+  };
+
+  const handleMediaPick = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const type = file.type.startsWith("video/") ? "video" : "image";
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      alert("Please select a photo or video file");
+      return;
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      alert("Status media must be under 30MB");
+      return;
+    }
+    setMediaFile({ file, preview: URL.createObjectURL(file), type });
+    setIsCreatingStatus(true);
+  };
+
+  const handleReplyToStory = () => {
+    if (activeViewer?.type !== "network" || !activePerson) return;
+    setSelectedChat({
+      id: activePerson.id,
+      name: activePerson.user,
+      type: "user",
+      profilePic: activePerson.avatar,
+    });
+    onClose();
+  };
+
+  const toggleViewers = async () => {
+    if (showViewers) {
+      setShowViewers(false);
+      return;
+    }
+    setShowViewers(true);
+    setViewersLoading(true);
+    const list = await getStatusViewers(activeStory?.id);
+    setViewersList(list);
+    setViewersLoading(false);
   };
 
   const handleDeleteMyStory = async (storyId, e) => {
@@ -199,21 +292,44 @@ const StatusModal = ({ onClose }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center animate-fadeIn p-4 select-none"
+      className="fixed inset-0 z-50 bg-[var(--modal-backdrop)] backdrop-blur-md flex items-center justify-center animate-fadeIn p-4 max-md:p-0 select-none"
       onClick={onClose}
     >
       {/* Story Viewer Overlay */}
       {activeViewer && activePerson && activeStory ? (
         <div
-          className="relative w-full max-w-sm h-[580px] max-h-[88vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-5 md:p-6 animate-scaleIn select-none"
+          className="relative w-full max-w-sm h-[580px] max-h-[88vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-5 md:p-6 animate-scaleIn select-none max-md:max-w-none max-md:w-full max-md:h-full max-md:max-h-full max-md:rounded-none"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={() => setIsPaused(true)}
           onMouseUp={() => setIsPaused(false)}
           onTouchStart={() => setIsPaused(true)}
           onTouchEnd={() => setIsPaused(false)}
         >
-          {/* Background Gradient */}
-          <div className={`absolute inset-0 ${activeStory.bg} -z-10 transition-colors duration-500`} />
+          {/* Background: photo/video fills the frame, else gradient */}
+          {activeStory.mediaUrl ? (
+            <>
+              {activeStory.mediaType === "video" ? (
+                <video
+                  src={activeStory.mediaUrl}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  controls
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <img
+                  src={activeStory.mediaUrl}
+                  alt="Status"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/60 pointer-events-none" />
+            </>
+          ) : (
+            <div className={`absolute inset-0 ${activeStory.bg} -z-10 transition-colors duration-500`} />
+          )}
 
           {/* Progress Bars */}
           <div className="flex gap-1.5 w-full z-20">
@@ -259,6 +375,22 @@ const StatusModal = ({ onClose }) => {
               {activeViewer.type === "my" && (
                 <button
                   type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleViewers();
+                  }}
+                  className="p-1.5 rounded-full hover:bg-black/25 text-white/80 hover:text-white transition-colors flex items-center gap-1"
+                  title="Seen by"
+                >
+                  <Eye size={15} />
+                  {(activeStory.viewersCount ?? 0) > 0 && (
+                    <span className="text-[10px] font-bold">{activeStory.viewersCount}</span>
+                  )}
+                </button>
+              )}
+              {activeViewer.type === "my" && (
+                <button
+                  type="button"
                   onClick={(e) => handleDeleteMyStory(activeStory.id, e)}
                   className="p-1.5 rounded-full hover:bg-black/25 text-white/80 hover:text-red-300 transition-colors"
                   title="Delete this status update"
@@ -300,8 +432,15 @@ const StatusModal = ({ onClose }) => {
             />
 
             <p className="text-white text-xl md:text-2xl font-medium leading-relaxed drop-shadow-md pointer-events-none">
-              {activeStory.text}
+              {activeStory.mediaUrl ? "" : activeStory.text}
             </p>
+            {activeStory.mediaUrl && activeStory.text ? (
+              <div className="absolute bottom-1 inset-x-2 z-10 text-center pointer-events-none">
+                <p className="inline-block text-white text-sm leading-relaxed drop-shadow-md bg-black/35 backdrop-blur-sm px-3 py-1.5 rounded-2xl">
+                  {activeStory.text}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {/* Bottom Navigation Controls */}
@@ -325,23 +464,87 @@ const StatusModal = ({ onClose }) => {
                 : "1 status update"}
             </span>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                goToNextStory();
-              }}
-              className="p-2 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
-              title="Next story"
-            >
-              <ChevronRight size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              {activeViewer.type === "network" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleReplyToStory();
+                  }}
+                  className="p-2 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
+                  title="Reply to story"
+                >
+                  <MessageCircle size={18} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToNextStory();
+                }}
+                className="p-2 rounded-full bg-black/25 text-white hover:bg-black/40 transition-colors"
+                title="Next story"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
-        </div>
+
+          {/* Viewers bottom sheet (own stories) */}
+          {showViewers && activeViewer.type === "my" && (
+            <div
+              className="absolute inset-x-0 bottom-0 z-30 max-h-[48%] overflow-y-auto bg-black/75 backdrop-blur-xl rounded-t-3xl p-4 animate-slideUp"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Eye size={13} /> Viewed by
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowViewers(false);
+                  }}
+                  className="p-1 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {viewersLoading ? (
+                <div className="flex items-center justify-center py-6 gap-2 text-white/70">
+                  <Loader size={16} className="animate-spin" />
+                  <span className="text-xs">Loading…</span>
+                </div>
+              ) : viewersList.length === 0 ? (
+                <p className="text-xs text-white/60 text-center py-4">No views yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {viewersList.map((v) => (
+                    <div key={v._id} className="flex items-center justify-between gap-2 py-1.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={v.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(v.username || "User")}&background=27272a&color=ffffff`}
+                          alt={v.username}
+                          className="w-8 h-8 rounded-full object-cover border border-white/20"
+                        />
+                        <span className="text-xs font-semibold text-white truncate">{v.username}</span>
+                      </div>
+                      <span className="text-[10px] text-white/60 shrink-0">
+                        {v.at ? new Date(v.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          </div>
       ) : (
-        /* Status List & Creator Modal */
-        <div 
-          className="w-full max-w-md bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn text-theme-main"
+        /* Status List & Creator Modal */        <div 
+          className="w-full max-w-md bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn text-theme-main max-md:max-w-none max-md:h-full max-md:max-h-full max-md:rounded-none max-md:border-0"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -378,14 +581,60 @@ const StatusModal = ({ onClose }) => {
 
               {isCreatingStatus ? (
                 <form onSubmit={handleCreateStatus} className="bg-[var(--glass-surface)] border border-[var(--glass-border)] p-3.5 rounded-2xl space-y-3">
+                  <input
+                    ref={mediaInputRef}
+                    type="file"
+                    accept={mediaPickerType === "video" ? "video/*" : "image/*"}
+                    onChange={handleMediaPick}
+                    className="hidden"
+                  />
+                  {mediaFile && (
+                    <div className="relative rounded-xl overflow-hidden border border-[var(--glass-border)]">
+                      {mediaFile.type === "video" ? (
+                        <video src={mediaFile.preview} className="w-full max-h-44 object-cover" muted playsInline />
+                      ) : (
+                        <img src={mediaFile.preview} alt="Status preview" className="w-full max-h-44 object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setMediaFile(null)}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                        title="Remove media"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
                   <textarea
                     rows={2}
-                    placeholder="Share an update with your contacts..."
+                    placeholder={mediaFile ? "Add a caption (optional)..." : "Share an update with your contacts..."}
                     value={newStatusText}
                     onChange={(e) => setNewStatusText(e.target.value)}
-                    autoFocus
+                    autoFocus={!mediaFile}
                     className="w-full glass-input rounded-xl p-2.5 text-xs text-theme-main placeholder-theme-muted/40 focus:outline-none focus:border-accent-primary/60 border border-[var(--glass-border)] resize-none"
                   />
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMediaPickerType("image");
+                        mediaInputRef.current?.click();
+                      }}
+                      className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-[var(--glass-border)] text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all"
+                    >
+                      <ImageIcon size={13} /> Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMediaPickerType("video");
+                        mediaInputRef.current?.click();
+                      }}
+                      className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-[var(--glass-border)] text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all"
+                    >
+                      <Video size={13} /> Video
+                    </button>
+                  </div>
 
                   {/* Background Color Picker with Palette */}
                   <div className="flex items-center justify-between pt-1">
@@ -404,11 +653,11 @@ const StatusModal = ({ onClose }) => {
 
                     <button
                       type="submit"
-                      disabled={!newStatusText.trim()}
+                      disabled={(!newStatusText.trim() && !mediaFile) || isUploadingMedia}
                       className="px-3.5 py-1.5 rounded-xl bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-medium flex items-center gap-1.5 shadow-md shadow-accent-primary/25 transition-all disabled:opacity-40"
                     >
-                      <Send size={12} />
-                      <span>Post</span>
+                      {isUploadingMedia ? <Loader size={12} className="animate-spin" /> : <Send size={12} />}
+                      <span>{isUploadingMedia ? "Uploading…" : "Post"}</span>
                     </button>
                   </div>
                 </form>
@@ -424,6 +673,7 @@ const StatusModal = ({ onClose }) => {
                     <div className="relative flex-shrink-0">
                       <img
                         src={
+                          myStories[0]?.mediaUrl ||
                           authUser?.profilePic ||
                           `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`
                         }
@@ -497,7 +747,7 @@ const StatusModal = ({ onClose }) => {
                     >
                       <div className="relative flex-shrink-0">
                         <img
-                          src={person.avatar}
+                          src={person.stories[0]?.mediaUrl || person.avatar}
                           alt={person.user}
                           className="w-10 h-10 rounded-full object-cover ring-2 ring-accent-secondary p-0.5"
                         />

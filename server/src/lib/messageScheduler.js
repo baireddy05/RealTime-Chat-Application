@@ -1,6 +1,8 @@
 import Message from "../models/Message.model.js";
 import Reminder from "../models/Reminder.model.js";
+import Room from "../models/Room.model.js";
 import { getReceiverSocketId, io } from "./socket.js";
+import { notifyNewMessage } from "./notify.js";
 
 export const startMessageScheduler = () => {
   setInterval(async () => {
@@ -20,11 +22,26 @@ export const startMessageScheduler = () => {
 
         if (msg.roomId) {
           io.to(msg.roomId.toString()).emit("newMessage", msg);
+          try {
+            const scheduledRoom = await Room.findById(msg.roomId).select("name members").lean();
+            if (scheduledRoom) {
+              notifyNewMessage({
+                message: msg,
+                senderName: msg.senderId?.username,
+                room: { _id: msg.roomId, name: scheduledRoom.name, members: scheduledRoom.members || [] },
+              });
+            }
+          } catch (pushErr) {
+            console.error("Scheduled push failed:", pushErr.message);
+          }
         } else {
           const receiverIdStr = (msg.receiverId?._id || msg.receiverId)?.toString();
           const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
           if (receiverIdStr) io.to(receiverIdStr).emit("newMessage", msg);
           if (senderIdStr) io.to(senderIdStr).emit("newMessage", msg);
+          if (receiverIdStr) {
+            notifyNewMessage({ message: msg, senderName: msg.senderId?.username, receiverId: receiverIdStr });
+          }
         }
       }
 

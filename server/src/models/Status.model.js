@@ -9,12 +9,27 @@ const statusSchema = new mongoose.Schema(
     },
     text: {
       type: String,
-      required: true,
+      default: "",
     },
     bg: {
       type: String,
       default: "bg-gradient-to-tr from-sky-500 to-indigo-600",
     },
+    mediaUrl: {
+      type: String,
+      default: null,
+    },
+    mediaType: {
+      type: String,
+      enum: ["image", "video", null],
+      default: null,
+    },
+    viewers: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     expiresAt: {
       type: Date,
       required: true,

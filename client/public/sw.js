@@ -1,7 +1,7 @@
-// Pulse Messenger Service Worker for Web Push & Offline Notifications
+// Pulse Messenger Service Worker: Web Push, offline shell & runtime caching.
 
-const CACHE_NAME = "pulse-cache-v1";
-const STATIC_ASSETS = ["/", "/index.html"];
+const CACHE_NAME = "pulse-cache-v2";
+const STATIC_ASSETS = ["/", "/index.html", "/offline.html", "/favicon.png", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -14,13 +14,69 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
       )
-    )
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
+});
+
+const isApiRequest = (url) =>
+  url.pathname.startsWith("/api/") || url.pathname.startsWith("/socket.io/");
+
+const isStaticAsset = (url) =>
+  url.origin === self.location.origin &&
+  /\.(js|css|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|mp3|wav|webm|mp4|json)$/i.test(url.pathname);
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
+
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return;
+  }
+
+  // API + realtime traffic must never be cached
+  if (isApiRequest(url)) return;
+
+  // Navigations: network first, fall back to cached shell, then offline page
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy)).catch(() => {});
+          return res;
+        })
+        .catch(() =>
+          caches.match("/index.html").then((cached) => cached || caches.match("/offline.html"))
+        )
+    );
+    return;
+  }
+
+  // Versioned static assets: stale-while-revalidate
+  if (isStaticAsset(url)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const network = fetch(request)
+          .then((res) => {
+            if (res && res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+            }
+            return res;
+          })
+          .catch(() => cached);
+        return cached || network;
+      })
+    );
+  }
 });
 
 // Web Push event listener
@@ -39,22 +95,48 @@ self.addEventListener("push", (event) => {
     }
   }
 
+  const isCall = data?.data?.type === "call" || data?.type === "call";
+  const tag = isCall
+    ? `pulse-call-${data?.data?.callerId || data?.callerId || "unknown"}`
+    : `pulse-chat-${data?.data?.chatType || "dm"}-${data?.data?.chatId || "unknown"}`;
+
   const options = {
-    body: data.body || "New activity in Pulse Messenger",
+    body: data.body || (isCall ? "Incoming call" : "New activity in Pulse Messenger"),
     icon: data.icon || "/favicon.png",
     badge: data.badge || "/favicon.png",
-    vibrate: [150, 80, 150],
+    vibrate: isCall ? [300, 100, 300, 100, 300] : [150, 80, 150],
+    tag,
+    renotify: true,
+    requireInteraction: isCall,
     data: {
-      url: data.url || "/",
+      url: data.url || pushTargetUrl(data?.data || data),
+      ...(data?.data || {}),
     },
     actions: [
-      { action: "open", title: "Open" },
+      { action: "open", title: isCall ? "Open App" : "Open" },
       { action: "dismiss", title: "Dismiss" },
     ],
   };
 
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
+
+// Deep-link target derived from the push payload when the sender didn't
+// include an explicit url: ?chat=<type>:<id> or ?callFrom=<userId>.
+function pushTargetUrl(d) {
+  try {
+    if (!d) return "/";
+    if (d.type === "message" && d.chatId) {
+      return `/?chat=${encodeURIComponent(`${d.chatType || "user"}:${d.chatId}`)}`;
+    }
+    if (d.type === "call" && d.callerId) {
+      return `/?callFrom=${encodeURIComponent(d.callerId)}`;
+    }
+    return d.url || "/";
+  } catch {
+    return "/";
+  }
+}
 
 // Handle notification click
 self.addEventListener("notificationclick", (event) => {
@@ -64,15 +146,36 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
+  const targetUrl = event.notification?.data?.url || "/";
+
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Prefer a tab already on the target conversation
+      try {
+        const target = new URL(targetUrl, self.location.origin);
+        const targetChat = target.searchParams.get("chat");
+        for (const client of windowClients) {
+          const clientUrl = new URL(client.url);
+          if (
+            targetChat &&
+            clientUrl.pathname === target.pathname &&
+            clientUrl.searchParams.get("chat") === targetChat &&
+            "focus" in client
+          ) {
+            return client.focus();
+          }
+        }
+      } catch {}
       for (const client of windowClients) {
         if ("focus" in client) {
+          client.postMessage
+            ? client.postMessage({ type: "pulse:push-open", url: targetUrl })
+            : null;
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow(event.notification.data?.url || "/");
+        return clients.openWindow(targetUrl);
       }
     })
   );
