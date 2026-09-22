@@ -1,9 +1,9 @@
 # Real-Time Instant Messaging Application
 
-A fully functional, highly secure, production-ready Real-Time Instant Messaging Application built with the MERN stack (MongoDB, Express, React, Node.js), Socket.io, and Cloudinary.
+A fully functional, feature-complete Real-Time Instant Messaging Application built with the MERN stack (MongoDB, Express, React, Node.js), Socket.io, and Cloudinary.
 
 ## Features
-- **Secure Authentication:** Zero-LocalStorage authentication using `HttpOnly`, `Secure`, and `SameSite=Strict` JWT cookies. Passwords hashed with `bcryptjs`.
+- **Secure Authentication:** Zero-LocalStorage authentication using `HttpOnly` JWT cookies (`Secure` + `SameSite=None` in production, `Lax` for local development, with a Bearer-token fallback for WebView contexts). Passwords hashed with `bcryptjs` (12 salt rounds).
 - **Real-Time Communication:** Websockets authenticated via secure cookies. 1-to-1 Direct Messages and Groups.
 - **Quoted Message Replies (Threading):** Quote and reply directly to any message with clickable jump-to navigation and highlight pulse.
 - **Message Editing:** Edit sent messages with live socket broadcast and `(edited)` timestamp badges.
@@ -79,5 +79,24 @@ cd client
 npm run dev
 ```
 
-### 6. Android App (PWA install or APK)
+### 6. Demo Accounts (for evaluation)
+
+Run the seeder once (or just start the server against an empty database, which auto-seeds):
+
+```bash
+cd server
+npm run seed
+```
+
+| Username | Email | Password |
+|---|---|---|
+| User1 | user1@example.com | password123 |
+| User2 | user2@example.com | password123 |
+| User3 | user3@example.com | password123 |
+| User4 | user4@example.com | password123 |
+| User5 | user5@example.com | password123 |
+
+Seeded content includes a "General Group" with welcome messages, and User1 + User2 start as friends. Suggested flow: log in as User1 and User2 in two browsers, exchange text, an image, and a PDF, then try a call and a status post.
+
+### 7. Android App (PWA install or APK)
 Install on phones straight from the browser (Add to Home Screen), or build a real installable APK with Capacitor — push notifications, calls, splash screen and icons included. Full guide: [`ANDROID_APK.md`](./ANDROID_APK.md).
