@@ -21,9 +21,15 @@ const dataUrlToBlob = (dataUrl) => {
 };
 
 /**
- * Trigger file download via programmatic anchor
+ * Trigger file download via programmatic anchor.
+ * On the native Android app (Capacitor WebView) anchor downloads are dead,
+ * so prefer the Filesystem + Share plugins when the native bridge has them
+ * (duck-typed: no new JS dependencies, safely a no-op on web).
+ * Returns true when the file was verifiably saved/shared.
  */
-const triggerBlobDownload = (blob, filename) => {
+const triggerBlobDownload = async (blob, filename) => {
+  if (await tryNativeSave(blob, filename)) return true;
+
   const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.style.display = "none";
@@ -38,6 +44,65 @@ const triggerBlobDownload = (blob, filename) => {
     }
     window.URL.revokeObjectURL(blobUrl);
   }, 2000);
+  return false;
+};
+
+/**
+ * Native save path: write the blob into the app cache and open the system
+ * share sheet so the user can save / open the PDF with any app.
+ */
+const tryNativeSave = async (blob, filename) => {
+  try {
+    const cap = window.Capacitor;
+    const FS = cap?.Plugins?.Filesystem;
+    const Share = cap?.Plugins?.Share;
+    if (!cap?.isNativePlatform?.() || !FS?.writeFile || !Share?.share) return false;
+    if (!blob || blob.size === 0 || blob.size > 50 * 1024 * 1024) return false;
+
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    if (!base64) return false;
+
+    const safe = (filename || "document.pdf").replace(/[^\w.\-() ]+/g, "_");
+    await FS.writeFile({ path: safe, data: base64, directory: "CACHE" });
+    const { uri } = await FS.getUri({ path: safe, directory: "CACHE" });
+    await Share.share({ title: safe, url: uri, dialogTitle: `Open ${safe}` });
+    try {
+      await FS.deleteFile({ path: safe, directory: "CACHE" });
+    } catch {}
+    return true;
+  } catch (err) {
+    console.warn("[Download] Native save failed:", err?.message || err);
+    return false;
+  }
+};
+
+const isNativeApp = () => {
+  try {
+    return !!window.Capacitor?.isNativePlatform?.();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Map a failed request to a message the user can act on.
+ */
+const describeFailure = (err) => {
+  const status = err?.response?.status;
+  if (status === 403) return "Access denied for this file. Ask the sender to re-send it.";
+  if (status === 404) return "This file no longer exists on the server.";
+  if (err?.code === "ECONNABORTED" || /timeout/i.test(err?.message || "")) {
+    return "Download timed out. Check your connection and retry.";
+  }
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "You appear to be offline. Reconnect and retry.";
+  }
+  return "Could not fetch the file. Check your connection and retry.";
 };
 
 /**
@@ -53,16 +118,18 @@ export const downloadFile = async (url, filename = "document.pdf") => {
   }
 
   // 0. Our own backend file store: authenticated blob download (never CORS-blocked)
+  // NOTE: failures fall THROUGH to the fallbacks below (never return early).
+  let lastError = null;
   if (url.includes("/api/upload/file/")) {
     try {
       const response = await axiosInstance.get(url, { responseType: "blob", timeout: 120000 });
       if (response.data) {
-        triggerBlobDownload(response.data, cleanFilename);
+        await triggerBlobDownload(response.data, cleanFilename);
         return;
       }
     } catch (err) {
+      lastError = err;
       console.warn("[Download] Backend file download failed:", err?.response?.data || err.message);
-      return;
     }
   }
 
@@ -70,13 +137,23 @@ export const downloadFile = async (url, filename = "document.pdf") => {
   if (url.startsWith("data:")) {
     const blob = dataUrlToBlob(url);
     if (blob) {
-      triggerBlobDownload(blob, cleanFilename);
+      await triggerBlobDownload(blob, cleanFilename);
       return;
     }
   }
 
   // 2. Blob URLs
   if (url.startsWith("blob:")) {
+    if (isNativeApp()) {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        if (await tryNativeSave(blob, cleanFilename)) return;
+      } catch (err) {
+        lastError = err;
+      }
+      throw new Error(describeFailure(lastError));
+    }
     const a = document.createElement("a");
     a.style.display = "none";
     a.href = url;
@@ -104,22 +181,26 @@ export const downloadFile = async (url, filename = "document.pdf") => {
       const res = await fetch(attachmentUrl, { mode: "cors" });
       if (res.ok) {
         const blob = await res.blob();
-        triggerBlobDownload(blob, cleanFilename);
+        await triggerBlobDownload(blob, cleanFilename);
         return;
       }
-    } catch {
+      lastError = new Error(`Cloudinary responded ${res.status}`);
+    } catch (err) {
+      lastError = err;
       // If direct fetch is blocked by CORS, trigger direct anchor download with fl_attachment
-      const a = document.createElement("a");
-      a.href = attachmentUrl;
-      a.download = cleanFilename;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        if (document.body.contains(a)) document.body.removeChild(a);
-      }, 1000);
-      return;
+      if (!isNativeApp()) {
+        const a = document.createElement("a");
+        a.href = attachmentUrl;
+        a.download = cleanFilename;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          if (document.body.contains(a)) document.body.removeChild(a);
+        }, 1000);
+        return;
+      }
     }
   }
 
@@ -132,10 +213,11 @@ export const downloadFile = async (url, filename = "document.pdf") => {
     });
 
     if (response.data) {
-      triggerBlobDownload(response.data, cleanFilename);
+      await triggerBlobDownload(response.data, cleanFilename);
       return;
     }
   } catch (proxyError) {
+    lastError = proxyError;
     console.warn("[Download] Proxy download failed, attempting native link navigation:", proxyError);
   }
 
@@ -144,14 +226,21 @@ export const downloadFile = async (url, filename = "document.pdf") => {
     const response = await fetch(url, { method: "GET", mode: "cors" });
     if (response.ok) {
       const blob = await response.blob();
-      triggerBlobDownload(blob, cleanFilename);
+      await triggerBlobDownload(blob, cleanFilename);
       return;
     }
+    lastError = new Error(`Server responded ${response.status}`);
   } catch (fetchError) {
+    lastError = fetchError;
     console.warn("[Download] Client fetch fallback failed:", fetchError);
   }
 
-  // 6. Universal Native Fallback: Open in new tab (Allows native browser PDF viewer & download)
+  // 6. Universal Native Fallback (browser only): open in new tab with cookies
+  // attached, so the backend serves the file as an attachment. In the native
+  // app anchor navigation is dead, so throw a readable error instead.
+  if (isNativeApp()) {
+    throw new Error(describeFailure(lastError));
+  }
   const a = document.createElement("a");
   a.href = url;
   a.download = cleanFilename;

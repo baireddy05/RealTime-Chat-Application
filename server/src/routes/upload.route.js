@@ -167,9 +167,17 @@ router.get("/file/:id", protectRoute, async (req, res) => {
     if (!files) return res.status(404).json({ error: "File not found" });
 
     const fileUrl = `${req.protocol}://${req.get("host")}/api/upload/file/${id}`;
-    const msg = await Message.findOne({ "file.url": fileUrl })
+    // Match by stable file id, NOT by exact URL: stored URLs may carry an
+    // older host/protocol (redeploys, LAN vs public URL) while the id never
+    // changes. New messages carry file.fileId; older ones match by URL suffix.
+    let msg = await Message.findOne({ "file.fileId": id })
       .select("senderId receiverId roomId")
       .lean();
+    if (!msg) {
+      msg = await Message.findOne({ "file.url": { $regex: `/${id}$` } })
+        .select("senderId receiverId roomId")
+        .lean();
+    }
     // Orphan uploads (never sent) are downloadable by their owner
     let allowed = files.metadata?.owner === myId;
     if (!allowed && msg) {

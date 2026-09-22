@@ -736,6 +736,8 @@ const MessageBubble = memo(({
                             try {
                               setDownloadingFileId(message._id);
                               await downloadFile(message.file.url, message.file.name);
+                            } catch (err) {
+                              alert(`Couldn't download "${message.file.name || "file"}": ${err?.message || "unknown error"}`);
                             } finally {
                               setDownloadingFileId(null);
                             }
@@ -763,6 +765,8 @@ const MessageBubble = memo(({
                               try {
                                 setDownloadingFileId(message._id);
                                 await downloadFile(message.file.url, message.file.name);
+                              } catch (err) {
+                                alert(`Couldn't download "${message.file.name || "file"}": ${err?.message || "unknown error"}`);
                               } finally {
                                 setDownloadingFileId(null);
                               }

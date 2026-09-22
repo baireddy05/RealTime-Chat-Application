@@ -473,6 +473,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
   // Documents go to our own backend store (Cloudinary blocks PDF/ZIP
   // delivery with 401s on this account). Falls back to the old paths.
+  // Returns { url, fileId } — fileId lets the server authorize downloads
+  // even if the stored URL's host/protocol later changes.
   const uploadRawFile = async (fileObj) => {
     try {
       const formData = new FormData();
@@ -482,7 +484,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         timeout: 120000,
       });
       if (data?.url) {
-        return data.url;
+        return { url: data.url, fileId: data.fileId || null };
       }
     } catch (err) {
       console.warn("Backend document upload failed, trying Cloudinary:", err?.response?.data || err.message);
@@ -501,12 +503,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       });
       const uploadData = await res.json();
       if (uploadData.secure_url) {
-        return uploadData.secure_url;
+        return { url: uploadData.secure_url, fileId: null };
       }
-      return fileObj.dataUrl;
+      return { url: fileObj.dataUrl, fileId: null };
     } catch {
       // Fallback to dataUrl
-      return fileObj.dataUrl;
+      return { url: fileObj.dataUrl, fileId: null };
     }
   };
 
@@ -859,10 +861,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
     if (currentDoc) {
       setIsUploading(true);
-      const url = await uploadRawFile(currentDoc);
+      const uploaded = await uploadRawFile(currentDoc);
       setIsUploading(false);
+      const url = typeof uploaded === "string" ? uploaded : uploaded?.url;
+      const fileId = typeof uploaded === "object" ? uploaded?.fileId || null : null;
       filePayload = {
         url,
+        ...(fileId ? { fileId } : {}),
         name: currentDoc.name,
         size: currentDoc.size,
         fileType: currentDoc.type,
