@@ -1,8 +1,9 @@
-import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
+﻿import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
+import { useCallStore } from "../store/useCallStore";
 import CreateGroupModal from "./CreateGroupModal";
 import LabelsManagerModal from "./LabelsManagerModal";
 import ChannelsModal from "./ChannelsModal";
@@ -47,14 +48,14 @@ const formatTimeRelative = (dateStr) => {
 const getMessageSnippet = (msg) => {
   if (!msg) return "";
   if (msg.isDeleted || msg.text === "This message was deleted" || msg.decryptedText === "This message was deleted") {
-    return "🚫 This message was deleted";
+    return "ðŸš« This message was deleted";
   }
-  if (msg.audio) return "🎤 Voice note";
+  if (msg.audio) return "ðŸŽ¤ Voice note";
   const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
     if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
-    if (msg.image) return "📷 Photo";
-  if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
-  if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
+    if (msg.image) return "ðŸ“· Photo";
+  if (msg.file) return `ðŸ“Ž ${msg.file.name || "Attachment"}`;
+  if (msg.contact) return `ðŸ‘¤ Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
 
   const text = msg.decryptedText || msg.text || "";
   if (isEncryptedMessage(text)) {
@@ -70,11 +71,11 @@ const getSearchSnippet = (msg, query) => {
     const q = (query || "").trim().toLowerCase();
     const idx = q ? text.toLowerCase().indexOf(q) : 0;
     const start = Math.max(0, idx - 30);
-    return (start > 0 ? "…" : "") + text.slice(start, start + 110) + (text.length > start + 110 ? "…" : "");
+    return (start > 0 ? "â€¦" : "") + text.slice(start, start + 110) + (text.length > start + 110 ? "â€¦" : "");
   }
-  if (msg.image) return "📷 Photo";
-  if (msg.audio) return "🎤 Voice note";
-  if (msg.file) return `📎 ${msg.file.name || "File"}`;
+  if (msg.image) return "ðŸ“· Photo";
+  if (msg.audio) return "ðŸŽ¤ Voice note";
+  if (msg.file) return `ðŸ“Ž ${msg.file.name || "File"}`;
   return "Message";
 };
 
@@ -98,7 +99,7 @@ const Sidebar = ({
   onOpenCalls,
   onOpenStatus,
   onOpenStarred,
-  statusEmoji = "💻",
+  statusEmoji = "ðŸ’»",
   statusCategory = "Coding",
   statusDetail = "Available",
   handleInstallPWA,
@@ -197,6 +198,56 @@ const Sidebar = ({
   const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
   const [showChannelsModal, setShowChannelsModal] = useState(false);
 
+  // ---- WhatsApp-style mobile primary tabs (swipeable pager) ----
+  // Chats / Updates / Groups / Calls live as swipeable pages on mobile.
+  // Desktop keeps the classic single-pane chat list (activity rail owns nav).
+  const MOBILE_TABS = ["chats", "updates", "groups", "calls"];
+  const [mobileTab, setMobileTab] = useState("chats");
+  const mobileTabIndex = Math.max(0, MOBILE_TABS.indexOf(mobileTab));
+  const touchStartRef = useRef(null);
+
+  const handlePagerTouchStart = useCallback((e) => {
+    const t = e.touches?.[0];
+    if (!t) return;
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  }, []);
+
+  const handlePagerTouchEnd = useCallback(
+    (e) => {
+      const start = touchStartRef.current;
+      touchStartRef.current = null;
+      if (!start) return;
+      const t = e.changedTouches?.[0];
+      if (!t) return;
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      // Horizontal swipe with clear intent (>60px, dominant axis)
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      if (dx < 0 && mobileTabIndex < MOBILE_TABS.length - 1) {
+        setSearchQuery("");
+        setMobileTab(MOBILE_TABS[mobileTabIndex + 1]);
+      } else if (dx > 0 && mobileTabIndex > 0) {
+        setSearchQuery("");
+        setMobileTab(MOBILE_TABS[mobileTabIndex - 1]);
+      }
+    },
+    [mobileTabIndex]
+  );
+
+  // Inline data for Updates / Calls tabs (no modals on mobile)
+  const myStatuses = useChatStore((s) => s.myStatuses);
+  const getStatuses = useChatStore((s) => s.getStatuses);
+  const callHistory = useCallStore((s) => s.callHistory);
+  const isCallHistoryLoading = useCallStore((s) => s.isCallHistoryLoading);
+  const getCallHistory = useCallStore((s) => s.getCallHistory);
+  const clearCallHistory = useCallStore((s) => s.clearCallHistory);
+  const startCall = useCallStore((s) => s.startCall);
+
+  useEffect(() => {
+    if (mobileTab === "updates") getStatuses?.();
+    if (mobileTab === "calls") getCallHistory?.();
+  }, [mobileTab, getStatuses, getCallHistory]);
+
   // Close options dropdown on outside click / tap, anywhere on screen.
   // Document-level capture listener (not an overlay div): overlay divs get
   // clipped to their own pane by ancestor backdrop-filters, so taps in the
@@ -216,7 +267,7 @@ const Sidebar = ({
     };
   }, [showOptionsDropdown]);
 
-  // ---- Per-chat context menu (⋮ on desktop, long-press / right-click everywhere)
+  // ---- Per-chat context menu (â‹® on desktop, long-press / right-click everywhere)
   const openChatMenu = useCallback((chat, anchor) => {
     cardLongPressFiredRef.current = false;
     setOpenMenuChat(chat);
@@ -335,7 +386,7 @@ const Sidebar = ({
       relockChat(openMenuChat.id);
     } else {
       if (!hasChatPin()) {
-        alert("Set a chat lock PIN first in Settings → Privacy.");
+        alert("Set a chat lock PIN first in Settings â†’ Privacy.");
         return;
       }
       setChatLocked(openMenuChat.id, true);
@@ -661,7 +712,7 @@ const Sidebar = ({
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     // Locked chats hide their contents until unlocked (PIN gate)
     const roomLocked = isChatLocked(roomId) && !unlockedChats.includes(roomId);
-    const previewText = roomLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
+    const previewText = roomLocked ? "ðŸ”’ Locked chat" : getMessageSnippet(lastMsg);
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
@@ -808,7 +859,7 @@ const Sidebar = ({
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     // Locked chats hide their contents until unlocked (PIN gate)
     const friendLocked = isChatLocked(friendId) && !unlockedChats.includes(friendId);
-    const previewText = friendLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
+    const previewText = friendLocked ? "ðŸ”’ Locked chat" : getMessageSnippet(lastMsg);
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
     const isRead = lastMsg && ((lastMsg.reads || []).some(r => (r.userId?._id || r.userId)?.toString() === friendId) || (lastMsg.readBy || []).some(id => (id?._id || id)?.toString() === friendId));
@@ -957,6 +1008,207 @@ const Sidebar = ({
     return renderFriendCard(item);
   };
 
+  const renderUpdatesTabContent = () => (
+    <div className="space-y-3 p-1">
+      <div className="flex items-center justify-between px-1 pt-1">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-900 dark:text-white">Status</span>
+        {onOpenStatus && (
+          <button
+            type="button"
+            onClick={onOpenStatus}
+            className="text-[11px] font-semibold text-accent-primary hover:underline"
+          >
+            View all
+          </button>
+        )}
+      </div>
+      <div
+        onClick={onOpenStatus}
+        className="flex items-center gap-3 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/10 cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
+      >
+        <div className="relative shrink-0">
+          <img
+            src={authUser?.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "You")}&background=27272a&color=ffffff`}
+            alt="My status"
+            className="w-11 h-11 rounded-full object-cover border border-black/10 dark:border-white/10"
+          />
+          <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center ring-2 ring-white dark:ring-[#121117] text-sm font-bold leading-none">+</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-zinc-900 dark:text-white">My status</p>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+            {(myStatuses || []).length > 0 ? `${myStatuses.length} update${myStatuses.length === 1 ? "" : "s"} â€¢ Tap to view` : "Tap to add status update"}
+          </p>
+        </div>
+      </div>
+      <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        Recent updates
+      </div>
+      {(networkStatuses || []).length === 0 ? (
+        <div className="p-6 text-center text-xs text-zinc-500 dark:text-zinc-400 bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 rounded-2xl">
+          No status updates yet. Swipe back to Chats or tap + on My status.
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {(networkStatuses || []).map((person) => (
+            <div
+              key={person.id}
+              onClick={onOpenStatus}
+              className="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
+            >
+              <img
+                src={person.stories?.[0]?.mediaUrl || person.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(person.user || "User")}&background=27272a&color=ffffff`}
+                alt={person.user}
+                className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500/70 p-0.5 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">{person.user}</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                  {(person.stories || []).length > 1 ? `${person.stories.length} updates` : person.stories?.[0]?.time || "Recently"}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-center text-[10px] text-zinc-400 dark:text-zinc-500 px-6 pt-1">
+        Tip: swipe left / right anywhere here to switch tabs like WhatsApp.
+      </p>
+    </div>
+  );
+
+  const renderGroupsTabContent = () => (
+    <div className="space-y-2 p-1">
+      <button
+        type="button"
+        onClick={handleOpenGroupModal}
+        className="w-full flex items-center gap-3 p-3 rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-black shadow-sm active:scale-[0.99] transition-transform"
+      >
+        <span className="w-10 h-10 rounded-2xl bg-white/15 dark:bg-black/10 flex items-center justify-center shrink-0">
+          <span className="material-symbols-outlined text-xl">group_add</span>
+        </span>
+        <span className="text-left min-w-0">
+          <span className="block text-xs font-bold">New group</span>
+          <span className="block text-[11px] opacity-70 truncate">Create a group with your contacts</span>
+        </span>
+      </button>
+      <div className="px-1 pt-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <span>Your groups</span>
+        <span className="font-mono">{sortedRooms.length}</span>
+      </div>
+      {sortedRooms.length === 0 ? (
+        <div className="p-8 text-center text-xs text-zinc-500">
+          No groups yet. Tap New group above to create one.
+        </div>
+      ) : (
+        sortedRooms.map(renderRoomCard)
+      )}
+    </div>
+  );
+
+  const renderCallsTabContent = () => {
+    const formatCallTime = (d) => {
+      try {
+        const date = new Date(d);
+        const now = new Date();
+        if (date.toDateString() === now.toDateString()) {
+          return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        }
+        return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      } catch {
+        return "";
+      }
+    };
+    return (
+      <div className="space-y-1.5 p-1">
+        <div className="flex items-center justify-between px-1 pt-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-900 dark:text-white">Recent calls</span>
+          <div className="flex items-center gap-2">
+            {(callHistory || []).length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm("Clear your entire call history?")) return;
+                  await clearCallHistory();
+                }}
+                className="text-[11px] text-zinc-500 hover:text-red-500 dark:text-zinc-400 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+            {onOpenCalls && (
+              <button type="button" onClick={onOpenCalls} className="text-[11px] font-semibold text-accent-primary hover:underline">
+                View all
+              </button>
+            )}
+          </div>
+        </div>
+        {isCallHistoryLoading && (callHistory || []).length === 0 ? (
+          <div className="flex items-center justify-center py-10 gap-2 text-zinc-500 text-xs">
+            <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+            Loading callsâ€¦
+          </div>
+        ) : (callHistory || []).length === 0 ? (
+          <div className="p-8 text-center text-xs text-zinc-500">
+            No calls yet. Your recent calls will appear here.
+          </div>
+        ) : (
+          (callHistory || []).slice(0, 30).map((log) => {
+            const myId = authUser?._id?.toString();
+            const outgoing = (log.callerId?._id || log.callerId)?.toString() === myId;
+            const other = outgoing ? log.receiverId : log.callerId;
+            const missed = log.status === "missed" || log.status === "rejected";
+            return (
+              <div
+                key={log._id}
+                className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/10 dark:border-white/10"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img
+                    src={other?.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(other?.username || "User")}&background=27272a&color=ffffff`}
+                    alt={other?.username}
+                    className="w-9 h-9 rounded-full object-cover border border-black/10 dark:border-white/10 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold truncate ${missed ? "text-red-500" : "text-zinc-900 dark:text-white"}`}>
+                      {other?.username || "User"}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                      {missed ? "Missed" : outgoing ? "Outgoing" : "Incoming"} â€¢ {log.callType === "audio" ? "Voice" : "Video"} â€¢ {formatCallTime(log.startedAt)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const otherId = other?._id || other;
+                    if (!otherId) return;
+                    try { onOpenCalls?.(); } catch {}
+                    startCall({
+                      targetUser: {
+                        _id: otherId,
+                        id: otherId,
+                        name: other?.username || "User",
+                        username: other?.username || "User",
+                        profilePic: other?.profilePic || "",
+                        authName: authUser?.username,
+                      },
+                      callType: log.callType || "video",
+                    });
+                  }}
+                  className="p-2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-colors shrink-0"
+                  title="Call back"
+                >
+                  <span className="material-symbols-outlined text-[18px]">{log.callType === "audio" ? "call" : "videocam"}</span>
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    );
+  };
+
   return (
     <section
       aria-label="Chats List"
@@ -985,7 +1237,12 @@ const Sidebar = ({
               </button>
             )}
             <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>
-              <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">Chats</h1>
+              <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">
+                <span className="md:hidden">
+                  {mobileTab === "updates" ? "Updates" : mobileTab === "groups" ? "Groups" : mobileTab === "calls" ? "Calls" : "Chats"}
+                </span>
+                <span className="hidden md:inline">Chats</span>
+              </h1>
             </div>
           </div>
 
@@ -1139,8 +1396,8 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Search Bar with ⌘K */}
-        <div className="relative flex items-center w-full mt-1">
+        {/* Search Bar with âŒ˜K â€” Chats tab only on mobile */}
+        <div className={`relative items-center w-full mt-1 ${mobileTab === "chats" ? "flex" : "hidden md:flex"}`}>
           <span className="material-symbols-outlined absolute left-3 text-zinc-400 dark:text-zinc-500 pointer-events-none text-base">
             search
           </span>
@@ -1163,13 +1420,13 @@ const Sidebar = ({
             </button>
           ) : (
             <kbd className="hidden sm:inline-block absolute right-3 px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 font-mono text-[9px] pointer-events-none">
-              ⌘K
+              âŒ˜K
             </kbd>
           )}
         </div>
 
-        {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct */}
-        <div className="relative select-none">
+        {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct â€” Chats tab only on mobile */}
+        <div className={`relative select-none ${mobileTab === "chats" ? "" : "hidden md:block"}`}>
           <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1">
             <button
               onClick={() => setActiveFilter("all")}
@@ -1303,7 +1560,7 @@ const Sidebar = ({
               <button
                 type="button"
                 onClick={() => scrollTabs(1)}
-                title="More filters — scroll right"
+                title="More filters â€” scroll right"
                 className="absolute right-0 top-0 bottom-0 w-7 hidden md:flex items-center justify-end animate-fadeIn text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 <span className="material-symbols-outlined text-xl drop-shadow">chevron_right</span>
@@ -1312,7 +1569,7 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* Label folders toolbar — hidden entirely when no labels exist
+        {/* Label folders toolbar â€” hidden entirely when no labels exist
             so it never leaves a dead gap in the header */}
         {(labels || []).length > 0 && (
           <div className="flex items-center gap-1.5 pt-1 pb-0.5 select-none">
@@ -1359,9 +1616,9 @@ const Sidebar = ({
         )}
       </div>
 
-      {/* 2. Pending Friend Requests Banner List */}
+      {/* 2. Pending Friend Requests Banner List â€” Chats tab only on mobile */}
       {incomingRequests && incomingRequests.length > 0 && (
-        <div className="my-2 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/20 backdrop-blur-xl shadow-glass flex flex-col gap-2 shrink-0 animate-fadeIn">
+        <div className={`my-2 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/20 backdrop-blur-xl shadow-glass flex-col gap-2 shrink-0 animate-fadeIn ${mobileTab === "chats" ? "flex" : "hidden md:flex"}`}>
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-white animate-pulse" />
@@ -1646,8 +1903,25 @@ const Sidebar = ({
         </div>
       )}
 
-      {/* 4. Conversation List */}
-      <div className="flex-1 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar space-y-1">
+      {/* 4. Conversation List â€” swipeable pages on mobile (WhatsApp-style) */}
+      <div
+        onTouchStart={handlePagerTouchStart}
+        onTouchEnd={handlePagerTouchEnd}
+        className="flex-1 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar space-y-1"
+      >
+        {/* Mobile swipe position dots */}
+        <div className="md:hidden flex items-center justify-center gap-1 pt-1 pb-0.5" aria-hidden="true">
+          {MOBILE_TABS.map((t) => (
+            <span
+              key={t}
+              className={`h-1 rounded-full transition-all duration-300 ${
+                mobileTab === t ? "w-5 bg-zinc-900 dark:bg-white" : "w-1 bg-zinc-300 dark:bg-zinc-700"
+              }`}
+            />
+          ))}
+        </div>
+        {/* Chats branch â€” always on desktop, only on Chats tab for mobile */}
+        <div className={mobileTab === "chats" ? "" : "hidden md:block"}>
         {/* Empty States */}
         {activeFilter === "unread" && totalUnreadCount === 0 && (
           <div className="p-8 text-center text-zinc-500 text-xs">No unread chats.</div>
@@ -1801,6 +2075,17 @@ const Sidebar = ({
             )}
           </>
         )}
+        </div>
+        {/* Mobile-only swipeable tabs (hidden on desktop â€” switch via bottom nav or swipe) */}
+        {mobileTab === "updates" && (
+          <div className="md:hidden animate-fadeIn" key="mtab-updates">{renderUpdatesTabContent()}</div>
+        )}
+        {mobileTab === "groups" && (
+          <div className="md:hidden animate-fadeIn" key="mtab-groups">{renderGroupsTabContent()}</div>
+        )}
+        {mobileTab === "calls" && (
+          <div className="md:hidden animate-fadeIn" key="mtab-calls">{renderCallsTabContent()}</div>
+        )}
       </div>
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
@@ -1809,7 +2094,7 @@ const Sidebar = ({
         <ChannelsModal onClose={() => setShowChannelsModal(false)} onOpenChannel={openChannelChat} />
       )}
 
-      {/* Per-chat context menu (⋮ / right-click / long-press) */}
+      {/* Per-chat context menu (â‹® / right-click / long-press) */}
       {openMenuChat && typeof document !== "undefined" && createPortal(
         <>
           <div
@@ -1871,7 +2156,7 @@ const Sidebar = ({
                   className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-accent-primary hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                 >
                   <span className="material-symbols-outlined text-[16px]">add</span>
-                  <span>New label…</span>
+                  <span>New labelâ€¦</span>
                 </button>
               ) : (
                 <div className="max-h-40 overflow-y-auto custom-scrollbar">
@@ -2002,9 +2287,10 @@ const Sidebar = ({
         </>,
         document.body
       )}
-      {/* 5. Mobile bottom navigation (WhatsApp-style primary tabs).
+      {/* 5. Mobile bottom navigation (WhatsApp-style swipeable primary tabs).
           Rendered inside the sidebar column so it never overlaps content;
-          hidden on desktop where the activity rail serves this role. */}
+          hidden on desktop where the activity rail serves this role.
+          Tapping switches the inline page â€” swiping the list above does the same. */}
       <nav
         aria-label="Primary"
         className="md:hidden shrink-0 -mx-3 -mb-3 mt-2 border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4"
@@ -2015,10 +2301,16 @@ const Sidebar = ({
           onClick={() => {
             setSelectedChat(null);
             setActiveFilter("all");
+            setSearchQuery("");
+            setMobileTab("chats");
           }}
-          className="flex flex-col items-center gap-0.5 py-1 text-zinc-900 dark:text-white active:scale-95 transition-transform"
+          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
+            mobileTab === "chats" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          }`}
         >
-          <span className="relative flex items-center justify-center w-12 h-7 rounded-full bg-zinc-900/[0.07] dark:bg-white/10">
+          <span className={`relative flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
+            mobileTab === "chats" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          }`}>
             <span className="material-symbols-outlined text-[20px]">chat</span>
             {totalUnreadCount > 0 && (
               <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold flex items-center justify-center shadow">
@@ -2026,45 +2318,56 @@ const Sidebar = ({
               </span>
             )}
           </span>
-          <span className="text-[10px] font-semibold">Chats</span>
+          <span className={`text-[10px] ${mobileTab === "chats" ? "font-semibold" : "font-medium"}`}>Chats</span>
         </button>
-
-        {onOpenStatus && (
-          <button
-            type="button"
-            onClick={onOpenStatus}
-            className="flex flex-col items-center gap-0.5 py-1 text-zinc-500 dark:text-zinc-400 active:scale-95 transition-transform"
-          >
-            <span className="flex items-center justify-center w-12 h-7">
-              <span className="material-symbols-outlined text-[20px]">motion_photos_on</span>
-            </span>
-            <span className="text-[10px] font-medium">Updates</span>
-          </button>
-        )}
 
         <button
           type="button"
-          onClick={handleOpenGroupModal}
-          className="flex flex-col items-center gap-0.5 py-1 text-zinc-500 dark:text-zinc-400 active:scale-95 transition-transform"
+          onClick={() => { setSearchQuery(""); setMobileTab("updates"); }}
+          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
+            mobileTab === "updates" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          }`}
         >
-          <span className="flex items-center justify-center w-12 h-7">
-            <span className="material-symbols-outlined text-[20px]">group_add</span>
+          <span className={`relative flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
+            mobileTab === "updates" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          }`}>
+            <span className="material-symbols-outlined text-[20px]">motion_photos_on</span>
+            {unviewedStoryUsers.size > 0 && (
+              <span className="absolute top-0.5 right-2.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-black" />
+            )}
           </span>
-          <span className="text-[10px] font-medium">Groups</span>
+          <span className={`text-[10px] ${mobileTab === "updates" ? "font-semibold" : "font-medium"}`}>Updates</span>
         </button>
 
-        {onOpenCalls && (
-          <button
-            type="button"
-            onClick={onOpenCalls}
-            className="flex flex-col items-center gap-0.5 py-1 text-zinc-500 dark:text-zinc-400 active:scale-95 transition-transform"
-          >
-            <span className="flex items-center justify-center w-12 h-7">
-              <span className="material-symbols-outlined text-[20px]">call_log</span>
-            </span>
-            <span className="text-[10px] font-medium">Calls</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => { setSearchQuery(""); setMobileTab("groups"); }}
+          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
+            mobileTab === "groups" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          }`}
+        >
+          <span className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
+            mobileTab === "groups" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          }`}>
+            <span className="material-symbols-outlined text-[20px]">groups</span>
+          </span>
+          <span className={`text-[10px] ${mobileTab === "groups" ? "font-semibold" : "font-medium"}`}>Groups</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setSearchQuery(""); setMobileTab("calls"); }}
+          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
+            mobileTab === "calls" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          }`}
+        >
+          <span className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
+            mobileTab === "calls" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          }`}>
+            <span className="material-symbols-outlined text-[20px]">call_log</span>
+          </span>
+          <span className={`text-[10px] ${mobileTab === "calls" ? "font-semibold" : "font-medium"}`}>Calls</span>
+        </button>
       </nav>
     </section>
   );

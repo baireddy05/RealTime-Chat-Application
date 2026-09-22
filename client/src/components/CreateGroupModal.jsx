@@ -106,7 +106,8 @@ const CreateGroupModal = ({ onClose }) => {
                 placeholder="e.g. Design Team, Family, Weekend Trip"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                autoFocus
+                autoComplete="off"
+                enterKeyHint="next"
                 className="w-full rounded-2xl pl-10 pr-3 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 border border-black/10 dark:border-white/10 focus:outline-none focus:border-zinc-900 dark:focus:border-white transition-all bg-black/[0.03] dark:bg-white/5"
               />
             </div>
