@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { X, Camera, Mail, Activity, Loader2, Check, User, Info, Sparkles } from "lucide-react";
+import { X, Camera, Mail, Loader2, Check, User, Info, Sparkles } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { axiosInstance } from "../lib/axios";
 

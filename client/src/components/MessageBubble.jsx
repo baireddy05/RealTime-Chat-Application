@@ -161,8 +161,6 @@ const MessageBubble = memo(({
   isMenuOpen,
   setOpenMenuMessageId,
   setMenuAnchor,
-  setHoveredMessageId,
-  setActivePickerId,
   setFullReactionPickerMsgId,
   reactToMessage,
   setReplyingTo,
@@ -318,9 +316,21 @@ const MessageBubble = memo(({
       right: rect.right,
       isMine,
     });
-    setActivePickerId(null);
   };
 
+    const handleDownloadFile = async (e) => {
+      e.stopPropagation();
+      if (downloadingFileId === message._id) return;
+      try {
+        setDownloadingFileId(message._id);
+        await downloadFile(message.file.url, message.file.name);
+      } catch (err) {
+        alert(`Couldn't download "${message.file.name || "file"}": ${err?.message || "unknown error"}`);
+      } finally {
+        setDownloadingFileId(null);
+      }
+    };
+  
   const handleTouchStart = (e) => {
     if (message.isDeleted) return;
     if (e.target.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
@@ -466,8 +476,6 @@ const MessageBubble = memo(({
       >
         <div
           id={`msg-${message._id}`}
-          onMouseEnter={() => setHoveredMessageId(message._id)}
-          onMouseLeave={() => setHoveredMessageId(null)}
           className={`msg-row flex max-w-full relative transition-all px-4 sm:px-6 md:px-8 ${
             isSameSenderAsPrev ? "mt-1" : "mt-3.5"
           } mb-0.5 ${isMine ? "justify-end" : "justify-start"}`}
@@ -731,17 +739,7 @@ const MessageBubble = memo(({
                       )}
                       {message.file && (
                         <div
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              setDownloadingFileId(message._id);
-                              await downloadFile(message.file.url, message.file.name);
-                            } catch (err) {
-                              alert(`Couldn't download "${message.file.name || "file"}": ${err?.message || "unknown error"}`);
-                            } finally {
-                              setDownloadingFileId(null);
-                            }
-                          }}
+                          onClick={handleDownloadFile}
                           className="flex items-center justify-between p-2.5 rounded-xl transition-all border my-1 max-w-sm bg-current/5 border-current/10 hover:bg-current/10 cursor-pointer active:scale-[0.99] group/doc"
                           title="Click to download / view document"
                         >
@@ -760,17 +758,7 @@ const MessageBubble = memo(({
                           </div>
                           <button
                             type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                setDownloadingFileId(message._id);
-                                await downloadFile(message.file.url, message.file.name);
-                              } catch (err) {
-                                alert(`Couldn't download "${message.file.name || "file"}": ${err?.message || "unknown error"}`);
-                              } finally {
-                                setDownloadingFileId(null);
-                              }
-                            }}
+                            onClick={handleDownloadFile}
                             disabled={downloadingFileId === message._id}
                             className="p-2 rounded-lg transition-all ml-2 shrink-0 bg-current/10 hover:bg-current/20 text-current cursor-pointer active:scale-95 disabled:opacity-50 flex items-center justify-center"
                             title="Download Document"
@@ -1022,7 +1010,6 @@ const MessageBubble = memo(({
                             right: rect.right,
                             isMine,
                           });
-                          setActivePickerId(null);
                         }
                       }}
                       className={`hidden md:flex absolute top-1 right-1 items-center justify-center p-0.5 rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-md shadow-sm transition-opacity duration-150 cursor-pointer z-10 ${

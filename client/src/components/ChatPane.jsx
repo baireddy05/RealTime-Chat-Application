@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, Fragment, lazy, Suspense } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, lazy, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -6,7 +6,6 @@ import { useCallStore } from "../store/useCallStore";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import MessageInput from "./MessageInput";
 import ImageModal from "./ImageModal";
-import AudioMessagePlayer from "./AudioMessagePlayer";
 import ForwardModal from "./ForwardModal";
 import StarredDrawer from "./StarredDrawer";
 import TasksDrawer from "./TasksDrawer";
@@ -18,26 +17,21 @@ const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
 import { 
-  Loader, Search, X, CheckCheck, Pin, Trash2, Ban,
-  Lock, MessageCircle, Volume2, VolumeX, Reply,
-  Edit3, Forward, Star, Info, Plus, Copy,
+  Loader, Search, X, Pin, Trash2,
+  MessageCircle, Volume2, VolumeX,
+  Forward, Star, Info, Copy,
   UploadCloud, Sparkles, ChevronUp, ChevronDown, DownloadCloud, Bell, BellOff,
-  Clock, Flame, Palette, MessageSquare, MoreVertical,
+  Clock, Palette,
   StickyNote, FileCode, FileText
 } from "lucide-react";
 import QuickNotesDrawer from "./QuickNotesDrawer";
-import FormattedMessageText from "./FormattedMessageText";
-import LinkPreview from "./LinkPreview";
 import ScheduledMessagesModal from "./ScheduledMessagesModal";
 import ChatThemeModal from "./ChatThemeModal";
-import { isOnlyEmojis, parseEmojiToHtml, EmojiSpan } from "../lib/emoji";
 import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
 import ThreadDrawer from "./ThreadDrawer";
 import MessageInfoModal from "./MessageInfoModal";
 import RemindModal from "./RemindModal";
 import GroupCallModal from "./GroupCallModal";
-import ContactCard from "./ContactCard";
-import SwipeableMessage from "./SwipeableMessage";
 import MessageBubble from "./MessageBubble";
 import ChatLockGate from "./ChatLockGate";
 import { isChatLocked } from "../lib/chatLock";
@@ -62,33 +56,7 @@ const getPinnedPreview = (msg, fallbackDecryptedText) => {
   return text;
 };
 
-const isDifferentDay = (d1, d2) => {
-  if (!d1 || !d2) return true;
-  const date1 = new Date(d1);
-  const date2 = new Date(d2);
-  return (
-    date1.getFullYear() !== date2.getFullYear() ||
-    date1.getMonth() !== date2.getMonth() ||
-    date1.getDate() !== date2.getDate()
-  );
-};
 
-const formatDateDivider = (dateStr) => {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
-  });
-};
 
 const formatFileSize = (bytes) => {
   if (!bytes) return "";
@@ -98,28 +66,12 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
 
-const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 // Message list page size for windowing (see visibleMessages below).
 const MESSAGE_PAGE_SIZE = 60;
 
-const SENDER_COLORS = [
-  "text-[var(--sender-1)]", "text-[var(--sender-2)]", "text-[var(--sender-3)]",
-  "text-[var(--sender-4)]", "text-[var(--sender-5)]", "text-[var(--sender-6)]",
-];
 
-const getSenderColor = (name = "") => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return SENDER_COLORS[Math.abs(hash) % SENDER_COLORS.length];
-};
 
-const extractFirstUrl = (text) => {
-  if (!text) return null;
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const match = text.match(urlRegex);
-  return match ? match[0] : null;
-};
 
 const ChatHeader = memo(() => (
   <div className="pt-4 pb-2 px-4 flex flex-col items-center gap-2 select-none w-full">
@@ -142,8 +94,6 @@ const ChatPane = ({ onBack }) => {
   const isMessagesLoading = useChatStore((s) => s.isMessagesLoading);
   const selectedChat = useChatStore((s) => s.selectedChat);
   const setSelectedChat = useChatStore((s) => s.setSelectedChat);
-  const subscribeToMessages = useChatStore((s) => s.subscribeToMessages);
-  const unsubscribeFromMessages = useChatStore((s) => s.unsubscribeFromMessages);
   const reactToMessage = useChatStore((s) => s.reactToMessage);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
   const togglePinMessage = useChatStore((s) => s.togglePinMessage);
@@ -188,8 +138,6 @@ const ChatPane = ({ onBack }) => {
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
-  const [activePickerId, setActivePickerId] = useState(null);
-  const [hoveredMessageId, setHoveredMessageId] = useState(null);
   const [downloadingFileId, setDownloadingFileId] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
@@ -493,7 +441,6 @@ const ChatPane = ({ onBack }) => {
       setContactInfoUserId(null);
       setOpenMenuMessageId(null);
       setMenuAnchor(null);
-      setActivePickerId(null);
       setFullReactionPickerMsgId(null);
       setIsDraggingOver(false);
       setSelectedMessageIds([]);
@@ -1533,8 +1480,6 @@ const ChatPane = ({ onBack }) => {
                   isMenuOpen={openMenuMessageId === message._id}
                   setOpenMenuMessageId={setOpenMenuMessageId}
                   setMenuAnchor={setMenuAnchor}
-                  setHoveredMessageId={setHoveredMessageId}
-                  setActivePickerId={setActivePickerId}
                   setFullReactionPickerMsgId={setFullReactionPickerMsgId}
                   reactToMessage={reactToMessage}
                   setReplyingTo={setReplyingTo}
@@ -1731,7 +1676,6 @@ const ChatPane = ({ onBack }) => {
                   onEmojiClick={(emojiData) => {
                     reactToMessage(fullReactionPickerMsgId, emojiData.emoji);
                     setFullReactionPickerMsgId(null);
-                    setActivePickerId(null);
                   }}
                   autoFocusSearch={false}
                   searchPlaceHolder="Search all emojis..."

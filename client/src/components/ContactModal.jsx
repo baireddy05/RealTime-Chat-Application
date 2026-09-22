@@ -7,7 +7,6 @@ import {
   Mail, 
   Send, 
   Check, 
-  Sparkles, 
   ShieldCheck,
   UserCheck,
   Share2,
@@ -19,7 +18,7 @@ import { useBackHandler } from "../lib/backNavigation";
 
 const ContactModal = ({ isOpen, onClose, onSendContact }) => {
   const { authUser, onlineUsers } = useAuthStore();
-  const { friends, searchResults, searchUsers, isSearching, getFriends } = useFriendStore();
+  const { friends, searchResults, searchUsers, getFriends } = useFriendStore();
 
   const [activeTab, setActiveTab] = useState("friends"); // "friends" | "myCard" | "custom"
   const [searchQuery, setSearchQuery] = useState("");

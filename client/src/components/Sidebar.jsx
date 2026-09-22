@@ -88,6 +88,8 @@ const getResultChatName = (msg, rooms) => {
   return msg.senderId?.username || "Direct message";
 };
 
+const MOBILE_TABS = ["chats", "updates", "groups", "calls"];
+
 const Sidebar = ({
   onChatSelect,
   onOpenProfile,
@@ -99,9 +101,6 @@ const Sidebar = ({
   onOpenCalls,
   onOpenStatus,
   onOpenStarred,
-  statusEmoji = "ðŸ’»",
-  statusCategory = "Coding",
-  statusDetail = "Available",
   handleInstallPWA,
   logout,
 }) => {
@@ -202,11 +201,9 @@ const Sidebar = ({
   // Chats / Updates / Groups / Calls live on a finger-following track.
   // The same store tab drives the mobile bottom nav and the desktop rail,
   // so both shells always show the exact same four options.
-  const MOBILE_TABS = ["chats", "updates", "groups", "calls"];
   const mobileTab = useChatStore((s) => s.mobileTab);
   const setMobileTab = useChatStore((s) => s.setMobileTab);
   const mobileTabIndex = Math.max(0, MOBILE_TABS.indexOf(mobileTab));
-  const effectiveIndex = mobileTabIndex;
   const [viewportW, setViewportW] = useState(0);
   const [isPagerDragging, setIsPagerDragging] = useState(false);
   const pagerViewportRef = useRef(null);
@@ -272,7 +269,7 @@ const Sidebar = ({
       track.style.transition = "none";
       track.style.transform = `translateX(${-mobileTabIndex * w + rdx}px)`;
     },
-    [mobileTabIndex, viewportW, setMobileTab, MOBILE_TABS]
+    [mobileTabIndex, viewportW]
   );
 
   const handlePagerTouchEnd = useCallback(
@@ -298,7 +295,7 @@ const Sidebar = ({
       // Otherwise React re-renders with dragging=false and the CSS transition
       // animates the track back to the current page (snap-back).
     },
-    [mobileTabIndex, viewportW, setMobileTab, MOBILE_TABS]
+    [mobileTabIndex, viewportW]
   );
 
   // Inline data for Updates / Calls tabs (no modals on mobile)
@@ -761,7 +758,6 @@ const Sidebar = ({
   const channelsCount = filteredChannels.length;
   const allCount = roomsCount + directCount + channelsCount;
 
-  const topPendingRequest = incomingRequests && incomingRequests.length > 0 ? incomingRequests[0] : null;
 
   const handleOpenGroupModal = () => {
     if (onOpenCreateGroup) {
@@ -2014,7 +2010,7 @@ const Sidebar = ({
           ref={pagerTrackRef}
           className="flex h-full"
           style={{
-            transform: `translateX(${-effectiveIndex * viewportW + (isPagerDragging ? gestureRef.current?.dx || 0 : 0)}px)`,
+            transform: `translateX(${-mobileTabIndex * viewportW + (isPagerDragging ? gestureRef.current?.dx || 0 : 0)}px)`,
             transition: isPagerDragging ? "none" : "transform 280ms cubic-bezier(0.2, 0.8, 0.25, 1)",
           }}
         >

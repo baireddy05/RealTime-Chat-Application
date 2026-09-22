@@ -324,7 +324,6 @@ export const useChatStore = create((set, get) => ({
         mediaUrl: media?.mediaUrl || undefined,
         mediaType: media?.mediaType || undefined,
       });
-      const authUser = useAuthStore.getState().authUser;
       
       const newStory = {
         id: res.data._id,
@@ -425,7 +424,7 @@ export const useChatStore = create((set, get) => ({
 
   toggleArchiveChat: async (chatId) => {
     try {
-      const res = await axiosInstance.post(`/chat/archive/${chatId}`);
+      await axiosInstance.post(`/chat/archive/${chatId}`);
       set((state) => {
         let newArchived = [...state.archivedChats];
         if (newArchived.includes(chatId)) {

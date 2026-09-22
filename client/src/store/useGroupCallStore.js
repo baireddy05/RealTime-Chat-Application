@@ -29,7 +29,7 @@ export const useGroupCallStore = create((set, get) => ({
 
     // We joined the room; now initiate connections with everyone already in the room
     socket.on("allUsersInCall", ({ users }) => {
-      const { localStream, activeSocket } = get();
+      const { localStream } = get();
       if (!localStream) return;
       users.forEach(userId => {
         const peer = get().createPeer(userId, true, localStream);

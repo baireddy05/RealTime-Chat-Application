@@ -158,7 +158,7 @@ const StatusModal = ({ onClose }) => {
           localStorage.setItem("viewedStories", JSON.stringify(viewed));
           window.dispatchEvent(new Event("pulse:story-viewed"));
         }
-      } catch (e) {}
+      } catch {}
       // Record the view server-side for the owner's viewers list
       viewStatus(activeStory.id);
     }

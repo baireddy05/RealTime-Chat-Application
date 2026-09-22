@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { 
   X, 
   Plus, 
@@ -8,7 +8,6 @@ import {
   Check, 
   StickyNote, 
   Edit2, 
-  Sparkles 
 } from "lucide-react";
 import { soundManager } from "../lib/sound";
 

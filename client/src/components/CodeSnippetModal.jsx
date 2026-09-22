@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { X, Code2, Send, Terminal, FileCode, Check } from "lucide-react";
+import { X, Code2, Send, Terminal, FileCode } from "lucide-react";
 import { soundManager } from "../lib/sound";
 
 const LANGUAGES = [

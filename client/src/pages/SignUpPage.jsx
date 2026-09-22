@@ -13,11 +13,8 @@ import {
   User,
   Sun,
   Moon,
-  Shield,
   Activity,
   ArrowLeft,
-  ArrowRight,
-  Sparkles,
 } from "lucide-react";
 
 const SignUpPage = () => {

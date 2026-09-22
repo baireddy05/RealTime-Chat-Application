@@ -65,7 +65,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, isForwardOpen]);
+  }, [onClose, isForwardOpen, isGallery, images.length]);
 
   const handleReset = () => {
     setScale(1);

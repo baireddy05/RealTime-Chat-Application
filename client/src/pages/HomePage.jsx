@@ -107,7 +107,7 @@ const HomePage = () => {
         const parsed = parseInt(saved, 10);
         if (!isNaN(parsed) && parsed >= 310 && parsed <= 700) return parsed;
       }
-    } catch (e) {}
+    } catch {}
     return 360;
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -123,7 +123,7 @@ const HomePage = () => {
     setSidebarWidth(360);
     try {
       localStorage.setItem("pulse_sidebar_width", "360");
-    } catch (e) {}
+    } catch {}
   }, []);
 
   const updateLogoCoords = useCallback(() => {
@@ -160,7 +160,7 @@ const HomePage = () => {
       setSidebarWidth(newWidth);
       try {
         localStorage.setItem("pulse_sidebar_width", newWidth.toString());
-      } catch (err) {}
+      } catch {}
 
       // Keep background pulse wave anchored strictly to the logo in real time
       if (logoRef.current) {
@@ -377,7 +377,7 @@ const HomePage = () => {
           person.stories.some(story => !viewed.includes(story.id))
         );
         setHasUnreadStories(hasUnread);
-      } catch (e) {
+      } catch {
         setHasUnreadStories(false);
       }
     };

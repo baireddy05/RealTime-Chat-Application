@@ -4,7 +4,6 @@ import {
   MessageSquare,
   Send,
   Loader,
-  Lock,
   FileText,
   Download,
 } from "lucide-react";

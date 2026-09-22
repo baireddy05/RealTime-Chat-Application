@@ -196,7 +196,7 @@ export const FormattedMessageText = memo(({ text, isMine, searchQuery, highlight
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({node, className, children, ...props}) {
+          code({_node, className, children, ...props}) {
             const match = /language-(\w+)/.exec(className || '');
             // In react-markdown v10, block code is wrapped in <pre> or has newlines/language class
             const isMultiLine = String(children).includes('\n');

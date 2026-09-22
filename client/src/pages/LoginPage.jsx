@@ -12,11 +12,8 @@ import {
   Mail,
   Sun,
   Moon,
-  Shield,
   Activity,
   ArrowLeft,
-  ArrowRight,
-  Sparkles,
 } from "lucide-react";
 
 const LoginPage = () => {

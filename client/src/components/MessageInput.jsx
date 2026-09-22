@@ -151,7 +151,6 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setChatDisappearing,
     drafts,
     setDraft,
-    messages,
     updateLiveLocation,
     stopLiveLocation,
   } = useChatStore();
