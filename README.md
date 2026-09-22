@@ -37,8 +37,6 @@ CLIENT_URL=http://localhost:5173
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=mailto:you@example.com
-# Optional: native Android (FCM) push for killed-app delivery. JSON string or file path.
-# FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
 ```
 
 Create a `.env` file in the `client` directory:
@@ -98,5 +96,5 @@ npm run seed
 
 Seeded content includes a "General Group" with welcome messages, and User1 + User2 start as friends. Suggested flow: log in as User1 and User2 in two browsers, exchange text, an image, and a PDF, then try a call and a status post.
 
-### 7. Android App (PWA install or APK)
-Install on phones straight from the browser (Add to Home Screen), or build a real installable APK with Capacitor — push notifications, calls, splash screen and icons included. Full guide: [`ANDROID_APK.md`](./ANDROID_APK.md).
+### 7. Install as an App (PWA)
+Install on phones straight from the browser via Add to Home Screen for an app-like experience with background push notifications.

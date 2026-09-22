@@ -40,7 +40,7 @@
 
 Pulse Messenger is a fully working, real-time instant messaging application built with the MERN stack and Socket.io. It supports one-to-one chats, group chats, broadcast channels, 24-hour status stories, audio/video calling (including group calls), and a wide set of modern messaging features such as quoted replies, message editing, scheduled messages, starred messages, polls, tasks, events, reminders, live location sharing, and end-to-end encrypted messaging.
 
-The application is responsive across desktop and mobile, installable as a Progressive Web App (PWA), and packaged as a native Android app shell (`com.pulse.messenger`) using Capacitor. Document sharing uses a private backend store (MongoDB GridFS) with authenticated downloads, while images, audio, and video are served through Cloudinary. The project includes automated browser tests (Playwright), health-monitoring endpoints, seed data for evaluation, and full setup documentation.
+The application is responsive across desktop and mobile, installable as a Progressive Web App (PWA). Document sharing uses a private backend store (MongoDB GridFS) with authenticated downloads, while images, audio, and video are served through Cloudinary. The project includes automated browser tests (Playwright), health-monitoring endpoints, seed data for evaluation, and full setup documentation.
 
 ---
 
@@ -58,7 +58,7 @@ The application is responsive across desktop and mobile, installable as a Progre
 
 ## 3. Scope of Work
 
-- **Included:** authentication, real-time messaging (text, media, files, voice notes, locations, contacts, polls, code snippets, sketches), groups with invite codes and join approvals, channels, broadcast lists, status stories, 1-to-1 and group WebRTC calls, call history, push notifications (Web Push + FCM), chat organization (labels, pins, archive, chat lock), themes, PWA + Capacitor Android shell, automated Playwright tests, seed data, and documentation.
+- **Included:** authentication, real-time messaging (text, media, files, voice notes, locations, contacts, polls, code snippets, sketches), groups with invite codes and join approvals, channels, broadcast lists, status stories, 1-to-1 and group WebRTC calls, call history, push notifications (Web Push), chat organization (labels, pins, archive, chat lock), themes, PWA support, automated Playwright tests, seed data, and documentation.
 - **Out of scope (not attempted):** app-store publication, iOS native build, production DevOps (CI/CD, log aggregation, error-tracking service integration).
 
 ---
@@ -80,7 +80,7 @@ The application is responsive across desktop and mobile, installable as a Progre
 | Encryption | Web Crypto API (AES-GCM 256-bit) | Client-side end-to-end message encryption |
 | Calls | WebRTC (peer-to-peer, Socket.io signalling) | Audio/video and group calls |
 | Push | Web Push (VAPID) + Firebase Cloud Messaging | Background message/call alerts, deep links |
-| Mobile shell | Capacitor (`com.pulse.messenger`) | Installable Android APK path |
+| PWA support | Web app manifest + service worker | Installable Add-to-Home-Screen app |
 | Testing | Playwright (7 spec files) | Automated end-to-end browser tests |
 | PWA | vite plugin + `usePWAInstall` hook | Add-to-Home-Screen install |
 
@@ -94,13 +94,13 @@ The application is responsive across desktop and mobile, installable as a Progre
 |  - 6 Zustand     |                            | - 7 route groups  |       | - 13 models    |
 |    stores        |                            | - JWT cookie auth |       +----------------+
 |  - ~50 components|                            | - Socket.io layer |
-|  - PWA / Capacitor|                           | - GridFS doc store|
+|  - PWA (web only)|                           | - GridFS doc store|
 +--------+---------+                            +--------+----------+
          |                                               |
          |  Media upload/download                        |  Media upload (signed)
          v                                               v
 +------------------+                            +------------------+
-|  Cloudinary CDN  |                            |  Push: VAPID/FCM |
+|  Cloudinary CDN  |                            |  Push: VAPID (web) |
 |  (images/audio/  |                            |  rendered via    |
 |   video/avatars) |                            |  service worker  |
 +------------------+                            +------------------+
@@ -112,7 +112,7 @@ The application is responsive across desktop and mobile, installable as a Progre
 - **Document share:** client uploads via `POST /api/upload/document` (50 MB cap, allow-listed types) -> stored in GridFS, message stores `{ url, fileId, name, size }` -> recipient downloads via authenticated `GET /api/upload/file/:id` (owner-or-participant check, served as attachment).
 - **Media share:** client requests `/api/upload/signature` -> uploads directly to Cloudinary -> URL saved on the message.
 - **Calls:** WebRTC offer/answer/ICE exchanged through Socket.io rooms; call records persisted to call history; push alerts wake offline/killed apps with deep links (`?chat=`, `?callFrom=`).
-- **Push:** VAPID subscriptions (web) and FCM tokens (Android) stored server-side; background events trigger notifications; dead endpoints auto-prune.
+- **Push:** VAPID subscriptions stored server-side; background events trigger notifications; dead endpoints auto-prune.
 
 ---
 
@@ -130,7 +130,7 @@ The application is responsive across desktop and mobile, installable as a Progre
 - `routes/` - `auth`, `chat`, `upload`, `friends`, `status`, `calls` (`call.route.js`), `push` (7 groups).
 - `controllers/` - 8 controllers matching the routes plus broadcast logic.
 - `models/` - 13 Mongoose models (User, Message, Room, Status, CallLog, FriendRequest, BroadcastList, Event, Task, Reminder, Report, DeviceToken, PushSubscription).
-- `lib/` - `socket.js` (auth + rooms + signalling), `db.js` (Atlas connect with pooling), `corsConfig.js` (origin allow-list), `utils.js` (token/cookie helper), `messageScheduler.js` (scheduled messages), `push.js`/`notify.js`/`fcm.js` (notifications), `aiCompanion.js`, `cloudinary.js`.
+- `lib/` - `socket.js` (auth + rooms + signalling), `db.js` (Atlas connect with pooling), `corsConfig.js` (origin allow-list), `utils.js` (token/cookie helper), `messageScheduler.js` (scheduled messages), `push.js`/`notify.js` (notifications), `aiCompanion.js`, `cloudinary.js`.
 - `middleware/` - JWT route guard (`protectRoute`).
 
 ---
@@ -215,7 +215,7 @@ npm run dev      # starts on http://localhost:5173
 
 **Verify:** open `http://localhost:5173`, sign up two accounts (or use the demo accounts below) in two browsers, and exchange messages. Health check: `GET http://localhost:5000/api/health` should return `pong`.
 
-**Android build:** PWA installs straight from the browser (Add to Home Screen); a real APK can be built with Capacitor - full guide in `ANDROID_APK.md` (`npm run cap:sync`, `npm run cap:open android`).
+**Install as an app (PWA):** installs straight from the browser via Add to Home Screen, with background push notifications.
 
 ---
 
@@ -269,7 +269,7 @@ Seeded content: a "General Group" with welcome messages; User1 and User2 start a
 
 **Current limitations:** demo seed accounts ship with a publicly documented password (fine for evaluation, must be disabled for any real deployment); no centralized error-tracking or request-logging service; confirmation dialogs still use native `confirm`/`prompt` in places; server-side unit test coverage is thin.
 
-**Future scope:** replace native dialogs with a custom modal/toast system; add `helmet` security headers and structured logging; add server unit + integration tests; move scheduled-message delivery to a persistent job queue; iOS Capacitor build; app-store release pipeline; database indexes for the file-access fallback query; admin/moderation dashboard.
+**Future scope:** replace native dialogs with a custom modal/toast system; add `helmet` security headers and structured logging; add server unit + integration tests; move scheduled-message delivery to a persistent job queue; database indexes for the file-access fallback query; admin/moderation dashboard.
 
 ---
 
@@ -298,7 +298,7 @@ Base URL: `http://localhost:5000/api` (auth via HttpOnly JWT cookie; Bearer fall
 | GET | `/upload/signature` | Signed Cloudinary media upload params |
 | GET/POST | `/statuses` | 24-hour stories (post, view, viewers, delete) |
 | GET/POST | `/calls` | Call history, redial data, clearing |
-| GET/POST | `/push/*` | VAPID subscriptions, FCM tokens, test push |
+| GET/POST | `/push/*` | VAPID subscriptions, test push |
 | GET | `/`, `/health`, `/api/health`, `/ping` | Liveness/uptime checks |
 
 Real-time events (Socket.io, cookie/token authenticated): `message`, `typing`/`stopTyping`, `messageDelivered`/`messageRead`, room updates, call signalling (`joinGroupCall`, offers/answers/ICE), presence.
@@ -309,7 +309,7 @@ Real-time events (Socket.io, cookie/token authenticated): `message`, `typing`/`s
 
 ```
 RealTime Chat Application/
-|-- client/                  # React 19 + Vite + Tailwind + Zustand + PWA/Capacitor
+|-- client/                  # React 19 + Vite + Tailwind + Zustand + PWA (web only)
 |   |-- src/
 |   |   |-- pages/           # HomePage, LoginPage, SignUpPage, WelcomePage
 |   |   |-- components/      # Sidebar, ChatPane, MessageBubble/Input, ~45 modals/drawers
@@ -319,20 +319,17 @@ RealTime Chat Application/
 |   |   |                    # chatLock, backNavigation, vcard, themes
 |   |   |-- hooks/           # usePWAInstall
 |   |-- tests/               # 7 Playwright spec files
-|   |-- android/             # Capacitor native shell (com.pulse.messenger)
-|   |-- ANDROID_APK.md       # APK build guide
 |-- server/                  # Node + Express + Socket.io + Mongoose
 |   |-- src/
 |   |   |-- routes/          # auth, chat, upload, friends, status, calls, push
 |   |   |-- controllers/     # 8 controllers (incl. broadcast)
 |   |   |-- models/          # 13 models
-|   |   |-- lib/             # socket, db, corsConfig, scheduler, push/fcm/notify
+|   |   |-- lib/             # socket, db, corsConfig, scheduler, push/notify
 |   |   |-- middleware/      # JWT protectRoute
 |   |-- seed.js              # demo data seeder
 |   |-- scripts/             # gen-vapid helper
 |-- README.md                # setup guide
 |-- FEATURES.md              # full feature inventory (source of truth)
-|-- ANDROID_APK.md           # mobile build guide
 |-- PROJECT_REPORT.md        # this report
 ```
 
@@ -340,6 +337,6 @@ RealTime Chat Application/
 
 ## References
 
-- Repository docs: `README.md` (setup), `FEATURES.md` (feature inventory), `ANDROID_APK.md` (mobile build), `client/tests/` (automated tests).
-- Stack documentation: React, Vite, Tailwind CSS, Zustand, Socket.io, Express.js, Mongoose/MongoDB (incl. GridFSBucket), Cloudinary Upload API, Web Crypto (AES-GCM), WebRTC, Web Push (VAPID), Capacitor, Playwright.
+- Repository docs: `README.md` (setup), `FEATURES.md` (feature inventory), `PROJECT_REPORT.md` (this report), `client/tests/` (automated tests).
+- Stack documentation: React, Vite, Tailwind CSS, Zustand, Socket.io, Express.js, Mongoose/MongoDB (incl. GridFSBucket), Cloudinary Upload API, Web Crypto (AES-GCM), WebRTC, Web Push (VAPID), Playwright.
 - Live verification performed during development: Cloudinary delivery probes (401 on `image/upload`, 404 on `raw/upload` for legacy PDFs), production `vite build`, `oxlint`, Playwright last-run record.

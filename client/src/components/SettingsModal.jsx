@@ -13,7 +13,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
-import { isNativeApp, ensurePushTransports } from "../lib/push";
+import { ensurePushTransports } from "../lib/push";
 import { hasChatPin, setChatPin, clearChatPin, verifyChatPin, getLockedChats } from "../lib/chatLock";
 
 // Chat Lock PIN management (device-local, Privacy tab)
@@ -162,10 +162,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
     try {
       const { axiosInstance } = await import("../lib/axios");
       const { data } = await axiosInstance.get("/api/push/config");
-      if (isNativeApp()) {
-        setPushStatus("on");
-        return;
-      }
       if (!data?.vapidPublicKey) {
         setPushStatus("unconfigured");
         return;
@@ -472,9 +468,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     <span>Background Push Notifications</span>
                   </div>
                   <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                    {isNativeApp()
-                      ? "Get message and call alerts on this device even when the app is closed."
-                      : "Get message and call alerts even when the browser tab is closed."}
+                    Get message and call alerts even when the browser tab is closed.
                   </p>
                   {pushStatus === "unconfigured" && (
                     <p className="text-[11px] text-amber-500">

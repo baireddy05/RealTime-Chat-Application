@@ -1,17 +1,8 @@
 import { axiosInstance } from "./axios";
-import { Capacitor } from "@capacitor/core";
 
-// Unified push manager: Web Push for browsers/PWA, FCM (via Capacitor)
-// for the native Android app. All failures are local-only and silent so
-// auth and messaging flows never break because of push.
-
-export const isNativeApp = () => {
-  try {
-    return Capacitor.isNativePlatform();
-  } catch {
-    return false;
-  }
-};
+// Web Push manager for browsers and installed PWAs. All failures are
+// local-only and silent so auth and messaging flows never break because
+// of push.
 
 const urlBase64ToUint8Array = (base64String) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -72,17 +63,6 @@ export async function disableWebPush() {
   }
 }
 
-// --- Native push (Capacitor Android app, FCM) ---
-
-let fcmListenersAttached = false;
-let nativeRegisteredThisSession = false;
-
-const emitForegroundPush = (data) => {
-  try {
-    window.dispatchEvent(new CustomEvent("pulse:push-received", { detail: data || {} }));
-  } catch {}
-};
-
 /** Navigate to a push target. Full reload when the app isn't running;
  *  in-app event when it is (HomePage listens for it). */
 export function handlePushAction(data) {
@@ -108,84 +88,12 @@ export function handlePushAction(data) {
   }
 }
 
-export async function ensureNativePush() {
-  if (!isNativeApp()) return { ok: false, reason: "not-native" };
-  try {
-    const { PushNotifications } = await import("@capacitor/push-notifications");
-    let perm = await PushNotifications.checkPermissions();
-    if (perm.receive !== "granted") {
-      perm = await PushNotifications.requestPermissions();
-    }
-    if (perm.receive !== "granted") return { ok: false, reason: "no-permission" };
-
-    if (!fcmListenersAttached) {
-      fcmListenersAttached = true;
-      // Notification channel required by the server's FCM payload
-      // (android.notification.channelId = "pulse_messages").
-      try {
-        await PushNotifications.createChannel({
-          id: "pulse_messages",
-          name: "Pulse messages",
-          description: "New messages and incoming calls",
-          importance: 4,
-          visibility: 1,
-          sound: "default",
-          vibration: true,
-        });
-      } catch {}
-      // Token (re)registration — upserts server-side, idempotent.
-      PushNotifications.addListener("registration", (t) => {
-        if (t?.value) {
-          axiosInstance
-            .post("/api/push/device-token", { platform: "android", token: t.value })
-            .catch(() => {});
-        }
-      });
-      PushNotifications.addListener("registrationError", (err) => {
-        console.warn("[Push] FCM registration error:", err?.error || err);
-      });
-      // App in foreground: surface through the in-app event bus
-      // (in-app call ringing is already handled by the live socket).
-      PushNotifications.addListener("pushNotificationReceived", (notification) => {
-        emitForegroundPush(notification?.data || {});
-      });
-      PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-        handlePushAction(action?.notification?.data);
-      });
-    }
-
-    if (!nativeRegisteredThisSession) {
-      await PushNotifications.register();
-      nativeRegisteredThisSession = true;
-    }
-    return { ok: true };
-  } catch (err) {
-    console.warn("[Push] Native registration failed:", err?.message || err);
-    return { ok: false, reason: "native-failed" };
-  }
-}
-
-export async function disableNativePush() {
-  nativeRegisteredThisSession = false;
-  if (!isNativeApp()) return;
-  try {
-    // Remove our server-side token; listeners stay (guarded by auth state).
-    await axiosInstance.delete("/api/push/device-token", { data: {} }).catch(() => {});
-    const { PushNotifications } = await import("@capacitor/push-notifications");
-    await PushNotifications.unregister().catch(() => {});
-  } catch {}
-}
-
-// Called after login/signup/auth-check: wires the right transport.
+// Called after login/signup/auth-check: wires the web transport.
 // Never throws; never prompts by itself (permission UX lives in Settings).
 export async function ensurePushTransports() {
-  if (isNativeApp()) {
-    return ensureNativePush();
-  }
   return ensureWebPushSubscription();
 }
 
 export async function disablePushTransports() {
   await disableWebPush();
-  await disableNativePush();
 }
