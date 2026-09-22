@@ -179,9 +179,7 @@ const ThreadDrawer = ({ onClose }) => {
                 {activeThreadMessage.file && (
                   <button
                     type="button"
-                    onClick={() => downloadFile(activeThreadMessage.file.url, activeThreadMessage.file.name).catch((err) =>
-                      alert(`Couldn't download "${activeThreadMessage.file.name || "file"}": ${err?.message || "unknown error"}`)
-                    )}
+                    onClick={() => downloadFile(activeThreadMessage.file.url, activeThreadMessage.file.name)}
                     className="mt-2.5 flex items-center gap-2 p-2 rounded-xl bg-[var(--glass-hover)] border border-[var(--glass-border)] hover:border-accent-primary/40 transition-colors text-xs w-full text-left cursor-pointer"
                   >
                     <FileText size={16} className="text-accent-primary shrink-0" />
@@ -322,9 +320,7 @@ const ThreadDrawer = ({ onClose }) => {
                     {reply.file && (
                       <button
                         type="button"
-                        onClick={() => downloadFile(reply.file.url, reply.file.name).catch((err) =>
-                          alert(`Couldn't download "${reply.file.name || "file"}": ${err?.message || "unknown error"}`)
-                        )}
+                        onClick={() => downloadFile(reply.file.url, reply.file.name)}
                         className={`mt-2 flex items-center gap-2 p-2 rounded-xl border text-xs transition-colors w-full text-left cursor-pointer ${
                           isMe
                             ? "bg-white/15 border-white/20 text-white"
