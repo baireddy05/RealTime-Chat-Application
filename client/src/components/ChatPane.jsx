@@ -50,7 +50,7 @@ const getPinnedPreview = (msg, fallbackDecryptedText) => {
   if (msg.isDeleted || msg.text === "This message was deleted" || msg.decryptedText === "This message was deleted") {
     return "🚫 This message was deleted";
   }
-  if (msg.poll) return `📊 Poll: ${msg.poll.question || "Poll"}`;
+  if (msg.poll?.options?.length > 0) return `📊 Poll: ${msg.poll.question || "Poll"}`;
   if (msg.audio) return "🎤 Voice Note";
   const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
   if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";

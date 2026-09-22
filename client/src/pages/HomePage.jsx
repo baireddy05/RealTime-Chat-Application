@@ -51,7 +51,7 @@ const HomePage = () => {
   const logout = useAuthStore((s) => s.logout);
   const initSocketListeners = useCallStore((s) => s.initSocketListeners);
   const friends = useFriendStore((s) => s.friends);
-  const incomingRequests = useFriendStore((s) => s.incomingRequests);
+
   const getFriends = useFriendStore((s) => s.getFriends);
   const getFriendRequests = useFriendStore((s) => s.getFriendRequests);
   const { isInstallable, promptInstall } = usePWAInstall();
@@ -65,7 +65,8 @@ const HomePage = () => {
   const [isJoinGroupOpen, setIsJoinGroupOpen] = useState(false);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const [isCallsOpen, setIsCallsOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState("chats");
+  const mobileTab = useChatStore((s) => s.mobileTab);
+  const setMobileTab = useChatStore((s) => s.setMobileTab);
 
   // Initialize mobile root back-navigation guard
   useEffect(() => {
@@ -346,7 +347,7 @@ const HomePage = () => {
     }
   }
 
-  const pendingCount = incomingRequests?.length || 0;
+
   
   // Calculate unread chats (ignoring hidden rooms)
   const unreadChatsCount = useMemo(() => {
@@ -440,7 +441,7 @@ const HomePage = () => {
           <button
             onClick={() => {
               setSelectedChat(null);
-              setActiveNav("all-chats");
+              setMobileTab("chats");
             }}
               className="group relative flex items-center justify-center w-12 h-12 hover:scale-105 active:scale-95 transition-all cursor-pointer"
               type="button"
@@ -453,21 +454,22 @@ const HomePage = () => {
 
           <div className="w-8 h-[1px] bg-black/10 dark:bg-white/10" />
 
-          {/* Core Navigation Items */}
+          {/* Core Navigation Items - same four tabs as the mobile bottom nav */}
           <div className="flex flex-col items-center gap-2">
             {/* Chats */}
             <button
               onClick={() => {
-                setActiveNav("chats");
+                setSelectedChat(null);
+                setMobileTab("chats");
               }}
               className={`group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                activeNav === "chats"
+                mobileTab === "chats"
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm font-bold"
                   : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
               }`}
               type="button"
             >
-              {activeNav === "chats" && (
+              {mobileTab === "chats" && (
                 <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
               )}
               <span className="material-symbols-outlined text-xl">chat</span>
@@ -476,83 +478,78 @@ const HomePage = () => {
                   {unreadChatsCount}
                 </span>
               )}
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100]">
                 Chats
               </span>
             </button>
 
-            {/* 24-Hour Status Stories */}
+            {/* Updates */}
             <button
               onClick={() => {
-                setIsStatusStoriesOpen(true);
-              }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-all"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-xl">motion_photos_on</span>
-              {hasUnreadStories && (
-                <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
-              )}
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
-                Status Stories
-              </span>
-            </button>
-
-            {/* Starred Messages */}
-            <button
-              onClick={() => {
-                setIsStarredOpen(true);
-              }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-all"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-xl">star</span>
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
-                Starred Messages
-              </span>
-            </button>
-
-            {/* New Group */}
-            <button
-              onClick={() => {
-                setIsCreateGroupOpen(true);
-              }}
-              className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5 transition-all"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-xl">group_add</span>
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
-                New Group
-              </span>
-            </button>
-
-            {/* New Chat / Contacts */}
-            <button
-              onClick={() => {
-                setActiveNav("contacts");
-                setIsContactsModalOpen(true);
+                setMobileTab("updates");
               }}
               className={`group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
-                activeNav === "contacts"
+                mobileTab === "updates"
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm font-bold"
                   : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
               }`}
               type="button"
             >
-              {activeNav === "contacts" && (
+              {mobileTab === "updates" && (
                 <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
               )}
-              <span className="material-symbols-outlined text-xl">person_add</span>
-              {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] flex items-center justify-center font-bold animate-pulse">
-                  {pendingCount}
-                </span>
+              <span className="material-symbols-outlined text-xl">motion_photos_on</span>
+              {hasUnreadStories && (
+                <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 dark:bg-white ring-1 ring-white dark:ring-[#09090b]" />
               )}
-              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100] before:content-[''] before:absolute before:right-full before:top-1/2 before:-translate-y-1/2 before:border-4 before:border-transparent before:border-r-zinc-900 dark:before:border-r-[#1c1b24]">
-                Contacts ({friends?.length || 0})
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100]">
+                Updates
+              </span>
+            </button>
+
+            {/* Groups */}
+            <button
+              onClick={() => {
+                setMobileTab("groups");
+              }}
+              className={`group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
+                mobileTab === "groups"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
+              }`}
+              type="button"
+            >
+              {mobileTab === "groups" && (
+                <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
+              )}
+              <span className="material-symbols-outlined text-xl">groups</span>
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100]">
+                Groups
+              </span>
+            </button>
+
+            {/* Calls */}
+            <button
+              onClick={() => {
+                setMobileTab("calls");
+              }}
+              className={`group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
+                mobileTab === "calls"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-sm font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
+              }`}
+              type="button"
+            >
+              {mobileTab === "calls" && (
+                <span className="absolute -left-3 w-1 h-5 rounded-r-full bg-zinc-900 dark:bg-white" />
+              )}
+              <span className="material-symbols-outlined text-xl">call_log</span>
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-[#1c1b24] dark:text-white border border-zinc-700/40 dark:border-white/20 text-xs font-semibold shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 scale-95 group-hover:scale-100 whitespace-nowrap z-[100]">
+                Calls
               </span>
             </button>
           </div>
+
         </div>
 
         {/* Bottom Stack: Settings, Theme, Profile */}
@@ -614,7 +611,6 @@ const HomePage = () => {
           onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
           onOpenJoinGroup={() => setIsJoinGroupOpen(true)}
           onOpenBroadcast={() => setIsBroadcastOpen(true)}
-          onOpenCalls={() => setIsCallsOpen(true)}
           onOpenCalls={() => setIsCallsOpen(true)}
           onOpenStatus={() => setIsStatusStoriesOpen(true)}
           onOpenStarred={() => setIsStarredOpen(true)}

@@ -78,6 +78,10 @@ export const useChatStore = create((set, get) => ({
   isScheduledOpen: false,
   isChatThemeOpen: false,
   isSettingsOpen: false,
+  // Primary tabs shared by mobile bottom nav and desktop activity rail
+  // (Chats / Updates / Groups / Calls). The sidebar pager follows this.
+  mobileTab: "chats",
+  setMobileTab: (tab) => set({ mobileTab: tab }),
   backgroundAnimationsEnabled: (() => {
     try {
       const v = localStorage.getItem("pulse_bg_animations_enabled");
@@ -2328,7 +2332,7 @@ export const useChatStore = create((set, get) => ({
         audio: fwdAudio,
         file: message.file || null,
         contact: message.contact || null,
-        poll: message.poll || null,
+        poll: message.poll?.options?.length > 0 ? message.poll : null,
         isForwarded: true,
         isEncrypted,
       };

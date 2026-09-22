@@ -7,6 +7,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  // Generous assertions: cold Vite dev-server boot + bcrypt signup + first
+  // API fan-out can exceed the 5s default under parallel load (3 browsers).
+  expect: { timeout: 15000 },
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',

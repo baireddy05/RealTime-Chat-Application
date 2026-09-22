@@ -137,6 +137,9 @@ export const sendBroadcast = async (req, res) => {
         contact: contact || null,
         isForwarded: false,
         isBroadcast: true,
+        // Explicit null: the schema would otherwise materialize an empty
+        // poll subdocument that renders as a bogus "Select one" card.
+        poll: null,
       });
       await msg.save();
       await msg.populate("senderId", "username profilePic");

@@ -198,30 +198,21 @@ const Sidebar = ({
   const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
   const [showChannelsModal, setShowChannelsModal] = useState(false);
 
-  // ---- WhatsApp-style mobile primary tabs (true swipeable pager) ----
-  // Chats / Updates / Groups / Calls live on a finger-following track on
-  // mobile. Desktop pins to the Chats page (activity rail owns nav there).
+  // ---- Primary tabs shared with the desktop activity rail ----
+  // Chats / Updates / Groups / Calls live on a finger-following track.
+  // The same store tab drives the mobile bottom nav and the desktop rail,
+  // so both shells always show the exact same four options.
   const MOBILE_TABS = ["chats", "updates", "groups", "calls"];
-  const [mobileTab, setMobileTab] = useState("chats");
+  const mobileTab = useChatStore((s) => s.mobileTab);
+  const setMobileTab = useChatStore((s) => s.setMobileTab);
   const mobileTabIndex = Math.max(0, MOBILE_TABS.indexOf(mobileTab));
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 768
-  );
+  const effectiveIndex = mobileTabIndex;
   const [viewportW, setViewportW] = useState(0);
   const [isPagerDragging, setIsPagerDragging] = useState(false);
   const pagerViewportRef = useRef(null);
   const pagerTrackRef = useRef(null);
   const gestureRef = useRef(null); // { startX, startY, dx, locked, startT, lastX, lastT, vel }
-  const effectiveIndex = isMobile ? mobileTabIndex : 0;
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(max-width: 767px)");
-    const onChange = (e) => setIsMobile(e.matches);
-    setIsMobile(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   useEffect(() => {
     const el = pagerViewportRef.current;
@@ -234,7 +225,6 @@ const Sidebar = ({
 
   const handlePagerTouchStart = useCallback(
     (e) => {
-      if (!isMobile) return;
       const t = e.touches?.[0];
       if (!t || e.touches.length !== 1) return;
       const now = performance.now();
@@ -248,7 +238,7 @@ const Sidebar = ({
         vel: 0,
       };
     },
-    [isMobile]
+    []
   );
 
   const handlePagerTouchMove = useCallback(
@@ -282,7 +272,7 @@ const Sidebar = ({
       track.style.transition = "none";
       track.style.transform = `translateX(${-mobileTabIndex * w + rdx}px)`;
     },
-    [mobileTabIndex, viewportW]
+    [mobileTabIndex, viewportW, setMobileTab, MOBILE_TABS]
   );
 
   const handlePagerTouchEnd = useCallback(
@@ -308,7 +298,7 @@ const Sidebar = ({
       // Otherwise React re-renders with dragging=false and the CSS transition
       // animates the track back to the current page (snap-back).
     },
-    [mobileTabIndex, viewportW]
+    [mobileTabIndex, viewportW, setMobileTab, MOBILE_TABS]
   );
 
   // Inline data for Updates / Calls tabs (no modals on mobile)
@@ -1315,10 +1305,7 @@ const Sidebar = ({
             )}
             <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>
               <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">
-                <span className="md:hidden">
-                  {mobileTab === "updates" ? "Updates" : mobileTab === "groups" ? "Groups" : mobileTab === "calls" ? "Calls" : "Chats"}
-                </span>
-                <span className="hidden md:inline">Chats</span>
+                {mobileTab === "updates" ? "Updates" : mobileTab === "groups" ? "Groups" : mobileTab === "calls" ? "Calls" : "Chats"}
               </h1>
             </div>
           </div>
@@ -1377,7 +1364,7 @@ const Sidebar = ({
                   {onOpenProfile && (
                     <button
                       onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
-                      className="md:hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
                       <span className="material-symbols-outlined text-[16px] text-accent-primary">person</span>
                       <span>My Profile</span>
@@ -1386,10 +1373,24 @@ const Sidebar = ({
                   {onOpenStarred && (
                     <button
                       onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
-                      className="md:hidden w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
                       <span className="material-symbols-outlined text-[16px] text-accent-primary">star</span>
                       <span>Starred Messages</span>
+                    </button>
+                  )}
+                  {onOpenAddFriend && (
+                    <button
+                      onClick={() => { onOpenAddFriend(); setShowOptionsDropdown(false); }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-accent-primary">person_add</span>
+                      <span>Contacts ({friends?.length || 0})</span>
+                      {pendingCount > 0 && (
+                        <span className="ml-auto px-1.5 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold">
+                          {pendingCount}
+                        </span>
+                      )}
                     </button>
                   )}
                   {onOpenSetStatus && (
@@ -1474,7 +1475,7 @@ const Sidebar = ({
         </div>
 
         {/* Search Bar with âŒ˜K â€” Chats tab only on mobile */}
-        <div className={`relative items-center w-full mt-1 ${mobileTab === "chats" ? "flex" : "hidden md:flex"}`}>
+        <div className={`relative items-center w-full mt-1 ${mobileTab === "chats" ? "flex" : "hidden"}`}>
           <span className="material-symbols-outlined absolute left-3 text-zinc-400 dark:text-zinc-500 pointer-events-none text-base">
             search
           </span>
@@ -1503,7 +1504,7 @@ const Sidebar = ({
         </div>
 
         {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct â€” Chats tab only on mobile */}
-        <div className={`relative select-none ${mobileTab === "chats" ? "" : "hidden md:block"}`}>
+        <div className={`relative select-none ${mobileTab === "chats" ? "" : "hidden"}`}>
           <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1">
             <button
               onClick={() => setActiveFilter("all")}
@@ -1648,7 +1649,8 @@ const Sidebar = ({
 
         {/* Label folders toolbar â€” hidden entirely when no labels exist
             so it never leaves a dead gap in the header */}
-        {(labels || []).length > 0 && (
+        {/* Label folders toolbar — chats tab only (desktop included) */}
+        {(labels || []).length > 0 && mobileTab === "chats" && (
           <div className="flex items-center gap-1.5 pt-1 pb-0.5 select-none">
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0">
             {(labels || []).map((label) => {
@@ -1695,7 +1697,7 @@ const Sidebar = ({
 
       {/* 2. Pending Friend Requests Banner List â€” Chats tab only on mobile */}
       {incomingRequests && incomingRequests.length > 0 && (
-        <div className={`my-2 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/20 backdrop-blur-xl shadow-glass flex-col gap-2 shrink-0 animate-fadeIn ${mobileTab === "chats" ? "flex" : "hidden md:flex"}`}>
+        <div className={`my-2 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/20 backdrop-blur-xl shadow-glass flex-col gap-2 shrink-0 animate-fadeIn ${mobileTab === "chats" ? "flex" : "hidden"}`}>
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-white animate-pulse" />

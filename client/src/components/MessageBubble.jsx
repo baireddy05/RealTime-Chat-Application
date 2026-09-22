@@ -817,7 +817,7 @@ const MessageBubble = memo(({
                       {message.location && (
                         <LiveLocationCard message={message} isMine={isMine} />
                       )}
-                      {message.poll && (
+                      {message.poll?.options?.length > 0 && (
                         <div className={`mt-1 mb-2 p-3 rounded-2xl border ${isMine ? 'bg-black/10 border-white/10 text-white' : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-zinc-900 dark:text-zinc-100'}`}>
                           <div className="flex items-start gap-2 mb-3">
                             <span className="material-symbols-outlined text-lg mt-0.5">poll</span>
