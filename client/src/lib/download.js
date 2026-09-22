@@ -109,8 +109,19 @@ export const downloadFile = async (url, filename = "document.pdf") => {
         await triggerBlobDownload(blob, cleanFilename);
         return;
       }
+      // Restricted Cloudinary delivery (401/403): these bytes are locked on
+      // Cloudinary's side — no fallback can fetch them. Fail loudly so the
+      // caller can tell the user to ask the sender to re-send.
+      if (res.status === 401 || res.status === 403) {
+        const dead = new Error(
+          "This file was stored with the old file storage and can no longer be fetched. Ask the sender to send it again."
+        );
+        dead.code = "DEAD_FILE";
+        throw dead;
+      }
       lastError = new Error(`Cloudinary responded ${res.status}`);
     } catch (err) {
+      if (err?.code === "DEAD_FILE") throw err;
       lastError = err;
       // If direct fetch is blocked by CORS, trigger direct anchor download with fl_attachment
       const a = document.createElement("a");

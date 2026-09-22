@@ -471,14 +471,14 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
   };
 
-  // Documents go to our own backend store (Cloudinary blocks PDF/ZIP
-  // delivery with 401s on this account). Falls back to the old paths.
-  // Returns { url, fileId } — fileId lets the server authorize downloads
-  // even if the stored URL's host/protocol later changes.
+  // Documents go to our own backend store (Cloudinary blocks document
+  // delivery with 401s, producing links that can never be downloaded again).
+  // Returns { url, fileId }. Throws when the file cannot be stored, so the
+  // sender knows instead of sending a dead link.
   const uploadRawFile = async (fileObj) => {
+    const formData = new FormData();
+    formData.append("file", fileObj.file, fileObj.name || "document");
     try {
-      const formData = new FormData();
-      formData.append("file", fileObj.file, fileObj.name || "document");
       const { data } = await axiosInstance.post("/upload/document", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 120000,
@@ -487,29 +487,15 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         return { url: data.url, fileId: data.fileId || null };
       }
     } catch (err) {
-      console.warn("Backend document upload failed, trying Cloudinary:", err?.response?.data || err.message);
+      console.warn("Backend document upload failed:", err?.response?.data || err.message);
     }
-    try {
-      const { data } = await axiosInstance.get("/upload/signature");
-      const formData = new FormData();
-      formData.append("file", fileObj.file);
-      formData.append("api_key", data.apiKey);
-      formData.append("timestamp", data.timestamp);
-      formData.append("signature", data.signature);
-
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${data.cloudName}/auto/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      const uploadData = await res.json();
-      if (uploadData.secure_url) {
-        return { url: uploadData.secure_url, fileId: null };
-      }
-      return { url: fileObj.dataUrl, fileId: null };
-    } catch {
-      // Fallback to dataUrl
+    // Last resort for tiny files only: embed as data URL (must fit the ~1MB
+    // JSON body limit or the message send itself will fail).
+    const approxBytes = Math.floor((fileObj.dataUrl?.length || 0) * 0.75);
+    if (fileObj.dataUrl && approxBytes > 0 && approxBytes < 700 * 1024) {
       return { url: fileObj.dataUrl, fileId: null };
     }
+    throw new Error("couldn't upload the document (check your connection and retry)");
   };
 
   const uploadAudioToCloudinary = async (audioBlob) => {
@@ -861,17 +847,24 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
     if (currentDoc) {
       setIsUploading(true);
-      const uploaded = await uploadRawFile(currentDoc);
+      try {
+        const uploaded = await uploadRawFile(currentDoc);
+        const url = typeof uploaded === "string" ? uploaded : uploaded?.url;
+        const fileId = typeof uploaded === "object" ? uploaded?.fileId || null : null;
+        if (!url) throw new Error("upload failed");
+        filePayload = {
+          url,
+          ...(fileId ? { fileId } : {}),
+          name: currentDoc.name,
+          size: currentDoc.size,
+          fileType: currentDoc.type,
+        };
+      } catch (err) {
+        setIsUploading(false);
+        alert(`Couldn't send "${currentDoc.name || "document"}": ${err?.message || "upload failed"}`);
+        return;
+      }
       setIsUploading(false);
-      const url = typeof uploaded === "string" ? uploaded : uploaded?.url;
-      const fileId = typeof uploaded === "object" ? uploaded?.fileId || null : null;
-      filePayload = {
-        url,
-        ...(fileId ? { fileId } : {}),
-        name: currentDoc.name,
-        size: currentDoc.size,
-        fileType: currentDoc.type,
-      };
     }
 
     window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
