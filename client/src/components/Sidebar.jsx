@@ -1,4 +1,4 @@
-﻿import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -198,40 +198,117 @@ const Sidebar = ({
   const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
   const [showChannelsModal, setShowChannelsModal] = useState(false);
 
-  // ---- WhatsApp-style mobile primary tabs (swipeable pager) ----
-  // Chats / Updates / Groups / Calls live as swipeable pages on mobile.
-  // Desktop keeps the classic single-pane chat list (activity rail owns nav).
+  // ---- WhatsApp-style mobile primary tabs (true swipeable pager) ----
+  // Chats / Updates / Groups / Calls live on a finger-following track on
+  // mobile. Desktop pins to the Chats page (activity rail owns nav there).
   const MOBILE_TABS = ["chats", "updates", "groups", "calls"];
   const [mobileTab, setMobileTab] = useState("chats");
   const mobileTabIndex = Math.max(0, MOBILE_TABS.indexOf(mobileTab));
-  const touchStartRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768
+  );
+  const [viewportW, setViewportW] = useState(0);
+  const [isPagerDragging, setIsPagerDragging] = useState(false);
+  const pagerViewportRef = useRef(null);
+  const pagerTrackRef = useRef(null);
+  const gestureRef = useRef(null); // { startX, startY, dx, locked, startT, lastX, lastT, vel }
+  const effectiveIndex = isMobile ? mobileTabIndex : 0;
 
-  const handlePagerTouchStart = useCallback((e) => {
-    const t = e.touches?.[0];
-    if (!t) return;
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    const el = pagerViewportRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setViewportW(el.clientWidth));
+    setViewportW(el.clientWidth);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const handlePagerTouchStart = useCallback(
+    (e) => {
+      if (!isMobile) return;
+      const t = e.touches?.[0];
+      if (!t || e.touches.length !== 1) return;
+      const now = performance.now();
+      gestureRef.current = {
+        startX: t.clientX,
+        startY: t.clientY,
+        dx: 0,
+        locked: null,
+        lastX: t.clientX,
+        lastT: now,
+        vel: 0,
+      };
+    },
+    [isMobile]
+  );
+
+  const handlePagerTouchMove = useCallback(
+    (e) => {
+      const g = gestureRef.current;
+      const t = e.touches?.[0];
+      const track = pagerTrackRef.current;
+      if (!g || !t || !track) return;
+      if (g.locked === "v") return;
+      const dx = t.clientX - g.startX;
+      const dy = t.clientY - g.startY;
+      if (!g.locked) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
+        g.locked = Math.abs(dx) > Math.abs(dy) * 1.15 ? "h" : "v";
+        if (g.locked === "v") return;
+        setIsPagerDragging(true);
+        cancelCardLongPress();
+      }
+      const now = performance.now();
+      const dt = Math.max(1, now - g.lastT);
+      g.vel = 0.7 * g.vel + 0.3 * ((t.clientX - g.lastX) / dt);
+      g.lastX = t.clientX;
+      g.lastT = now;
+      // Rubber-band resistance past the first / last page
+      let rdx = dx;
+      if ((mobileTabIndex === 0 && dx > 0) || (mobileTabIndex === MOBILE_TABS.length - 1 && dx < 0)) {
+        rdx = dx * 0.35;
+      }
+      g.dx = rdx;
+      const w = viewportW || pagerViewportRef.current?.clientWidth || 0;
+      track.style.transition = "none";
+      track.style.transform = `translateX(${-mobileTabIndex * w + rdx}px)`;
+    },
+    [mobileTabIndex, viewportW]
+  );
 
   const handlePagerTouchEnd = useCallback(
     (e) => {
-      const start = touchStartRef.current;
-      touchStartRef.current = null;
-      if (!start) return;
+      const g = gestureRef.current;
+      gestureRef.current = null;
+      if (!g || g.locked !== "h") return;
       const t = e.changedTouches?.[0];
-      if (!t) return;
-      const dx = t.clientX - start.x;
-      const dy = t.clientY - start.y;
-      // Horizontal swipe with clear intent (>60px, dominant axis)
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-      if (dx < 0 && mobileTabIndex < MOBILE_TABS.length - 1) {
+      const dx = t ? t.clientX - g.startX : g.dx;
+      const w = viewportW || pagerViewportRef.current?.clientWidth || 1;
+      const distThreshold = w * 0.22;
+      const flick = Math.abs(dx) > 32 && Math.abs(g.vel) > 0.45;
+      let delta = 0;
+      if (dx < -distThreshold || (flick && g.vel < 0)) delta = 1;
+      else if (dx > distThreshold || (flick && g.vel > 0)) delta = -1;
+      const next = Math.max(0, Math.min(MOBILE_TABS.length - 1, mobileTabIndex + delta));
+      g.dx = 0;
+      setIsPagerDragging(false);
+      if (next !== mobileTabIndex) {
         setSearchQuery("");
-        setMobileTab(MOBILE_TABS[mobileTabIndex + 1]);
-      } else if (dx > 0 && mobileTabIndex > 0) {
-        setSearchQuery("");
-        setMobileTab(MOBILE_TABS[mobileTabIndex - 1]);
+        setMobileTab(MOBILE_TABS[next]);
       }
+      // Otherwise React re-renders with dragging=false and the CSS transition
+      // animates the track back to the current page (snap-back).
     },
-    [mobileTabIndex]
+    [mobileTabIndex, viewportW]
   );
 
   // Inline data for Updates / Calls tabs (no modals on mobile)
@@ -1903,25 +1980,44 @@ const Sidebar = ({
         </div>
       )}
 
-      {/* 4. Conversation List â€” swipeable pages on mobile (WhatsApp-style) */}
+      {/* 4. Conversation List - desktop single pane, true swipeable pager on mobile */}
+      {/* Mobile pager position dots (tap to jump) */}
+      <div className="md:hidden flex items-center justify-center gap-1.5 pt-1 pb-0.5">
+        {MOBILE_TABS.map((t, i) => (
+          <button
+            key={t}
+            type="button"
+            aria-label={`Go to ${t}`}
+            onClick={() => {
+              if (i !== mobileTabIndex) {
+                setSearchQuery("");
+                setMobileTab(t);
+              }
+            }}
+            className={`h-1 rounded-full transition-all duration-300 ${
+              mobileTab === t ? "w-5 bg-zinc-900 dark:bg-white" : "w-1 bg-zinc-300 dark:bg-zinc-700"
+            }`}
+          />
+        ))}
+      </div>
       <div
+        ref={pagerViewportRef}
         onTouchStart={handlePagerTouchStart}
+        onTouchMove={handlePagerTouchMove}
         onTouchEnd={handlePagerTouchEnd}
-        className="flex-1 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar space-y-1"
+        onTouchCancel={handlePagerTouchEnd}
+        className="flex-1 min-h-0 overflow-hidden touch-pan-y"
       >
-        {/* Mobile swipe position dots */}
-        <div className="md:hidden flex items-center justify-center gap-1 pt-1 pb-0.5" aria-hidden="true">
-          {MOBILE_TABS.map((t) => (
-            <span
-              key={t}
-              className={`h-1 rounded-full transition-all duration-300 ${
-                mobileTab === t ? "w-5 bg-zinc-900 dark:bg-white" : "w-1 bg-zinc-300 dark:bg-zinc-700"
-              }`}
-            />
-          ))}
-        </div>
-        {/* Chats branch â€” always on desktop, only on Chats tab for mobile */}
-        <div className={mobileTab === "chats" ? "" : "hidden md:block"}>
+        <div
+          ref={pagerTrackRef}
+          className="flex h-full"
+          style={{
+            transform: `translateX(${-effectiveIndex * viewportW + (isPagerDragging ? gestureRef.current?.dx || 0 : 0)}px)`,
+            transition: isPagerDragging ? "none" : "transform 280ms cubic-bezier(0.2, 0.8, 0.25, 1)",
+          }}
+        >
+          {/* Page: Chats */}
+          <div className="w-full shrink-0 h-full min-h-0 overflow-y-auto pr-0.5 custom-scrollbar space-y-1">
         {/* Empty States */}
         {activeFilter === "unread" && totalUnreadCount === 0 && (
           <div className="p-8 text-center text-zinc-500 text-xs">No unread chats.</div>
@@ -2075,17 +2171,20 @@ const Sidebar = ({
             )}
           </>
         )}
+          </div>
+          {/* Page: Updates */}
+          <div className="w-full shrink-0 h-full min-h-0 overflow-y-auto pr-0.5 custom-scrollbar">
+            {renderUpdatesTabContent()}
+          </div>
+          {/* Page: Groups */}
+          <div className="w-full shrink-0 h-full min-h-0 overflow-y-auto pr-0.5 custom-scrollbar space-y-1">
+            {renderGroupsTabContent()}
+          </div>
+          {/* Page: Calls */}
+          <div className="w-full shrink-0 h-full min-h-0 overflow-y-auto pr-0.5 custom-scrollbar">
+            {renderCallsTabContent()}
+          </div>
         </div>
-        {/* Mobile-only swipeable tabs (hidden on desktop â€” switch via bottom nav or swipe) */}
-        {mobileTab === "updates" && (
-          <div className="md:hidden animate-fadeIn" key="mtab-updates">{renderUpdatesTabContent()}</div>
-        )}
-        {mobileTab === "groups" && (
-          <div className="md:hidden animate-fadeIn" key="mtab-groups">{renderGroupsTabContent()}</div>
-        )}
-        {mobileTab === "calls" && (
-          <div className="md:hidden animate-fadeIn" key="mtab-calls">{renderCallsTabContent()}</div>
-        )}
       </div>
 
       {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
