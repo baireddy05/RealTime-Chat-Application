@@ -11,6 +11,8 @@ import {
   Check,
   Shield,
   Lock,
+  Pipette,
+  RotateCcw,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { ensurePushTransports } from "../lib/push";
@@ -139,6 +141,142 @@ const ChatLockSettings = () => {
 import { useThemeStore } from "../store/useThemeStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { UI_THEMES } from "../lib/uiThemes";
+import {
+  CUSTOM_COLOR_GROUPS,
+  fieldCurrentHex,
+  fieldToVars,
+} from "../lib/uiCustomColors";
+
+// One custom-color row: live swatch (native picker) + field label + hex value.
+// Reads the live DOM value at render; SettingsModal re-renders on every
+// theme/customVars change, so the swatch always matches what is painted.
+const CustomColorRow = ({ field }) => {
+  const setCustomVars = useThemeStore((s) => s.setCustomVars);
+  const hex = fieldCurrentHex(field);
+  return (
+    <label
+      className="flex items-center gap-3 p-2 rounded-xl hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
+      title={`Customize ${field.label}`}
+    >
+      <span
+        className="relative w-9 h-9 rounded-xl overflow-hidden border border-black/15 dark:border-white/15 shadow-inner shrink-0"
+        style={{ background: hex }}
+      >
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => setCustomVars(fieldToVars(field, e.target.value))}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-xs font-semibold text-zinc-900 dark:text-white truncate">
+          {field.label}
+        </span>
+        <span className="block text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+          {hex.toUpperCase()}
+        </span>
+      </span>
+    </label>
+  );
+};
+
+// Live mock preview painted purely with theme CSS variables, so every
+// custom color shows exactly where it lands in the real UI the moment it
+// is picked (re-renders with SettingsModal on each store change).
+const CustomColorsPreview = () => (
+  <div
+    className="rounded-2xl overflow-hidden border border-black/10 dark:border-white/10"
+    style={{ background: "rgb(var(--bg-chat-rgb))" }}
+  >
+    <div
+      className="flex items-center gap-2 px-3 py-2"
+      style={{ background: "var(--glass-header)", borderBottom: "1px solid var(--glass-divider)" }}
+    >
+      <span className="relative w-8 h-8 rounded-full shrink-0" style={{ background: "rgb(var(--bg-surface-bright-rgb))" }}>
+        <span
+          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2"
+          style={{ background: "rgb(var(--status-online-rgb))", ["--tw-ring-color"]: "rgb(var(--bg-chat-rgb))" }}
+        />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-bold truncate" style={{ color: "rgb(var(--text-main-rgb))" }}>
+          Preview chat
+        </span>
+        <span className="block text-[10px]" style={{ color: "rgb(var(--text-muted-rgb))" }}>
+          online
+        </span>
+      </span>
+      <span
+        className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+        style={{ background: "var(--pill-active-bg)", color: "var(--pill-active-text)" }}
+      >
+        3
+      </span>
+    </div>
+    <div className="p-3 space-y-2">
+      <div className="flex justify-start">
+        <div
+          className="max-w-[85%] px-3 py-2 rounded-2xl rounded-tl-sm text-xs"
+          style={{
+            background: "var(--bubble-incoming-surface)",
+            color: "var(--bubble-incoming-text)",
+            border: "1px solid var(--bubble-incoming-border)",
+          }}
+        >
+          <span className="block text-[10px] font-bold" style={{ color: "var(--sender-1)" }}>
+            Ava
+          </span>
+          Hey, do the new colors look right?
+          <span className="block text-right opacity-70" style={{ color: "var(--bubble-incoming-subtext)", fontSize: 9 }}>
+            10:42
+          </span>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <div
+          className="max-w-[85%] px-3 py-2 rounded-2xl rounded-tr-sm text-xs"
+          style={{
+            background: "var(--bubble-outgoing-gradient)",
+            color: "var(--bubble-outgoing-text)",
+            border: "1px solid var(--bubble-outgoing-border)",
+          }}
+        >
+          Perfect match!
+          <span className="flex justify-end items-center gap-1 opacity-80" style={{ fontSize: 9 }}>
+            <span style={{ color: "var(--bubble-outgoing-subtext)" }}>10:43</span>
+            <span className="font-bold" style={{ color: "var(--bubble-outgoing-ticks)" }}>
+              ✓✓
+            </span>
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <span
+          className="text-[10px] font-bold px-3 py-1.5 rounded-xl text-white"
+          style={{ background: "rgb(var(--accent-primary-rgb))" }}
+        >
+          Accent button
+        </span>
+        <span className="text-[10px]" style={{ color: "rgb(var(--txt-dim-rgb))" }}>
+          Muted hint text
+        </span>
+      </div>
+    </div>
+    <div className="px-3 pb-3">
+      <div
+        className="rounded-2xl px-3 py-2 text-[11px]"
+        style={{
+          background: "var(--glass-input)",
+          color: "rgb(var(--text-muted-rgb))",
+          border: "1px solid var(--glass-border)",
+        }}
+      >
+        Type a message...
+      </div>
+    </div>
+  </div>
+);
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const {
@@ -149,7 +287,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
     soundMuted,
     toggleSound,
   } = useChatStore();
-  const { uiThemeId, setUiTheme } = useThemeStore();
+  const { uiThemeId, setUiTheme, customVars, resetCustomVars } = useThemeStore();
+  const customCount = Object.keys(customVars || {}).length;
   const { authUser, updateProfile } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState("appearance");
@@ -403,6 +542,60 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
                   Applies instantly across chats, calls, and menus on this device.
                 </p>
+              </div>
+
+              {/* Section 3: Custom Colors (full UI control) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Pipette size={15} className="text-zinc-500 dark:text-zinc-400 shrink-0" />
+                    <h3 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider truncate">
+                      Custom Colors
+                    </h3>
+                    {customCount > 0 && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/20 shrink-0">
+                        {customCount} set
+                      </span>
+                    )}
+                  </div>
+                  {customCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={resetCustomVars}
+                      className="text-[11px] font-semibold text-zinc-500 hover:text-red-500 dark:hover:text-red-400 flex items-center gap-1 transition-colors shrink-0"
+                      title="Remove all custom colors and restore the preset"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
+                  Tap any swatch to recolor the whole interface - backgrounds, text, both message bubbles, ticks, accents, and presence dots. Applies live and survives preset switches.
+                </p>
+
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 px-1">
+                    Live preview
+                  </p>
+                  <CustomColorsPreview />
+                </div>
+
+                <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3 sm:p-4 space-y-4">
+                  {CUSTOM_COLOR_GROUPS.map((group) => (
+                    <div key={group.id} className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 px-2">
+                        {group.label}
+                      </p>
+                      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-x-3 gap-y-0.5">
+                        {group.fields.map((field) => (
+                          <CustomColorRow key={field.id} field={field} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           )}
