@@ -13,6 +13,7 @@ import {
   Lock,
   Pipette,
   RotateCcw,
+  Undo2,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { ensurePushTransports } from "../lib/push";
@@ -558,17 +559,33 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       </span>
                     )}
                   </div>
+                  <div className="flex items-center gap-2 shrink-0">
                   {customCount > 0 && (
                     <button
                       type="button"
                       onClick={resetCustomVars}
-                      className="text-[11px] font-semibold text-zinc-500 hover:text-red-500 dark:hover:text-red-400 flex items-center gap-1 transition-colors shrink-0"
+                      className="text-[11px] font-semibold text-zinc-500 hover:text-red-500 dark:hover:text-red-400 flex items-center gap-1 transition-colors"
                       title="Remove all custom colors and restore the preset"
                     >
                       <RotateCcw size={12} />
                       <span>Reset</span>
                     </button>
                   )}
+                  {(customCount > 0 || uiThemeId !== "midnight") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetCustomVars();
+                        setUiTheme("midnight");
+                      }}
+                      className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1 transition-colors"
+                      title="Clear custom colors and restore the default Midnight theme"
+                    >
+                      <Undo2 size={12} />
+                      <span>Default theme</span>
+                    </button>
+                  )}
+                  </div>
                 </div>
 
                 <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
