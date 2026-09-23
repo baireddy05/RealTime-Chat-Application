@@ -210,7 +210,6 @@ const Sidebar = ({
   const pagerTrackRef = useRef(null);
   const gestureRef = useRef(null); // { startX, startY, dx, locked, startT, lastX, lastT, vel }
 
-
   useEffect(() => {
     const el = pagerViewportRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;

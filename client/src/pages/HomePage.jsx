@@ -659,7 +659,7 @@ const HomePage = () => {
           /* Web Style Command Center */
           <div className="flex-1 h-full flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden select-none">
             {/* Foreground Content: Central Logo, greeting, and quick launch cards */}
-            <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center animate-fadeIn">
+            <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center animate-fadeIn @container">
               {/* Central Glowing Hero Logo Emblem */}
               <div className="relative mb-6 flex items-center justify-center">
                 <div className="absolute inset-0 rounded-3xl bg-cyan-500/20 dark:bg-cyan-400/30 blur-2xl opacity-60 animate-pulse" />
@@ -676,8 +676,8 @@ const HomePage = () => {
                 Send and receive messages, voice notes, photos, and documents securely.
               </p>
 
-              {/* 4 Quick Launch Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-8">
+              {/* 4 Quick Launch Cards (container-aware: 2 columns only when the pane fits) */}
+              <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 w-full mb-8">
                 {/* 1. New Direct Chat */}
                 <button
                   onClick={() => setIsAddFriendOpen(true)}

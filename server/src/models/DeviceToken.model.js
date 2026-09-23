@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
-// Native device tokens for the Capacitor Android app (FCM registration
-// tokens reported by @capacitor/push-notifications). One per device.
+// Device push tokens (FCM registration tokens reported by native or web
+// clients). One per device.
 const deviceTokenSchema = new mongoose.Schema(
   {
     userId: {

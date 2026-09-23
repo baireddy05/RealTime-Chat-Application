@@ -11,7 +11,9 @@ export default defineConfig({
   // API fan-out can exceed the 5s default under parallel load (3 browsers).
   expect: { timeout: 15000 },
   use: {
-    baseURL: 'http://localhost:5173',
+    // Overridable when :5173 is taken by another local project:
+    //   PLAYWRIGHT_BASE_URL=http://localhost:5174 npx playwright test
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
     trace: 'on-first-retry',
   },
   projects: [
