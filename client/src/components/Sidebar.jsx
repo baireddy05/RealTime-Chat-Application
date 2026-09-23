@@ -48,14 +48,14 @@ const formatTimeRelative = (dateStr) => {
 const getMessageSnippet = (msg) => {
   if (!msg) return "";
   if (msg.isDeleted || msg.text === "This message was deleted" || msg.decryptedText === "This message was deleted") {
-    return "ðŸš« This message was deleted";
+    return "🚫 This message was deleted";
   }
-  if (msg.audio) return "ðŸŽ¤ Voice note";
+  if (msg.audio) return "🎤 Voice note";
   const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
     if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
-    if (msg.image) return "ðŸ“· Photo";
-  if (msg.file) return `ðŸ“Ž ${msg.file.name || "Attachment"}`;
-  if (msg.contact) return `ðŸ‘¤ Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
+    if (msg.image) return "📷 Photo";
+  if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
+  if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
 
   const text = msg.decryptedText || msg.text || "";
   if (isEncryptedMessage(text)) {
@@ -71,11 +71,11 @@ const getSearchSnippet = (msg, query) => {
     const q = (query || "").trim().toLowerCase();
     const idx = q ? text.toLowerCase().indexOf(q) : 0;
     const start = Math.max(0, idx - 30);
-    return (start > 0 ? "â€¦" : "") + text.slice(start, start + 110) + (text.length > start + 110 ? "â€¦" : "");
+    return (start > 0 ? "…" : "") + text.slice(start, start + 110) + (text.length > start + 110 ? "…" : "");
   }
-  if (msg.image) return "ðŸ“· Photo";
-  if (msg.audio) return "ðŸŽ¤ Voice note";
-  if (msg.file) return `ðŸ“Ž ${msg.file.name || "File"}`;
+  if (msg.image) return "📷 Photo";
+  if (msg.audio) return "🎤 Voice note";
+  if (msg.file) return `📎 ${msg.file.name || "File"}`;
   return "Message";
 };
 
@@ -330,7 +330,7 @@ const Sidebar = ({
     };
   }, [showOptionsDropdown]);
 
-  // ---- Per-chat context menu (â‹® on desktop, long-press / right-click everywhere)
+  // ---- Per-chat context menu (⋮ on desktop, long-press / right-click everywhere)
   const openChatMenu = useCallback((chat, anchor) => {
     cardLongPressFiredRef.current = false;
     setOpenMenuChat(chat);
@@ -449,7 +449,7 @@ const Sidebar = ({
       relockChat(openMenuChat.id);
     } else {
       if (!hasChatPin()) {
-        alert("Set a chat lock PIN first in Settings â†’ Privacy.");
+        alert("Set a chat lock PIN first in Settings → Privacy.");
         return;
       }
       setChatLocked(openMenuChat.id, true);
@@ -774,7 +774,7 @@ const Sidebar = ({
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     // Locked chats hide their contents until unlocked (PIN gate)
     const roomLocked = isChatLocked(roomId) && !unlockedChats.includes(roomId);
-    const previewText = roomLocked ? "ðŸ”’ Locked chat" : getMessageSnippet(lastMsg);
+    const previewText = roomLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
@@ -921,7 +921,7 @@ const Sidebar = ({
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     // Locked chats hide their contents until unlocked (PIN gate)
     const friendLocked = isChatLocked(friendId) && !unlockedChats.includes(friendId);
-    const previewText = friendLocked ? "ðŸ”’ Locked chat" : getMessageSnippet(lastMsg);
+    const previewText = friendLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
     const isRead = lastMsg && ((lastMsg.reads || []).some(r => (r.userId?._id || r.userId)?.toString() === friendId) || (lastMsg.readBy || []).some(id => (id?._id || id)?.toString() === friendId));
@@ -1099,7 +1099,7 @@ const Sidebar = ({
         <div className="min-w-0">
           <p className="text-xs font-semibold text-zinc-900 dark:text-white">My status</p>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
-            {(myStatuses || []).length > 0 ? `${myStatuses.length} update${myStatuses.length === 1 ? "" : "s"} â€¢ Tap to view` : "Tap to add status update"}
+            {(myStatuses || []).length > 0 ? `${myStatuses.length} update${myStatuses.length === 1 ? "" : "s"} • Tap to view` : "Tap to add status update"}
           </p>
         </div>
       </div>
@@ -1208,7 +1208,7 @@ const Sidebar = ({
         {isCallHistoryLoading && (callHistory || []).length === 0 ? (
           <div className="flex items-center justify-center py-10 gap-2 text-zinc-500 text-xs">
             <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-            Loading callsâ€¦
+            Loading calls…
           </div>
         ) : (callHistory || []).length === 0 ? (
           <div className="p-8 text-center text-xs text-zinc-500">
@@ -1236,7 +1236,7 @@ const Sidebar = ({
                       {other?.username || "User"}
                     </p>
                     <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                      {missed ? "Missed" : outgoing ? "Outgoing" : "Incoming"} â€¢ {log.callType === "audio" ? "Voice" : "Video"} â€¢ {formatCallTime(log.startedAt)}
+                      {missed ? "Missed" : outgoing ? "Outgoing" : "Incoming"} • {log.callType === "audio" ? "Voice" : "Video"} • {formatCallTime(log.startedAt)}
                     </p>
                   </div>
                 </div>
@@ -1469,7 +1469,7 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Search Bar with âŒ˜K â€” Chats tab only on mobile */}
+        {/* Search Bar with ⌘K — Chats tab only on mobile */}
         <div className={`relative items-center w-full mt-1 ${mobileTab === "chats" ? "flex" : "hidden"}`}>
           <span className="material-symbols-outlined absolute left-3 text-zinc-400 dark:text-zinc-500 pointer-events-none text-base">
             search
@@ -1493,12 +1493,12 @@ const Sidebar = ({
             </button>
           ) : (
             <kbd className="hidden sm:inline-block absolute right-3 px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 font-mono text-[9px] pointer-events-none">
-              âŒ˜K
+              ⌘K
             </kbd>
           )}
         </div>
 
-        {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct â€” Chats tab only on mobile */}
+        {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct — Chats tab only on mobile */}
         <div className={`relative select-none ${mobileTab === "chats" ? "" : "hidden"}`}>
           <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1">
             <button
@@ -1633,7 +1633,7 @@ const Sidebar = ({
               <button
                 type="button"
                 onClick={() => scrollTabs(1)}
-                title="More filters â€” scroll right"
+                title="More filters — scroll right"
                 className="absolute right-0 top-0 bottom-0 w-7 hidden md:flex items-center justify-end animate-fadeIn text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 <span className="material-symbols-outlined text-xl drop-shadow">chevron_right</span>
@@ -1642,7 +1642,7 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* Label folders toolbar â€” hidden entirely when no labels exist
+        {/* Label folders toolbar — hidden entirely when no labels exist
             so it never leaves a dead gap in the header */}
         {/* Label folders toolbar — chats tab only (desktop included) */}
         {(labels || []).length > 0 && mobileTab === "chats" && (
@@ -1690,7 +1690,7 @@ const Sidebar = ({
         )}
       </div>
 
-      {/* 2. Pending Friend Requests Banner List â€” Chats tab only on mobile */}
+      {/* 2. Pending Friend Requests Banner List — Chats tab only on mobile */}
       {incomingRequests && incomingRequests.length > 0 && (
         <div className={`my-2 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/20 backdrop-blur-xl shadow-glass flex-col gap-2 shrink-0 animate-fadeIn ${mobileTab === "chats" ? "flex" : "hidden"}`}>
           <div className="flex items-center justify-between px-1">
@@ -2190,7 +2190,7 @@ const Sidebar = ({
         <ChannelsModal onClose={() => setShowChannelsModal(false)} onOpenChannel={openChannelChat} />
       )}
 
-      {/* Per-chat context menu (â‹® / right-click / long-press) */}
+      {/* Per-chat context menu (⋮ / right-click / long-press) */}
       {openMenuChat && typeof document !== "undefined" && createPortal(
         <>
           <div
@@ -2252,7 +2252,7 @@ const Sidebar = ({
                   className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-accent-primary hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                 >
                   <span className="material-symbols-outlined text-[16px]">add</span>
-                  <span>New labelâ€¦</span>
+                  <span>New label…</span>
                 </button>
               ) : (
                 <div className="max-h-40 overflow-y-auto custom-scrollbar">
@@ -2386,7 +2386,7 @@ const Sidebar = ({
       {/* 5. Mobile bottom navigation (WhatsApp-style swipeable primary tabs).
           Rendered inside the sidebar column so it never overlaps content;
           hidden on desktop where the activity rail serves this role.
-          Tapping switches the inline page â€” swiping the list above does the same. */}
+          Tapping switches the inline page — swiping the list above does the same. */}
       <nav
         aria-label="Primary"
         className="md:hidden shrink-0 -mx-3 -mb-3 mt-2 border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4"
