@@ -40,7 +40,7 @@ const RemindModal = ({ message, onClose }) => {
   const preview =
     message.decryptedText ||
     (isEncryptedMessage(message.text) ? "🔒 Encrypted message" : message.text) ||
-    (message.image ? "📷 Photo" : message.file ? `📎 ${message.file.name}` : message.audio ? "🎤 Voice note" : "Message");
+    (message.image ? "📷 Photo" : message.file ? `📎️ ${message.file.name}` : message.audio ? "🎤 Voice note" : "Message");
 
   const submit = async (date) => {
     if (!date || date.getTime() <= Date.now()) {

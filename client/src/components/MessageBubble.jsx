@@ -608,7 +608,7 @@ const MessageBubble = memo(({
                       )}
                       <div className="min-w-0 flex-1">
                         <span className="font-semibold block text-[10px] opacity-90">{message.replyTo.senderName || "User"}</span>
-                        <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.contact ? `👤 Contact: ${message.replyTo.contact.fullName || message.replyTo.contact.username || "Contact"}` : "Attachment")}</p>
+                        <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎️ ${message.replyTo.file.name}` : message.replyTo.contact ? `👤 Contact: ${message.replyTo.contact.fullName || message.replyTo.contact.username || "Contact"}` : "Attachment")}</p>
                       </div>
                     </div>
                   )}

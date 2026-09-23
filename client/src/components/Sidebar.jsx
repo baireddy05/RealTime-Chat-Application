@@ -54,7 +54,7 @@ const getMessageSnippet = (msg) => {
   const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
     if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
     if (msg.image) return "📷 Photo";
-  if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
+  if (msg.file) return `📎️ ${msg.file.name || "Attachment"}`;
   if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
 
   const text = msg.decryptedText || msg.text || "";
@@ -75,7 +75,7 @@ const getSearchSnippet = (msg, query) => {
   }
   if (msg.image) return "📷 Photo";
   if (msg.audio) return "🎤 Voice note";
-  if (msg.file) return `📎 ${msg.file.name || "File"}`;
+  if (msg.file) return `📎️ ${msg.file.name || "File"}`;
   return "Message";
 };
 

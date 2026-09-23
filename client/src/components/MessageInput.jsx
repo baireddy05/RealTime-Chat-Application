@@ -876,7 +876,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       replyTo: currentReply ? {
         messageId: currentReply._id,
         senderName: currentReply.senderId?.username || currentReply.senderName || "User",
-        text: currentReply.decryptedText || currentReply.text || (currentReply.image ? "📷 Photo" : currentReply.file ? `📎 ${currentReply.file.name}` : "Attachment"),
+        text: currentReply.decryptedText || currentReply.text || (currentReply.image ? "📷 Photo" : currentReply.file ? `📎️ ${currentReply.file.name}` : "Attachment"),
         image: currentReply.image || null,
         file: currentReply.file || null,
       } : undefined,

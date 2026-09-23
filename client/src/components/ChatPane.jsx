@@ -49,7 +49,7 @@ const getPinnedPreview = (msg, fallbackDecryptedText) => {
   const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
   if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
   if (msg.image) return msg.decryptedText || fallbackDecryptedText || (!isEncryptedMessage(msg.text) && msg.text ? msg.text : "📷 Photo");
-  if (msg.file) return `📎 ${msg.file.name || "Attachment"}`;
+  if (msg.file) return `📎️ ${msg.file.name || "Attachment"}`;
   if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || "Contact"}`;
   
   const text = msg.decryptedText || fallbackDecryptedText || (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text) || "";
@@ -750,7 +750,7 @@ const ChatPane = ({ onBack }) => {
           const text = m.decryptedText || (isEncryptedMessage(m.text) ? "[Encrypted message]" : m.text) || "";
           let mediaHtml = "";
           if (m.image) mediaHtml += `<div style="margin-top:6px;"><img src="${m.image}" style="max-width:280px;border-radius:12px;display:block;" /></div>`;
-          if (m.file) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">📎 ${m.file.name || "Attachment"}</div>`;
+          if (m.file) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">📎️ ${m.file.name || "Attachment"}</div>`;
           if (m.audio) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">🎤 Audio Message</div>`;
           return `
             <div class="msg ${isMe ? "mine" : "theirs"}">

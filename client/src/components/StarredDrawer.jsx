@@ -110,7 +110,7 @@ const StarredDrawer = ({ onClose, onJumpToMessage }) => {
                   {msg.file && (
                     <div className="flex items-center gap-2 p-2 rounded-xl bg-[var(--glass-hover)] border border-[var(--glass-border)] mb-2">
                       <span className="text-xs text-accent-primary font-medium truncate">
-                        📎 {msg.file.name}
+                        📎️ {msg.file.name}
                       </span>
                     </div>
                   )}

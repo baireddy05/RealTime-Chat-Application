@@ -784,7 +784,7 @@ export const useChatStore = create((set, get) => ({
         replyTo: messageData.replyTo !== undefined ? messageData.replyTo : (replyingTo ? {
           messageId: replyingTo._id,
           senderName: replyingTo.senderId?.username || replyingTo.senderName || "User",
-          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : replyingTo.contact ? `👤 Contact: ${replyingTo.contact.fullName || replyingTo.contact.username || "Contact"}` : "Attachment"),
+          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎️ ${replyingTo.file.name}` : replyingTo.contact ? `👤 Contact: ${replyingTo.contact.fullName || replyingTo.contact.username || "Contact"}` : "Attachment"),
           image: replyingTo.image || null,
           file: replyingTo.file || null,
           contact: replyingTo.contact || null,
@@ -983,7 +983,7 @@ export const useChatStore = create((set, get) => ({
           const preview =
             msg.decryptedText ||
             (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text) ||
-            (msg.image ? "📷 Photo" : msg.file ? `📎 ${msg.file.name}` : msg.audio ? "🎤 Voice Note" : "Message");
+            (msg.image ? "📷 Photo" : msg.file ? `📎️ ${msg.file.name}` : msg.audio ? "🎤 Voice Note" : "Message");
           return { ...r, messageId: msg, preview };
         })
       );
@@ -1159,7 +1159,7 @@ export const useChatStore = create((set, get) => ({
           const title = selectedChat.type === "room"
             ? `${selectedChat.name} • ${senderName}`
             : senderName;
-          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎 ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
           const myUsername = useAuthStore.getState().authUser?.username || "";
           const mentioned =
             selectedChat.type === "room" &&
@@ -1198,7 +1198,7 @@ export const useChatStore = create((set, get) => ({
           );
           const senderName = processedMessage.senderId?.username || "Pulse User";
           const title = newMessage.roomId ? "New Group Message" : senderName;
-          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎 ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
           const myUsername = useAuthStore.getState().authUser?.username || "";
           const mentioned =
             !!newMessage.roomId &&
@@ -1329,7 +1329,7 @@ export const useChatStore = create((set, get) => ({
         const preview = msg
           ? msg.decryptedText ||
             (isEncryptedMessage(msg.text) ? "Message" : msg.text) ||
-            (msg.image ? "📷 Photo" : msg.file ? `📎 ${msg.file.name}` : "Message")
+            (msg.image ? "📷 Photo" : msg.file ? `📎️ ${msg.file.name}` : "Message")
           : "You asked to be reminded about a message";
         notificationManager.sendNotification({
           title: "⏰ Message reminder",
