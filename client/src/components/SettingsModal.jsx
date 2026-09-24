@@ -14,6 +14,10 @@ import {
   Pipette,
   RotateCcw,
   Undo2,
+  Eye,
+  EyeOff,
+  PanelLeft,
+  PanelRight,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { ensurePushTransports } from "../lib/push";
@@ -147,6 +151,7 @@ import {
   fieldCurrentHex,
   fieldToVars,
 } from "../lib/uiCustomColors";
+import CustomColorsPreview from "./CustomColorsPreview";
 
 // One custom-color row: live swatch (native picker) + field label + hex value.
 // Reads the live DOM value at render; SettingsModal re-renders on every
@@ -182,102 +187,6 @@ const CustomColorRow = ({ field }) => {
   );
 };
 
-// Live mock preview painted purely with theme CSS variables, so every
-// custom color shows exactly where it lands in the real UI the moment it
-// is picked (re-renders with SettingsModal on each store change).
-const CustomColorsPreview = () => (
-  <div
-    className="rounded-2xl overflow-hidden border border-black/10 dark:border-white/10"
-    style={{ background: "rgb(var(--bg-chat-rgb))" }}
-  >
-    <div
-      className="flex items-center gap-2 px-3 py-2"
-      style={{ background: "var(--glass-header)", borderBottom: "1px solid var(--glass-divider)" }}
-    >
-      <span className="relative w-8 h-8 rounded-full shrink-0" style={{ background: "rgb(var(--bg-surface-bright-rgb))" }}>
-        <span
-          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2"
-          style={{ background: "rgb(var(--status-online-rgb))", ["--tw-ring-color"]: "rgb(var(--bg-chat-rgb))" }}
-        />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-xs font-bold truncate" style={{ color: "rgb(var(--text-main-rgb))" }}>
-          Preview chat
-        </span>
-        <span className="block text-[10px]" style={{ color: "rgb(var(--text-muted-rgb))" }}>
-          online
-        </span>
-      </span>
-      <span
-        className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-        style={{ background: "var(--pill-active-bg)", color: "var(--pill-active-text)" }}
-      >
-        3
-      </span>
-    </div>
-    <div className="p-3 space-y-2">
-      <div className="flex justify-start">
-        <div
-          className="max-w-[85%] px-3 py-2 rounded-2xl rounded-tl-sm text-xs"
-          style={{
-            background: "var(--bubble-incoming-surface)",
-            color: "var(--bubble-incoming-text)",
-            border: "1px solid var(--bubble-incoming-border)",
-          }}
-        >
-          <span className="block text-[10px] font-bold" style={{ color: "var(--sender-1)" }}>
-            Ava
-          </span>
-          Hey, do the new colors look right?
-          <span className="block text-right opacity-70" style={{ color: "var(--bubble-incoming-subtext)", fontSize: 9 }}>
-            10:42
-          </span>
-        </div>
-      </div>
-      <div className="flex justify-end">
-        <div
-          className="max-w-[85%] px-3 py-2 rounded-2xl rounded-tr-sm text-xs"
-          style={{
-            background: "var(--bubble-outgoing-gradient)",
-            color: "var(--bubble-outgoing-text)",
-            border: "1px solid var(--bubble-outgoing-border)",
-          }}
-        >
-          Perfect match!
-          <span className="flex justify-end items-center gap-1 opacity-80" style={{ fontSize: 9 }}>
-            <span style={{ color: "var(--bubble-outgoing-subtext)" }}>10:43</span>
-            <span className="font-bold" style={{ color: "var(--bubble-outgoing-ticks)" }}>
-              ✓✓
-            </span>
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 pt-1">
-        <span
-          className="text-[10px] font-bold px-3 py-1.5 rounded-xl text-white"
-          style={{ background: "rgb(var(--accent-primary-rgb))" }}
-        >
-          Accent button
-        </span>
-        <span className="text-[10px]" style={{ color: "rgb(var(--txt-dim-rgb))" }}>
-          Muted hint text
-        </span>
-      </div>
-    </div>
-    <div className="px-3 pb-3">
-      <div
-        className="rounded-2xl px-3 py-2 text-[11px]"
-        style={{
-          background: "var(--glass-input)",
-          color: "rgb(var(--text-muted-rgb))",
-          border: "1px solid var(--glass-border)",
-        }}
-      >
-        Type a message...
-      </div>
-    </div>
-  </div>
-);
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const {
@@ -293,6 +202,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const { authUser, updateProfile } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState("appearance");
+  const [previewVisible, setPreviewVisible] = useState(true);
+  const [previewSide, setPreviewSide] = useState("right"); // "left" | "right"
+  const [previewMobileOpen, setPreviewMobileOpen] = useState(false);
   const [notificationsAllowed, setNotificationsAllowed] = useState(
     typeof Notification !== "undefined" && Notification.permission === "granted"
   );
@@ -301,7 +213,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const refreshPushStatus = async () => {
     try {
       const { axiosInstance } = await import("../lib/axios");
-      const { data } = await axiosInstance.get("/api/push/config");
+      const { data } = await axiosInstance.get("/push/config");
       if (!data?.vapidPublicKey) {
         setPushStatus("unconfigured");
         return;
@@ -344,13 +256,59 @@ const SettingsModal = ({ isOpen, onClose }) => {
     refreshPushStatus();
   };
 
+  const isAppearance = activeTab === "appearance";
+  const showSidePreview = isAppearance && previewVisible;
+
+  const previewPanel = (
+    <aside className="hidden lg:flex w-[380px] xl:w-[400px] shrink-0 bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden flex-col max-h-[90vh] animate-scaleIn">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-zinc-900 dark:text-white leading-tight">Live preview</p>
+          <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Updates as you pick</p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setPreviewSide("left")}
+            title="Dock preview on the left"
+            className={`p-1.5 rounded-lg transition-colors ${previewSide === "left" ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"}`}
+          >
+            <PanelLeft size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewSide("right")}
+            title="Dock preview on the right"
+            className={`p-1.5 rounded-lg transition-colors ${previewSide === "right" ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"}`}
+          >
+            <PanelRight size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewVisible(false)}
+            title="Hide preview"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          >
+            <EyeOff size={14} />
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 select-none">
+        <CustomColorsPreview />
+      </div>
+    </aside>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
       {/* Backdrop */}
       <div className="fixed inset-0" onClick={onClose} />
 
-      {/* Main Modal Card — bottom sheet on mobile, centered dialog on desktop */}
-      <div className="relative w-full sm:max-w-xl bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl rounded-b-none sm:rounded-b-3xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-scaleIn">
+      {/* Settings + standalone preview — preview docks left / right on desktop */}
+      <div className={`relative z-10 w-full flex flex-col lg:flex-row items-stretch justify-center gap-4 max-h-[92dvh] sm:max-h-[90vh] ${isAppearance ? "lg:max-w-6xl" : "lg:max-w-xl"}`}>
+        {showSidePreview && previewSide === "left" && previewPanel}
+        {/* Main Modal Card — bottom sheet on mobile, centered dialog on desktop */}
+        <div className="relative w-full lg:flex-1 lg:min-w-0 bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl rounded-b-none sm:rounded-b-3xl lg:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-scaleIn">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
@@ -411,7 +369,52 @@ const SettingsModal = ({ isOpen, onClose }) => {
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 select-none">
           {activeTab === "appearance" && (
-            <>
+            <div className="min-w-0 space-y-5 sm:space-y-6">
+              {/* Standalone preview controls — the preview itself docks left / right */}
+              <div className="flex items-center justify-between gap-2 rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Eye size={14} className="text-zinc-500 dark:text-zinc-400 shrink-0" />
+                  <p className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 truncate">
+                    Live preview in a standalone panel
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMobileOpen(true)}
+                    className="lg:hidden text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 transition-all"
+                  >
+                    Open preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewVisible((v) => !v)}
+                    className="hidden lg:flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    title={previewVisible ? "Hide standalone preview" : "Show standalone preview"}
+                  >
+                    {previewVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+                    <span>{previewVisible ? "Hide" : "Show"}</span>
+                  </button>
+                  <div className="hidden lg:flex items-center rounded-xl border border-black/10 dark:border-white/10 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => { setPreviewSide("left"); setPreviewVisible(true); }}
+                      title="Dock preview on the left"
+                      className={`p-1.5 transition-colors ${previewSide === "left" ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "text-zinc-400 hover:text-zinc-900 dark:hover:text-white"}`}
+                    >
+                      <PanelLeft size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPreviewSide("right"); setPreviewVisible(true); }}
+                      title="Dock preview on the right"
+                      className={`p-1.5 transition-colors ${previewSide === "right" ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "text-zinc-400 hover:text-zinc-900 dark:hover:text-white"}`}
+                    >
+                      <PanelRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
               {/* Section 1: Background Visual Animations */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -592,12 +595,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   Tap any swatch to recolor the whole interface - backgrounds, text, both message bubbles, ticks, accents, and presence dots. Applies live and survives preset switches.
                 </p>
 
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 px-1">
-                    Live preview
-                  </p>
-                  <CustomColorsPreview />
-                </div>
 
                 <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3 sm:p-4 space-y-4">
                   {CUSTOM_COLOR_GROUPS.map((group) => (
@@ -614,7 +611,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   ))}
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {activeTab === "sound" && (
@@ -760,7 +757,42 @@ const SettingsModal = ({ isOpen, onClose }) => {
             Done
           </button>
         </div>
+        </div>
+        {showSidePreview && previewSide === "right" && previewPanel}
       </div>
+
+      {/* Mobile standalone preview popup */}
+      {isAppearance && previewMobileOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn lg:hidden">
+          <div className="fixed inset-0" onClick={() => setPreviewMobileOpen(false)} />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl rounded-b-none sm:rounded-b-3xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[85dvh] animate-scaleIn">
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-zinc-900 dark:text-white leading-tight">Live preview</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Standalone — updates as you pick</p>
+              </div>
+              <button
+                onClick={() => setPreviewMobileOpen(false)}
+                className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
+                title="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 select-none">
+              <CustomColorsPreview />
+            </div>
+            <div className="flex items-center justify-end px-4 py-3 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
+              <button
+                onClick={() => setPreviewMobileOpen(false)}
+                className="px-5 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

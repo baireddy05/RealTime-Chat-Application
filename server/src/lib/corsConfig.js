@@ -1,5 +1,7 @@
 export const isOriginAllowed = (origin) => {
-  if (!origin) return true; // Allow non-browser requests (cron jobs, curl, server-to-server)
+  // Null origin (curl, cron, server-to-server) has no cookies to protect;
+  // credentialed CORS is decided per-request by the cors middleware below.
+  if (!origin) return false;
 
   const normalized = origin.trim().replace(/\/$/, "");
 
@@ -11,14 +13,17 @@ export const isOriginAllowed = (origin) => {
     if (envOrigins.includes(normalized)) return true;
   }
 
-  // Allow all Vercel deployment origins (*.vercel.app)
-  try {
-    const parsed = new URL(normalized);
-    if (parsed.hostname.endsWith(".vercel.app")) {
-      return true;
+  // Vercel preview deployments: only allow when explicitly opted in, never
+  // with credentials by default (prevents any *.vercel.app from getting cookies).
+  if (process.env.ALLOW_VERCEL_PREVIEWS === "true") {
+    try {
+      const parsed = new URL(normalized);
+      if (parsed.hostname.endsWith(".vercel.app")) {
+        return true;
+      }
+    } catch {
+      // Ignore invalid URL parse
     }
-  } catch {
-    // Ignore invalid URL parse
   }
 
   // Allow local development origins

@@ -4,8 +4,9 @@ import { Search, X, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { GiphyFetch } from '@giphy/js-fetch-api';
 import { Grid } from '@giphy/react-components';
 
-// Initialize Giphy Fetch with fallback API key
-const gf = new GiphyFetch(import.meta.env.VITE_GIPHY_API_KEY || 'sXpGFDGZs0Dv1mmNFvYaGUvYwKX0PWIh');
+// Initialize Giphy Fetch — key must come from env; no hardcoded secret in bundle.
+const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || "";
+const gf = GIPHY_KEY ? new GiphyFetch(GIPHY_KEY) : null;
 
 export const STICKER_CATEGORIES = [
   { id: "all", label: "🔥 Trending" },
@@ -71,11 +72,18 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
   }, [updateWidth]);
 
   // Fetch function required by Giphy Grid with robust fallback
+  // Debounced search input (raw query -> debounced term) prevents a Grid remount + fetch per keystroke.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const fetchGifs = useCallback(async (offset) => {
     const isStickers = activeTab === 'stickers';
-    const term = selectedCategory !== 'all' ? selectedCategory : searchQuery.trim();
+    const term = selectedCategory !== 'all' ? selectedCategory : debouncedQuery;
 
     try {
+      if (!gf) throw new Error("missing-giphy-key");
       if (term) {
         return await (isStickers
           ? gf.search(term, { type: 'stickers', offset, limit: 20 })
@@ -104,10 +112,10 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
         pagination: { total_count: filtered.length, count: filtered.length, offset: 0 }
       };
     }
-  }, [activeTab, selectedCategory, searchQuery]);
+  }, [activeTab, selectedCategory, debouncedQuery]);
 
-  // Key to force Grid re-render when search/tab changes
-  const gridKey = `${activeTab}-${selectedCategory}-${searchQuery}`;
+  // Key to force Grid re-render when search/tab changes (debounced to avoid scroll reset per keystroke)
+  const gridKey = `${activeTab}-${selectedCategory}-${debouncedQuery}`;
   const columnsCount = width < 290 ? 2 : 3;
   const categoriesList = activeTab === 'stickers' ? STICKER_CATEGORIES : GIF_CATEGORIES;
 
@@ -168,7 +176,6 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
             }}
             placeholder={`Search ${activeTab === 'gifs' ? 'GIFs...' : 'animated stickers...'}`}
             className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-theme-main placeholder:text-theme-muted focus:outline-none focus:ring-1 focus:ring-accent-primary transition-all"
-            autoFocus
           />
           {searchQuery && (
             <button

@@ -75,10 +75,13 @@ export const sendFcm = async (userId, { title, body, data = {} }) => {
     const dead = [];
     res.responses.forEach((r, i) => {
       if (!r.success) {
-        const code = r.error?.code || "";
+        const code = String(r.error?.code || "").toLowerCase();
         if (
           code.includes("invalid-registration-token") ||
-          code.includes("registration-token-not-registered")
+          code.includes("registration-token-not-registered") ||
+          code.includes("unregistered") ||
+          code.includes("not-found") ||
+          code.includes("invalid-argument")
         ) {
           dead.push(tokens[i]._id);
         } else {

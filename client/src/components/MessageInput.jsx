@@ -213,20 +213,29 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   }, []);
 
   // Close popup menus, reset attachments, and load draft when switching chats
+  // NOTE: deps intentionally exclude `drafts` — including it would clobber
+  // in-flight typing on every keystroke (setDraft -> drafts change -> reset text).
+  const chatKey = selectedChat?.id || selectedChat?._id;
   useEffect(() => {
+    let cancelled = false;
     queueMicrotask(() => {
+      if (cancelled) return;
       setShowAttachMenu(false);
       setShowMediaPicker(false);
       setImagePreview(null);
       setDocumentFile(null);
       setIsViewOnce(false);
-      
-      if (selectedChat?.id && !editingMessage) {
-        const savedDraft = drafts[selectedChat.id];
+
+      if (chatKey && !editingMessage) {
+        const savedDraft = drafts[chatKey];
         setText(savedDraft || "");
       }
     });
-  }, [selectedChat?.id, editingMessage, drafts]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatKey, editingMessage]);
 
   // Save draft on text change
   useEffect(() => {
@@ -296,6 +305,16 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        try {
+          socket?.emit?.("stopTyping", {
+            targetId: selectedChat?.id,
+            targetType: selectedChat?.type,
+          });
+        } catch {}
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -579,12 +598,18 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     setRecordingSeconds(0);
     setIsRecordingVideo(false);
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.onstop = null;
-      mediaRecorderRef.current.stop();
-      const tracks = mediaRecorderRef.current.stream?.getTracks();
-      if (tracks) {
-        tracks.forEach(track => track.stop());
-      }
+      try {
+        mediaRecorderRef.current.onstop = null;
+        if (mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch {}
+      try {
+        const tracks = mediaRecorderRef.current.stream?.getTracks();
+        if (tracks) {
+          tracks.forEach(track => track.stop());
+        }
+      } catch {}
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -867,12 +892,25 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
 
     window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+    let scheduledFor;
+    if (currentSchedule) {
+      const d = new Date(currentSchedule);
+      if (isNaN(d.getTime())) {
+        alert("Invalid scheduled time.");
+        return;
+      }
+      if (d.getTime() <= Date.now()) {
+        alert("Scheduled time must be in the future.");
+        return;
+      }
+      scheduledFor = d.toISOString();
+    }
     await sendMessage({
       text: currentText,
       image: imageUrl,
       viewOnce: !!currentImage && isViewOnce,
       file: filePayload,
-      scheduledFor: currentSchedule ? new Date(currentSchedule).toISOString() : undefined,
+      scheduledFor,
       replyTo: currentReply ? {
         messageId: currentReply._id,
         senderName: currentReply.senderId?.username || currentReply.senderName || "User",

@@ -706,18 +706,19 @@ const ChatPane = ({ onBack }) => {
   const handleExportChat = (format = "txt") => {
     if (!selectedChat || messages.length === 0) return;
     soundManager.playSendSound();
-    const cleanName = selectedChat.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeName = selectedChat.name || selectedChat.username || "Chat";
+    const cleanName = String(safeName).replace(/[^a-zA-Z0-9_-]/g, "_");
     const dateStr = new Date().toISOString().slice(0, 10);
 
     if (format === "json") {
       const exportData = {
-        chatName: selectedChat.name,
+        chatName: safeName,
         chatType: selectedChat.type,
         exportedAt: new Date().toISOString(),
         totalMessages: messages.length,
         messages: messages.map((m) => ({
           id: m._id,
-          sender: m.senderId?.username || (m.senderId === authUser._id ? authUser.username : "User"),
+          sender: m.senderId?.username || (authUser?._id && m.senderId === authUser._id ? authUser.username : "User"),
           text: m.decryptedText || m.text,
           createdAt: m.createdAt,
           isEdited: m.isEdited,
@@ -741,21 +742,23 @@ const ChatPane = ({ onBack }) => {
     }
 
     if (format === "html") {
+      const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
       const bubblesHtml = messages
         .filter((m) => !m.isDeleted)
         .map((m) => {
-          const isMe = (m.senderId?._id || m.senderId) === authUser._id;
-          const senderName = m.senderId?.username || (isMe ? authUser.username : "User");
-          const time = new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          const isMe = authUser?._id != null && String(m.senderId?._id || m.senderId) === String(authUser._id);
+          const senderName = m.senderId?.username || (isMe ? authUser?.username || "You" : "User");
+          const d = new Date(m.createdAt);
+          const time = isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
           const text = m.decryptedText || (isEncryptedMessage(m.text) ? "[Encrypted message]" : m.text) || "";
           let mediaHtml = "";
-          if (m.image) mediaHtml += `<div style="margin-top:6px;"><img src="${m.image}" style="max-width:280px;border-radius:12px;display:block;" /></div>`;
-          if (m.file) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">📎️ ${m.file.name || "Attachment"}</div>`;
+          if (m.image) mediaHtml += `<div style="margin-top:6px;"><img src="${esc(m.image)}" style="max-width:280px;border-radius:12px;display:block;" /></div>`;
+          if (m.file) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">📎️ ${esc(m.file.name || "Attachment")}</div>`;
           if (m.audio) mediaHtml += `<div style="margin-top:6px;font-size:12px;opacity:0.8;">🎤 Audio Message</div>`;
           return `
             <div class="msg ${isMe ? "mine" : "theirs"}">
-              <div class="sender">${senderName}</div>
-              <div class="text">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+              <div class="sender">${esc(senderName)}</div>
+              <div class="text">${esc(text)}</div>
               ${mediaHtml}
               <div class="time">${time}</div>
             </div>
@@ -767,7 +770,7 @@ const ChatPane = ({ onBack }) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pulse Messenger - ${selectedChat.name}</title>
+  <title>Pulse Messenger - ${esc(safeName)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f1f5f9; margin: 0; padding: 24px; }
     .container { max-width: 680px; margin: 0 auto; }
@@ -785,7 +788,7 @@ const ChatPane = ({ onBack }) => {
 <body>
   <div class="container">
     <div class="header">
-      <h1>${selectedChat.name}</h1>
+      <h1>${esc(safeName)}</h1>
       <p>Exported from Pulse Messenger on ${new Date().toLocaleString()} • ${messages.length} messages</p>
     </div>
     <div class="messages">
@@ -812,7 +815,7 @@ const ChatPane = ({ onBack }) => {
     const lines = [
       divider,
       "PULSE MESSENGER - CONVERSATION TRANSCRIPT",
-      `Chat: ${selectedChat.name.replace(/^#/, "")} (${selectedChat.type === "room" ? "Group" : "Direct Message"})`,
+      `Chat: ${String(safeName).replace(/^#/, "")} (${selectedChat.type === "room" ? "Group" : "Direct Message"})`,
       `Exported: ${new Date().toLocaleString()}`,
       `Total Messages: ${messages.length}`,
       divider,
@@ -821,8 +824,9 @@ const ChatPane = ({ onBack }) => {
 
     messages.forEach((msg) => {
       if (msg.isDeleted) return;
-      const senderName = msg.senderId?.username || (msg.senderId === authUser._id ? authUser.username : "User");
-      const time = new Date(msg.createdAt).toLocaleString();
+      const senderName = msg.senderId?.username || (authUser?._id && String(msg.senderId) === String(authUser._id) ? authUser?.username || "You" : "User");
+      const d = new Date(msg.createdAt);
+      const time = isNaN(d.getTime()) ? "unknown time" : d.toLocaleString();
       const editedTag = msg.isEdited ? " (edited)" : "";
 
       lines.push(`[${time}] ${senderName}${editedTag}:`);
@@ -1035,8 +1039,8 @@ const ChatPane = ({ onBack }) => {
               ) : (
                 <div className="relative shrink-0 w-9 h-9 sm:w-10 sm:h-10">
                   <img
-                    src={selectedChat.profilePic || selectedChat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}&background=27272a&color=ffffff`}
-                    alt={selectedChat.name}
+                    src={selectedChat.profilePic || selectedChat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name || selectedChat.username || "Chat")}&background=27272a&color=ffffff`}
+                    alt={selectedChat.name || selectedChat.username || "Chat"}
                     className="w-full h-full rounded-full object-cover shadow-sm border border-black/10 dark:border-white/10"
                   />
                   <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 ${isUserOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-zinc-400 dark:bg-zinc-600"}`} />
@@ -1045,7 +1049,7 @@ const ChatPane = ({ onBack }) => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 truncate">
                   <h2 className="text-zinc-900 dark:text-white font-semibold truncate text-sm sm:text-base tracking-tight">
-                    {selectedChat.name.replace(/^#/, "")}
+                    {(selectedChat.name || selectedChat.username || "Chat").replace(/^#/, "")}
                   </h2>
                 </div>
                 <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs truncate">
@@ -1470,7 +1474,7 @@ const ChatPane = ({ onBack }) => {
               <div className="flex flex-col min-h-0 w-full pb-3">
               {visibleMessages.map((message, index, currentList) => (
                 <MessageBubble
-                  key={message._id}
+                  key={message._id || message.tempId || `${message.createdAt || index}-${index}`}
                   message={message}
                   index={index}
                   currentList={currentList}

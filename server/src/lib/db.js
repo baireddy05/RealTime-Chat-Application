@@ -62,6 +62,12 @@ export const connectDB = async () => {
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     await seedInitialData();
   } catch (error) {
+    // Never fall back to an ephemeral in-memory DB in production — that would
+    // silently lose all data and seed well-known test credentials.
+    if (process.env.NODE_ENV === "production") {
+      console.error(`[Database] MongoDB connection failed in production — refusing in-memory fallback: ${error.message}`);
+      throw error;
+    }
     console.warn(`[Database] MongoDB Atlas connection failed (${error.message}).`);
     console.warn(`[Database] Starting embedded resilient database fallback...`);
     try {

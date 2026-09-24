@@ -17,7 +17,10 @@ export const applyUiThemeToDOM = (theme, customVars) => {
   root.style.colorScheme = theme.scheme;
   // Custom colors live outside the preset so switching presets never loses
   // them; clear any previous override keys first so removed keys reset.
-  const prev = applyUiThemeToDOM._customKeys || [];
+  // Snapshot prev before overwriting to avoid interleaved-call staleness.
+  const prev = [...(applyUiThemeToDOM._customKeys || [])];
+  const nextKeys = customVars ? Object.keys(customVars) : [];
+  applyUiThemeToDOM._customKeys = nextKeys;
   prev.forEach((key) => {
     if (!customVars || !(key in customVars)) root.style.removeProperty(key);
   });
@@ -31,6 +34,7 @@ export const applyUiThemeToDOM = (theme, customVars) => {
       keys.push(key);
     });
   }
+  // Keep tracked keys in sync with what was actually painted.
   applyUiThemeToDOM._customKeys = keys;
 
   // Update mobile meta theme color
@@ -87,12 +91,19 @@ export const useThemeStore = create((set, get) => ({
     applyUiThemeToDOM(getUiTheme(get().uiThemeId), {});
     set({ customVars: {} });
   },
-  // Back-compat: map legacy mode switches onto default UI themes
+  // Back-compat: map legacy mode switches onto matching-scheme theme.
+  // Preserves current preset family when possible instead of forcing midnight/daylight.
   setTheme: (newTheme) => {
-    get().setUiTheme(DEFAULT_BY_SCHEME[newTheme] || "midnight");
+    const current = getUiTheme(get().uiThemeId);
+    if (current.scheme === newTheme) return;
+    const candidate = UI_THEMES.find((t) => t.scheme === newTheme);
+    get().setUiTheme(candidate?.id || DEFAULT_BY_SCHEME[newTheme] || "midnight");
   },
   toggleTheme: () => {
-    const nextScheme = get().theme === "dark" ? "light" : "dark";
-    get().setUiTheme(DEFAULT_BY_SCHEME[nextScheme]);
+    const current = getUiTheme(get().uiThemeId);
+    const nextScheme = current.scheme === "dark" ? "light" : "dark";
+    // Prefer staying in same family is impossible across schemes; pick first of target scheme.
+    const candidate = UI_THEMES.find((t) => t.scheme === nextScheme);
+    get().setUiTheme(candidate?.id || DEFAULT_BY_SCHEME[nextScheme]);
   },
 }));

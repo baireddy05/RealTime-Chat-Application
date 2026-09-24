@@ -114,14 +114,9 @@ export const searchUsers = async (req, res) => {
 
     let foundUsers;
     if (!query || query.trim().length === 0) {
-      // When no query is provided, return all registered users so anyone can discover & add friends
-      foundUsers = await User.find()
-        .select("username email profilePic status bio friends")
-        .sort({ createdAt: -1 })
-        .limit(100)
-        .lean();
+      return res.status(400).json({ message: "Search query required" });
     } else {
-      const cleanQuery = query.trim();
+      const cleanQuery = query.trim().slice(0, 50);
       const escapedQuery = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const searchRegex = new RegExp(escapedQuery, "i");
 
@@ -132,8 +127,8 @@ export const searchUsers = async (req, res) => {
         : { username: searchRegex };
 
       foundUsers = await User.find(filter)
-        .select("username email profilePic status bio friends")
-        .limit(50)
+        .select("username profilePic status bio friends")
+        .limit(20)
         .lean();
     }
 

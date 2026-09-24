@@ -6,9 +6,10 @@ import { protectRoute } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 // Strict rate limiter for sensitive authentication endpoints (prevent brute-force & CPU exhaustion)
+const isTestEnv = process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT === "1";
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // TEMPORARY BYPASS FOR PLAYWRIGHT TESTS
+  max: isTestEnv ? 1000 : 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many attempts from this IP. Please try again after 15 minutes." },

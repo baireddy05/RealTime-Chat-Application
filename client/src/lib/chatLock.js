@@ -9,7 +9,11 @@ const PIN_SALT = "pulse-chat-lock:";
 const readIds = () => {
   try {
     const raw = JSON.parse(localStorage.getItem(LOCKED_KEY) || "[]");
-    return Array.isArray(raw) ? raw.map(String) : [];
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((v) => (typeof v === "string" ? v : String(v ?? "")))
+      .map((s) => s.trim())
+      .filter((s) => s && s !== "null" && s !== "undefined");
   } catch {
     return [];
   }
@@ -29,6 +33,9 @@ export const hasChatPin = () => {
 };
 
 export const setChatPin = async (pin) => {
+  if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+    throw new Error("PIN must be exactly 4 digits.");
+  }
   const hash = await sha256Hex(pin);
   try {
     localStorage.setItem(PIN_KEY, hash);

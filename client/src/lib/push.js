@@ -15,6 +15,7 @@ const urlBase64ToUint8Array = (base64String) => {
 
 const webPushSupported = () =>
   typeof window !== "undefined" &&
+  typeof navigator !== "undefined" &&
   "serviceWorker" in navigator &&
   "PushManager" in window &&
   "Notification" in window;
@@ -25,9 +26,13 @@ export async function ensureWebPushSubscription() {
   if (!webPushSupported()) return { ok: false, reason: "unsupported" };
   if (Notification.permission !== "granted") return { ok: false, reason: "no-permission" };
   try {
-    const { data } = await axiosInstance.get("/api/push/config");
+    // NOTE: axiosInstance.baseURL already ends in /api, so paths are /push/*.
+    const { data } = await axiosInstance.get("/push/config");
     if (!data?.vapidPublicKey) return { ok: false, reason: "not-configured" };
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("sw-timeout")), 8000)),
+    ]);
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
       sub = await reg.pushManager.subscribe({
@@ -36,7 +41,7 @@ export async function ensureWebPushSubscription() {
       });
     }
     // Upsert is idempotent server-side; keeps keys fresh after rotation.
-    await axiosInstance.post("/api/push/subscribe", {
+    await axiosInstance.post("/push/subscribe", {
       subscription: sub.toJSON(),
       userAgent: navigator.userAgent,
     });
@@ -50,13 +55,18 @@ export async function ensureWebPushSubscription() {
 export async function disableWebPush() {
   try {
     if (!webPushSupported()) return;
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("sw-timeout")), 8000)),
+    ]);
     const sub = await reg.pushManager.getSubscription();
     if (sub) {
-      try {
-        await axiosInstance.post("/api/push/unsubscribe", { endpoint: sub.endpoint });
-      } catch {}
+      // Unsubscribe client first so a server failure can't orphan the endpoint
+      // client-side; server prune happens on next send failure.
       await sub.unsubscribe();
+      try {
+        await axiosInstance.post("/push/unsubscribe", { endpoint: sub.endpoint });
+      } catch {}
     }
   } catch (err) {
     console.warn("[Push] Web unsubscribe failed:", err?.message || err);

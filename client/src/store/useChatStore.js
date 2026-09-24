@@ -432,7 +432,9 @@ export const useChatStore = create((set, get) => ({
         } else {
           newArchived.push(chatId);
         }
-        localStorage.setItem("pulse-archived-chats", JSON.stringify(newArchived));
+        try {
+          localStorage.setItem("pulse-archived-chats", JSON.stringify(newArchived));
+        } catch {}
         return { archivedChats: newArchived };
       });
       return true;
@@ -511,7 +513,9 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get(`/chat/${chatId}?type=${type}`);
       const authUser = useAuthStore.getState().authUser;
-      const key = getConversationKey(get().selectedChat, authUser?._id);
+      // Decrypt with the requested conversation's key — not selectedChat (avoids
+      // wrong-key flash on fast chat switches).
+      const key = getConversationKey({ id: chatId, type }, authUser?._id);
 
       const decryptedMessages = await Promise.all(
         res.data.map(async (m) => {
@@ -570,7 +574,10 @@ export const useChatStore = create((set, get) => ({
         const hasNew = decryptedMessages.some((m) => !currentIds.has(m._id));
         const nonOptimisticCount = state.messages.filter((m) => !m.isOptimistic).length;
         if (hasNew || nonOptimisticCount !== decryptedMessages.length) {
-          const optimistic = state.messages.filter((m) => m.isOptimistic);
+          const serverIds = new Set(decryptedMessages.map((m) => m._id));
+          // Drop optimistic twins already acked by server (match by tempId or text+sender+time window is overkill;
+          // server echo carries same _id, and socket insert already strips optimistics).
+          const optimistic = state.messages.filter((m) => m.isOptimistic && !serverIds.has(m._id) && !serverIds.has(m.tempId));
           return {
             messages: [...decryptedMessages, ...optimistic],
           };
@@ -621,7 +628,7 @@ export const useChatStore = create((set, get) => ({
       if (textToSend) {
         const key = getConversationKey(selectedChat, authUser?._id);
         textToSend = await encryptMessage(textToSend, key);
-        isEncrypted = true;
+        isEncrypted = isEncryptedMessage(textToSend);
       }
 
       const payload = {
@@ -673,6 +680,9 @@ export const useChatStore = create((set, get) => ({
 
   markMessagesAsRead: async (chatId, type) => {
     if (!chatId) return;
+    const prevUnread = get().unreadCounts?.[chatId];
+    const prevRooms = get().rooms;
+    const prevFriends = useFriendStore.getState()?.friends;
     try {
       set((state) => ({
         unreadCounts: {
@@ -692,6 +702,14 @@ export const useChatStore = create((set, get) => ({
       await axiosInstance.post(`/chat/${chatId}/read?type=${type}`);
     } catch (error) {
       console.error("Error marking messages as read:", error);
+      // Restore badge on failure so unread isn't silently lost.
+      try {
+        set((state) => ({
+          unreadCounts: { ...state.unreadCounts, [chatId]: prevUnread ?? state.unreadCounts?.[chatId] ?? 0 },
+          rooms: prevRooms ?? state.rooms,
+        }));
+        if (prevFriends) useFriendStore.setState({ friends: prevFriends });
+      } catch {}
     }
   },
 
@@ -754,12 +772,19 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
-    const { selectedChat, replyingTo, disappearingTimer, isSending } = get();
-    if (!selectedChat) return;
-    if (isSending) return; // Prevent concurrent sends at store level
+    const { selectedChat, replyingTo, disappearingTimer } = get();
+    if (!selectedChat) return { success: false, error: "No chat selected" };
+    const sendKey = `sending:${selectedChat.type}:${selectedChat.id}`;
+    if (get()[sendKey]) return { success: false, error: "Already sending" };
 
-    set({ isSending: true });
+    set({ isSending: true, [sendKey]: true });
+    // Snapshot last message for accurate rollback (not derived from post-optimistic list).
+    const prevLastMessage = get().lastMessages?.[selectedChat.id] ?? null;
     const authUser = useAuthStore.getState().authUser;
+    if (!authUser?._id) {
+      set({ isSending: false, [sendKey]: false });
+      return { success: false, error: "Not authenticated" };
+    }
     let textToSend = messageData.text || "";
     const originalText = textToSend;
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -771,7 +796,7 @@ export const useChatStore = create((set, get) => ({
       if (textToSend) {
         const key = getConversationKey(selectedChat, authUser?._id);
         textToSend = await encryptMessage(textToSend, key);
-        isEncrypted = true;
+        isEncrypted = isEncryptedMessage(textToSend);
       }
 
       const payload = {
@@ -803,9 +828,9 @@ export const useChatStore = create((set, get) => ({
           text: textToSend,
           decryptedText: originalText,
           senderId: {
-            _id: authUser._id,
-            username: authUser.username,
-            profilePic: authUser.profilePic,
+            _id: authUser?._id,
+            username: authUser?.username || "You",
+            profilePic: authUser?.profilePic,
           },
           image: messageData.image || null,
           file: messageData.file || null,
@@ -870,21 +895,20 @@ export const useChatStore = create((set, get) => ({
       return { success: true, data: msgDataWithDecrypted };
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove optimistic placeholder on failure and restore previous last message
+      // Remove optimistic placeholder on failure and restore snapshotted last message
       set((state) => {
         const remaining = state.messages.filter((m) => m._id !== tempId);
-        const prevLast = remaining[remaining.length - 1] || null;
         return {
           messages: remaining,
           lastMessages: {
             ...state.lastMessages,
-            [selectedChat.id]: prevLast,
+            [selectedChat.id]: prevLastMessage,
           },
         };
       });
       return { success: false, error: error.message };
     } finally {
-      set({ isSending: false });
+      set({ isSending: false, [sendKey]: false });
     }
   },
 
@@ -1066,7 +1090,10 @@ export const useChatStore = create((set, get) => ({
     }
 
     // Auto-resync active chat and metadata on reconnect (namespaced to avoid clobbering auth handler)
-    socket.off("chat:reconnect-resync");
+    try {
+      const prev = socket._chatReconnectHandler;
+      if (prev) socket.off("connect", prev);
+    } catch {}
     const handleReconnectResync = () => {
       get().resyncCurrentChat();
       get().getUsers();
@@ -1078,7 +1105,9 @@ export const useChatStore = create((set, get) => ({
     };
     socket.on("connect", handleReconnectResync);
     // Tag handler so unsubscribe can remove only ours
-    socket._chatReconnectHandler = handleReconnectResync;
+    try {
+      socket._chatReconnectHandler = handleReconnectResync;
+    } catch {}
 
     socket.on("newMessage", async (newMessage) => {
       const { selectedChat } = get();
@@ -1859,21 +1888,40 @@ export const useChatStore = create((set, get) => ({
     }
 
     // Poll until the message element is rendered (covers chat-switch load time)
+    // Tracked + cancellable: a new jump clears the previous timer.
+    try {
+      if (get()._jumpTimer) clearInterval(get()._jumpTimer);
+    } catch {}
     let tries = 0;
+    const jumpId = msgId;
     const timer = setInterval(() => {
+      // Stale timer (a newer jump started) — stop.
+      try {
+        if (get().pendingJumpMessageId !== jumpId) {
+          clearInterval(timer);
+          return;
+        }
+      } catch {}
       tries++;
       const el = typeof document !== "undefined" && document.getElementById(`msg-${msgId}`);
       if (el) {
         clearInterval(timer);
+        try {
+          if (get()._jumpTimer === timer) set({ _jumpTimer: null });
+        } catch {}
         set({ pendingJumpMessageId: null });
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.classList.add("ring-2", "ring-accent-primary", "rounded-2xl", "shadow-glow");
         setTimeout(() => el.classList.remove("ring-2", "ring-accent-primary", "shadow-glow"), 2000);
       } else if (tries > 25) {
         clearInterval(timer);
+        try {
+          if (get()._jumpTimer === timer) set({ _jumpTimer: null });
+        } catch {}
         set({ pendingJumpMessageId: null });
       }
     }, 300);
+    set({ _jumpTimer: timer });
   },
 
   setSelectedChat: (chat) => {
@@ -1883,12 +1931,21 @@ export const useChatStore = create((set, get) => ({
     if (chat?.id) unread[chat.id] = 0;
 
     if (socket) {
-      if (chat?.type === "room" && current?.id !== chat?.id) {
+      const prevRoom = current?.type === "room" ? current?.id?.toString() : null;
+      const nextRoom = chat?.type === "room" ? chat?.id?.toString() : null;
+      if (prevRoom && prevRoom !== nextRoom) {
+        try {
+          socket.emit("leaveRoom", prevRoom);
+        } catch {}
+      }
+      if (nextRoom && prevRoom !== nextRoom) {
         socket.emit("joinRoom", chat.id);
       }
     }
 
-    if (current?.id !== chat?.id) {
+    const sameChat =
+      current?.id?.toString() === chat?.id?.toString() && (current?.type || null) === (chat?.type || null);
+    if (!sameChat) {
       set({ 
         selectedChat: chat, 
         messages: [], 
@@ -1912,7 +1969,7 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get(`/chat/scheduled/${chatId}?type=${type}`);
       const authUser = useAuthStore.getState().authUser;
-      const key = getConversationKey(get().selectedChat, authUser?._id);
+      const key = getConversationKey({ id: chatId, type }, authUser?._id);
 
       const decrypted = await Promise.all(
         res.data.map(async (m) => {
@@ -2314,7 +2371,7 @@ export const useChatStore = create((set, get) => ({
       if (plainText) {
         const key = getConversationKey(targetChat, authUser?._id);
         textToSend = await encryptMessage(plainText, key);
-        isEncrypted = true;
+        isEncrypted = isEncryptedMessage(textToSend);
       }
 
       // Unopened view-once media must never leak through forwarding

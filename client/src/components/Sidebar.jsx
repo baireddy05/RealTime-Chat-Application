@@ -34,15 +34,22 @@ const ChatLabelDots = memo(({ chatId }) => {
 const formatTimeRelative = (dateStr) => {
   if (!dateStr) return "";
   const date = new Date(dateStr);
+  const time = date.getTime();
+  if (isNaN(time)) return "";
   const now = new Date();
   const diffMs = now - date;
+  if (isNaN(diffMs)) return "";
   const diffMins = Math.floor(diffMs / 60000);
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m`;
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours}h`;
   if (diffHours < 48) return "Yesterday";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  try {
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
 };
 
 const getMessageSnippet = (msg) => {
@@ -632,7 +639,7 @@ const Sidebar = ({
     });
     const q = searchQuery.toLowerCase().trim();
     if (!q) return nonDiscord;
-    return nonDiscord.filter((r) => r.name.toLowerCase().includes(q));
+    return nonDiscord.filter((r) => (r.name || "").toLowerCase().includes(q));
   }, [rooms, searchQuery]);
 
   const filteredFriends = useMemo(() => {
@@ -653,7 +660,7 @@ const Sidebar = ({
     const chatList = Array.from(allKnownUsers.values());
     const q = searchQuery.toLowerCase().trim();
     if (!q) return chatList;
-    return chatList.filter((f) => f.username.toLowerCase().includes(q));
+    return chatList.filter((f) => (f.username || f.name || "").toLowerCase().includes(q));
   }, [friends, users, lastMessages, searchQuery]);
 
   // Sort helper by recent message
@@ -845,7 +852,7 @@ const Sidebar = ({
                   isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
                 }`}
               >
-                {room.name.replace(/^#/, "")}
+                {(room.name || "Group").replace(/^#/, "")}
               </span>
               <ChatLabelDots chatId={roomId} />
             </div>

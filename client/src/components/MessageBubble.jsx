@@ -94,8 +94,11 @@ const LiveLocationCard = memo(({ message, isMine }) => {
     return () => clearInterval(t);
   }, [message.liveUntil, message._id]);
 
-  const live = message.liveUntil && new Date(message.liveUntil).getTime() > Date.now();
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${message.location.lat},${message.location.lng}`;
+  const live = message.liveUntil && !isNaN(new Date(message.liveUntil).getTime()) && new Date(message.liveUntil).getTime() > Date.now();
+  const locLat = Number(message.location?.lat);
+  const locLng = Number(message.location?.lng);
+  const hasValidLoc = Number.isFinite(locLat) && Number.isFinite(locLng);
+  const mapsUrl = hasValidLoc ? `https://www.google.com/maps/search/?api=1&query=${locLat},${locLng}` : null;
 
   const handleStop = async (e) => {
     e.stopPropagation();
@@ -108,6 +111,7 @@ const LiveLocationCard = memo(({ message, isMine }) => {
 
   return (
     <div className="mb-1 overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-black/5 dark:bg-white/5 p-1 w-[200px] sm:w-[240px]">
+      {hasValidLoc ? (
       <a
         href={mapsUrl}
         target="_blank"
@@ -130,6 +134,11 @@ const LiveLocationCard = memo(({ message, isMine }) => {
           </span>
         )}
       </a>
+      ) : (
+        <div className="block w-full h-32 rounded-xl relative overflow-hidden flex items-center justify-center text-[11px] text-theme-muted">
+          Location unavailable
+        </div>
+      )}
       <div className="px-2 py-1.5 flex items-center justify-between gap-2 text-[10px] text-theme-muted">
         <span className="truncate">
           {live
@@ -190,6 +199,14 @@ const MessageBubble = memo(({
   const [openingViewOnce, setOpeningViewOnce] = useState(false);
   const [openedAudioUrl, setOpenedAudioUrl] = useState(null);
 
+  useEffect(() => {
+    return () => {
+      try {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      } catch {}
+    };
+  }, []);
+
   const handleTranslate = async (targetLang = "en") => {
     setIsTranslating(true);
     setOpenMenuMessageId(null);
@@ -249,7 +266,9 @@ const MessageBubble = memo(({
   // Shadow the message prop so we can view the local copy while holding
   const message = isViewingWhisper && whisperContent ? { ...msgProp, ...whisperContent } : msgProp;
 
-  const isMine = (message.senderId?._id || message.senderId) === authUser._id || message.senderId?._id === authUser._id;
+  const myId = authUser?._id;
+  const senderRaw = message.senderId?._id || message.senderId;
+  const isMine = myId != null && senderRaw != null && String(senderRaw) === String(myId);
   const sender = message.senderId || {};
 
   // @mention highlight names for group chats (render-time only, E2EE-safe)
@@ -321,11 +340,16 @@ const MessageBubble = memo(({
     const handleDownloadFile = async (e) => {
       e.stopPropagation();
       if (downloadingFileId === message._id) return;
+      const fileUrl = typeof message.file === "object" ? message.file?.url : null;
+      if (!fileUrl) {
+        alert("File unavailable for download.");
+        return;
+      }
       try {
         setDownloadingFileId(message._id);
-        await downloadFile(message.file.url, message.file.name);
+        await downloadFile(fileUrl, message.file?.name || "file");
       } catch (err) {
-        alert(`Couldn't download "${message.file.name || "file"}": ${err?.message || "unknown error"}`);
+        alert(`Couldn't download "${message.file?.name || "file"}": ${err?.message || "unknown error"}`);
       } finally {
         setDownloadingFileId(null);
       }
@@ -410,12 +434,12 @@ const MessageBubble = memo(({
     acc[r.emoji] = acc[r.emoji] || { emoji: r.emoji, count: 0, users: [], hasReacted: false };
     acc[r.emoji].count += 1;
     acc[r.emoji].users.push(r.username || "User");
-    if (r.userId === authUser._id || r.userId?._id === authUser._id) acc[r.emoji].hasReacted = true;
+    if (myId != null && (String(r.userId) === String(myId) || String(r.userId?._id) === String(myId))) acc[r.emoji].hasReacted = true;
     return acc;
   }, {});
 
   const readObj = (message.reads || []).find(r => r.userId === selectedChat?.id);
-  const isReadByRecipient = selectedChat?.type === "user" && authUser.readReceipts !== false && (readObj || (message.readBy || []).includes(selectedChat?.id));
+  const isReadByRecipient = selectedChat?.type === "user" && authUser?.readReceipts !== false && (readObj || (message.readBy || []).includes(selectedChat?.id));
   const deliveryObj = (message.deliveries || []).find(d => d.userId === selectedChat?.id);
   const isDeliveredToRecipient = selectedChat?.type === "user" && !!deliveryObj;
   
@@ -426,7 +450,7 @@ const MessageBubble = memo(({
   if (isReadByRecipient && readObj?.at) {
     statusTitle += `\nSeen: ${new Date(readObj.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
-  const isStarred = (message.starredBy || []).some((id) => (id?._id || id) === authUser._id);
+  const isStarred = (message.starredBy || []).some((id) => myId != null && String(id?._id || id) === String(myId));
   const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.videoNote && !message.location && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
   const isSticker = message.isSticker || Boolean(message.image && (message.image.includes("/stickers/") || message.image.includes("giphy-preview.gif") || message.image.includes("sticker")));
   const isStickerOnly = !message.isDeleted && isSticker && (!message.text || !message.text.trim()) && !message.file && !message.audio && !message.videoNote && !message.location && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned;
@@ -816,9 +840,10 @@ const MessageBubble = memo(({
                           </div>
                           <div className="flex flex-col gap-2">
                             {message.poll.options.map((opt, i) => {
-                              const totalVotes = message.poll.options.reduce((acc, o) => acc + o.votes.length, 0);
-                              const percentage = totalVotes === 0 ? 0 : Math.round((opt.votes.length / totalVotes) * 100);
-                              const hasVoted = opt.votes.includes(authUser._id);
+                              const votes = Array.isArray(opt?.votes) ? opt.votes : [];
+                              const totalVotes = message.poll.options.reduce((acc, o) => acc + (Array.isArray(o?.votes) ? o.votes.length : 0), 0);
+                              const percentage = totalVotes === 0 ? 0 : Math.round((votes.length / totalVotes) * 100);
+                              const hasVoted = myId != null && votes.map(String).includes(String(myId));
                               return (
                                 <div key={i} className="relative overflow-hidden rounded-xl bg-black/10 dark:bg-white/10 border border-transparent hover:border-black/20 dark:hover:border-white/20 transition-colors cursor-pointer" onClick={() => {
                                   useChatStore.getState().votePoll(message._id, i);

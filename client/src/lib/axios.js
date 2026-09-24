@@ -7,10 +7,14 @@ export const axiosInstance = axios.create({
 
 // Automatically attach Authorization header from localStorage if available (handles cross-domain cookie blocks)
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("pulse-token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  try {
+    if (!config) return config;
+    config.headers = config.headers || {};
+    const token = localStorage.getItem("pulse-token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {}
   return config;
 });
 

@@ -88,12 +88,14 @@ export const getUserSocketIds = (receiverId) => {
 };
 
 // Middleware to authenticate socket connections via cookie OR auth payload
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   let token;
   const cookies = socket.handshake.headers.cookie;
   if (cookies) {
-    const parsedCookies = cookie.parse(cookies);
-    token = parsedCookies.jwt;
+    try {
+      const parsedCookies = cookie.parse(cookies);
+      token = parsedCookies.jwt;
+    } catch {}
   }
 
   // Fallback to socket handshake auth token (crucial for cross-domain cookie restrictions)
@@ -104,10 +106,18 @@ io.use((socket, next) => {
   if (!token) {
     return next(new Error("Authentication error: Token missing"));
   }
+  if (!process.env.JWT_SECRET) {
+    return next(new Error("Authentication error: Server misconfigured"));
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.userId = decoded.userId?.toString();
+    const uid = decoded.userId?.toString();
+    if (!uid) return next(new Error("Authentication error: Invalid token"));
+    // Deleted/disabled users must not hold live sockets.
+    const exists = await User.findById(uid).select("_id").lean();
+    if (!exists) return next(new Error("Authentication error: Invalid token"));
+    socket.userId = uid;
     next();
   } catch {
     return next(new Error("Authentication error: Invalid token"));
@@ -188,25 +198,43 @@ io.on("connection", (socket) => {
   });
 
   // Typing indicators (throttled server-side: at most 1 forward per target per 900ms)
-  socket.on("typing", ({ targetId, targetType, username }) => {
-    if (!targetId) return;
+  // Membership-checked + server-side username (no client impersonation).
+  socket.on("typing", async ({ targetId, targetType }) => {
+    if (!targetId || !userId) return;
     try {
+      let username = "User";
+      try {
+        const me = await User.findById(userId).select("username").lean();
+        if (me?.username) username = me.username;
+      } catch {}
       const key = `${userId}:${targetId}`;
       const now = Date.now();
       if (now - (lastTypingForwardedAt.get(key) || 0) < TYPING_THROTTLE_MS) return;
-      lastTypingForwardedAt.set(key, now);
       if (targetType === "room") {
+        const room = await Room.findById(targetId).select("members").lean();
+        if (!room) return;
+        if (!(room.members || []).some((m) => m.toString() === userId.toString())) return;
+        lastTypingForwardedAt.set(key, now);
         socket.to(targetId.toString()).emit("userTyping", { userId, username, targetId, targetType });
       } else {
+        lastTypingForwardedAt.set(key, now);
         io.to(targetId.toString()).emit("userTyping", { userId, username, targetId: userId, targetType: "user" });
       }
     } catch {}
   });
 
-  socket.on("stopTyping", ({ targetId, targetType, username }) => {
-    if (!targetId) return;
+  socket.on("stopTyping", async ({ targetId, targetType }) => {
+    if (!targetId || !userId) return;
     try {
+      let username = "User";
+      try {
+        const me = await User.findById(userId).select("username").lean();
+        if (me?.username) username = me.username;
+      } catch {}
       if (targetType === "room") {
+        const room = await Room.findById(targetId).select("members").lean();
+        if (!room) return;
+        if (!(room.members || []).some((m) => m.toString() === userId.toString())) return;
         socket.to(targetId.toString()).emit("userStoppedTyping", { userId, username, targetId, targetType });
       } else {
         io.to(targetId.toString()).emit("userStoppedTyping", { userId, username, targetId: userId, targetType: "user" });
@@ -345,29 +373,41 @@ io.on("connection", (socket) => {
   });
 
   socket.on("iceCandidate", ({ to, candidate }) => {
-    if (!to) return;
+    if (!to || !candidate || !userId) return;
+    // Only forward within an active pending 1:1 call.
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("iceCandidate", { candidate });
   });
 
   socket.on("peerToggleVideo", ({ to, isVideoOff }) => {
-    if (!to) return;
+    if (!to || !userId) return;
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("peerToggleVideo", { isVideoOff });
   });
 
   socket.on("peerToggleMute", ({ to, isMuted }) => {
-    if (!to) return;
+    if (!to || !userId) return;
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("peerToggleMute", { isMuted });
   });
 
   // Live device-orientation sync so a portrait phone stays portrait on the laptop
   socket.on("peerLayout", ({ to, isPortrait, isMobile }) => {
-    if (!to) return;
+    if (!to || !userId) return;
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("peerLayout", { isPortrait, isMobile });
   });
 
   // Mesh Network Group Calls
-  socket.on("joinGroupCall", ({ roomId }) => {
-    if (!roomId) return;
+  socket.on("joinGroupCall", async ({ roomId }) => {
+    if (!roomId || !userId) return;
+    try {
+      const room = await Room.findById(roomId).select("members").lean();
+      if (!room) return;
+      if (!(room.members || []).some((m) => m.toString() === userId.toString())) return;
+    } catch {
+      return;
+    }
     if (!groupCalls[roomId]) {
       groupCalls[roomId] = new Set();
     }
@@ -382,12 +422,21 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("groupCallStarted", { roomId, startedBy: userId });
   });
 
-  socket.on("signalGroupUser", ({ userToSignal, signal }) => {
+  socket.on("signalGroupUser", async ({ userToSignal, signal, roomId }) => {
+    if (!userToSignal || !signal || !userId) return;
+    // Require shared group call membership when roomId is known.
+    try {
+      if (roomId && groupCalls[roomId]) {
+        if (!groupCalls[roomId].has(userId)) return;
+        if (!groupCalls[roomId].has(userToSignal.toString())) return;
+      }
+    } catch {}
     // Send a WebRTC signal to a specific user in the group call with authenticated userId as callerId
     io.to(userToSignal.toString()).emit("userJoinedGroupCall", { signal, callerId: userId });
   });
 
   socket.on("returnGroupSignal", ({ callerId, signal }) => {
+    if (!callerId || !signal || !userId) return;
     // Return a WebRTC signal back to the initiator with authenticated userId as id
     io.to(callerId.toString()).emit("receivingReturnedGroupSignal", { signal, id: userId });
   });
@@ -405,13 +454,25 @@ io.on("connection", (socket) => {
   });
 
   // Message Delivery Receipt
-  socket.on("messageDelivered", async ({ messageId, senderId }) => {
+  socket.on("messageDelivered", async ({ messageId }) => {
     try {
       if (!messageId || !userId) return;
+      const msg = await Message.findById(messageId).select("senderId receiverId roomId").lean();
+      if (!msg) return;
+      // Only participants may ack delivery.
+      let isParticipant = false;
+      if (msg.roomId) {
+        const room = await Room.findById(msg.roomId).select("members").lean();
+        isParticipant = !!(room?.members || []).some((m) => m.toString() === userId.toString());
+      } else {
+        isParticipant = msg.senderId?.toString() === userId.toString() || msg.receiverId?.toString() === userId.toString();
+      }
+      if (!isParticipant) return;
       await Message.findOneAndUpdate(
         { _id: messageId, "deliveries.userId": { $ne: userId } },
         { $push: { deliveries: { userId, at: new Date() } } }
       ).exec();
+      const senderId = msg.senderId?.toString();
       if (!senderId) return;
       io.to(senderId.toString()).emit("messageDelivered", { 
         messageId, 

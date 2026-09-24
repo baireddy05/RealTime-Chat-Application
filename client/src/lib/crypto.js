@@ -22,7 +22,7 @@ const MAX_CACHE_SIZE = 500;
  * Memoized to eliminate redundant WebCrypto SHA-256 digests and key imports
  */
 async function deriveKey(keyString) {
-  const normalizedKey = keyString || "pulse-default-secure-vault-key";
+  const normalizedKey = typeof keyString === "string" && keyString ? keyString : "pulse-default-secure-vault-key";
   if (keyCache.has(normalizedKey)) {
     return keyCache.get(normalizedKey);
   }
@@ -56,6 +56,9 @@ function bufferToHex(buffer) {
 }
 
 function hexToBuffer(hex) {
+  if (typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
+    throw new Error("Invalid hex string");
+  }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
@@ -104,7 +107,8 @@ export async function encryptMessage(text, keyString) {
 export async function decryptMessage(cipherString, keyString) {
   if (!isEncryptedMessage(cipherString)) return cipherString;
 
-  const cacheKey = `${keyString}:${cipherString}`;
+  // Bound cache key length — full ciphertext keys would retain MBs of text.
+  const cacheKey = `${String(keyString ?? "").slice(0, 64)}:${String(cipherString).slice(0, 256)}:${String(cipherString).length}`;
   if (decryptionCache.has(cacheKey)) {
     return decryptionCache.get(cacheKey);
   }
@@ -129,11 +133,14 @@ export async function decryptMessage(cipherString, keyString) {
 
     const plainText = textDecoder.decode(decryptedBuffer);
 
-    if (decryptionCache.size >= MAX_CACHE_SIZE * 2) {
-      const oldest = decryptionCache.keys().next().value;
-      decryptionCache.delete(oldest);
+    // Skip caching large payloads to bound memory.
+    if (String(cipherString).length < 8192) {
+      if (decryptionCache.size >= MAX_CACHE_SIZE * 2) {
+        const oldest = decryptionCache.keys().next().value;
+        decryptionCache.delete(oldest);
+      }
+      decryptionCache.set(cacheKey, plainText);
     }
-    decryptionCache.set(cacheKey, plainText);
 
     return plainText;
   } catch (error) {
@@ -150,16 +157,23 @@ export function isEncryptedMessage(text) {
 }
 
 /**
- * Generate a deterministic conversation key for 1:1 or room chats
+ * Generate a deterministic conversation key for 1:1 or room chats.
+ * Single default vault so both sides always agree; never derive from "undefined".
  */
 export function getConversationKey(chatTarget, currentUserId) {
-  if (!chatTarget) return "pulse-default-vault";
-  const targetId = chatTarget.id || chatTarget._id;
-  if (chatTarget.type === "room" || (chatTarget.name && chatTarget.name.startsWith("#"))) {
-    // Group chat (room)
-    return `pulse-room-key-${targetId}`;
+  const DEFAULT_VAULT = "pulse-default-secure-vault-key";
+  if (!chatTarget) return DEFAULT_VAULT;
+  const targetId = chatTarget.id ?? chatTarget._id;
+  if (targetId === undefined || targetId === null || targetId === "") return DEFAULT_VAULT;
+  const isRoom = chatTarget.type === "room" || chatTarget.type === "group" || chatTarget.type === "channel";
+  if (isRoom) {
+    // Group chat (room) — type-explicit, no name heuristic.
+    return `pulse-room-key-${String(targetId)}`;
   }
-  // 1:1 direct message: sort both user IDs alphabetically so both users arrive at identical key
+  // 1:1 direct message: sort both user IDs alphabetically so both users arrive at identical key.
+  // Guard against missing currentUserId (logged-out race) — fall back to default vault.
+  if (currentUserId === undefined || currentUserId === null || currentUserId === "") return DEFAULT_VAULT;
   const ids = [String(currentUserId), String(targetId)].sort();
+  if (ids.some((id) => id === "undefined" || id === "null" || id === "")) return DEFAULT_VAULT;
   return `pulse-dm-key-${ids[0]}-${ids[1]}`;
 }

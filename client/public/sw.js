@@ -28,7 +28,7 @@ const isApiRequest = (url) =>
 
 const isStaticAsset = (url) =>
   url.origin === self.location.origin &&
-  /\.(js|css|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|mp3|wav|webm|mp4|json)$/i.test(url.pathname);
+  /\.(js|css|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|json)$/i.test(url.pathname);
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -49,8 +49,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy)).catch(() => {});
+          // Never poison the shell with error pages.
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy)).catch(() => {});
+          }
           return res;
         })
         .catch(() =>
@@ -60,15 +63,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Versioned static assets: stale-while-revalidate
+  // Versioned static assets: stale-while-revalidate with LRU cap.
+  // Media excluded (mp3/wav/webm/mp4) — never cache voice notes/calls.
   if (isStaticAsset(url)) {
+    if (/\.(mp3|wav|webm|mp4)$/i.test(url.pathname)) return;
     event.respondWith(
       caches.match(request).then((cached) => {
         const network = fetch(request)
           .then((res) => {
             if (res && res.ok) {
               const copy = res.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+              caches.open(CACHE_NAME).then(async (cache) => {
+                try {
+                  await cache.put(request, copy);
+                  // LRU cap ~120 entries.
+                  const keys = await cache.keys();
+                  if (keys.length > 120) {
+                    await cache.delete(keys[0]);
+                  }
+                } catch {}
+              }).catch(() => {});
             }
             return res;
           })

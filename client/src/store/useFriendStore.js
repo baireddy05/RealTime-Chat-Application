@@ -18,9 +18,8 @@ export const useFriendStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/friends");
       const authUser = useAuthStore.getState().authUser;
-      const chatStore = useChatStore.getState();
-      const lastMessages = { ...chatStore.lastMessages };
-      const unreadCounts = { ...chatStore.unreadCounts };
+      const unreadCounts = { ...useChatStore.getState().unreadCounts };
+      const lastMessages = { ...useChatStore.getState().lastMessages };
 
       const decryptedFriends = await Promise.all(res.data.map(async (f) => {
         if (f.unreadCount !== undefined) {
@@ -39,7 +38,11 @@ export const useFriendStore = create((set, get) => ({
         return f;
       }));
 
-      useChatStore.setState({ lastMessages, unreadCounts });
+      // Merge (not overwrite) to avoid racing getUsers/getRooms.
+      useChatStore.setState((s) => ({
+        lastMessages: { ...s.lastMessages, ...lastMessages },
+        unreadCounts: { ...s.unreadCounts, ...unreadCounts },
+      }));
       set({ friends: decryptedFriends });
     } catch (error) {
       console.error("Error fetching friends:", error);
@@ -64,17 +67,27 @@ export const useFriendStore = create((set, get) => ({
   },
 
   searchUsers: async (query = "") => {
-    set({ isSearching: true });
+    // Abort stale searches so slow responses can't overwrite newer results.
     try {
-      const endpoint = query && query.trim().length > 0
-        ? `/friends/search?query=${encodeURIComponent(query.trim())}`
-        : `/friends/search`;
-      const res = await axiosInstance.get(endpoint);
+      get()._searchAbort?.abort();
+    } catch {}
+    const ctrl = new AbortController();
+    set({ isSearching: true, _searchAbort: ctrl });
+    try {
+      const q = String(query || "").trim();
+      if (!q) {
+        set({ searchResults: [] });
+        return;
+      }
+      const endpoint = `/friends/search?query=${encodeURIComponent(q.slice(0, 50))}`;
+      const res = await axiosInstance.get(endpoint, { signal: ctrl.signal });
+      if (get()._searchAbort !== ctrl) return;
       set({ searchResults: res.data || [] });
     } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return;
       console.error("Error searching users:", error);
     } finally {
-      set({ isSearching: false });
+      if (get()._searchAbort === ctrl) set({ isSearching: false, _searchAbort: null });
     }
   },
 
@@ -116,9 +129,13 @@ export const useFriendStore = create((set, get) => ({
 
       const acceptedReq = incomingRequests.find((r) => r._id === requestId);
       const newFriend = res.data.friend || acceptedReq?.sender;
+      if (!newFriend?._id) {
+        // Keep request on failure to add — never silently drop it.
+        return { success: false, message: "Could not add friend" };
+      }
 
-      // Deduplicate: filter out any existing entry before adding
-      const dedupedFriends = friends.filter((f) => f._id !== newFriend?._id);
+      // Deduplicate: filter out any existing entry before adding (ObjectId-safe)
+      const dedupedFriends = friends.filter((f) => f._id?.toString() !== newFriend?._id?.toString());
 
       set({
         incomingRequests: incomingRequests.filter((r) => r._id !== requestId),
@@ -249,6 +266,17 @@ export const useFriendStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
 
+    // Track bound socket so a rotation doesn't leak listeners on the old one.
+    const prev = get()._friendSocket;
+    if (prev && prev !== socket) {
+      try {
+        prev.off("newFriendRequest");
+        prev.off("friendRequestAccepted");
+        prev.off("friendRemoved");
+        prev.off("userUpdated");
+      } catch {}
+    }
+    set({ _friendSocket: socket });
     get().unsubscribeFromFriendEvents();
 
     socket.on("newFriendRequest", (request) => {
@@ -292,7 +320,7 @@ export const useFriendStore = create((set, get) => ({
   },
 
   unsubscribeFromFriendEvents: () => {
-    const socket = useAuthStore.getState().socket;
+    const socket = get()._friendSocket || useAuthStore.getState().socket;
     if (!socket) return;
     socket.off("newFriendRequest");
     socket.off("friendRequestAccepted");

@@ -25,7 +25,7 @@ const hasLiveSocket = (userId) => {
   try {
     return getUserSocketIds(userId).length > 0;
   } catch {
-    return true; // fail open: a live socket dedupes via notification tag
+    return false; // fail closed: transient errors must not suppress push
   }
 };
 

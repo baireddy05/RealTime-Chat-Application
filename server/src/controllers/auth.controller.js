@@ -6,18 +6,29 @@ import mongoose from "mongoose";
 import { io } from "../lib/socket.js";
 
 export const signup = async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password } = req.body || {};
   try {
-    if (!username || !email || !password) {
+    if (typeof username !== "string" || typeof email !== "string" || typeof password !== "string") {
       return res.status(400).json({ message: "All fields are required" });
     }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanUsername || !cleanEmail || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    if (cleanUsername.length < 3 || cleanUsername.length > 30 || !/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+      return res.status(400).json({ message: "Invalid username" });
+    }
+    if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ message: "Invalid email" });
     }
 
-    const userEmail = await User.findOne({ email }).select("_id").lean();
-    const userUsername = await User.findOne({ username }).select("_id").lean();
+    if (password.length < 6 || password.length > 128) {
+      return res.status(400).json({ message: "Password must be 6-128 characters" });
+    }
+
+    const userEmail = await User.findOne({ email: cleanEmail }).collation({ locale: "en", strength: 2 }).select("_id").lean();
+    const userUsername = await User.findOne({ username: cleanUsername }).collation({ locale: "en", strength: 2 }).select("_id").lean();
 
     if (userEmail) return res.status(400).json({ message: "Email already exists" });
     if (userUsername) return res.status(400).json({ message: "Username already exists" });
@@ -26,8 +37,8 @@ export const signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      username,
-      email: email.toLowerCase().trim(),
+      username: cleanUsername,
+      email: cleanEmail,
       password: hashedPassword,
     });
 
@@ -53,10 +64,13 @@ export const signup = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
   try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Please enter your email or username and password" });
+    if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
+      return res.status(401).json({ message: "Invalid email/username or password" });
+    }
+    if (password.length > 128 || email.length > 254) {
+      return res.status(401).json({ message: "Invalid email/username or password" });
     }
 
     const trimmed = email.trim();
@@ -69,13 +83,13 @@ export const login = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid email/username or password" });
+      return res.status(401).json({ message: "Invalid email/username or password" });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
-      return res.status(400).json({ message: "Invalid email/username or password" });
+      return res.status(401).json({ message: "Invalid email/username or password" });
     }
 
     const token = generateToken(user._id, res);
@@ -113,11 +127,8 @@ export const logout = (req, res) => {
 
 export const checkAuth = (req, res) => {
   try {
-    const token = req.cookies.jwt || req.headers.authorization?.replace("Bearer ", "");
-    res.status(200).json({
-      ...(req.user.toObject ? req.user.toObject() : req.user),
-      token,
-    });
+    // Token itself stays httpOnly — never echo secrets in body.
+    res.status(200).json(req.user.toObject ? req.user.toObject() : req.user);
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -136,7 +147,7 @@ export const getPublicProfile = async (req, res) => {
     }
 
     const user = await User.findById(id)
-      .select("username email profilePic bio status friends blockedUsers")
+      .select("username profilePic bio status friends blockedUsers")
       .lean();
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -161,7 +172,6 @@ export const getPublicProfile = async (req, res) => {
     res.status(200).json({
       _id: user._id,
       username: user.username,
-      email: user.email,
       profilePic: user.profilePic,
       bio: user.bio,
       status: user.status,
@@ -181,20 +191,49 @@ export const getPublicProfile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { username, profilePic, bio, status, readReceipts, chatPreferences } = req.body;
+    const { username, profilePic, bio, status, readReceipts, chatPreferences } = req.body || {};
     const userId = req.user._id;
 
-    if (username) {
-      const existingUser = await User.findOne({ username, _id: { $ne: userId } }).select("_id").lean();
+    let cleanUsername;
+    if (username !== undefined) {
+      if (typeof username !== "string" || username.trim().length < 3 || username.trim().length > 30 || !/^[a-zA-Z0-9_.-]+$/.test(username.trim())) {
+        return res.status(400).json({ message: "Invalid username" });
+      }
+      cleanUsername = username.trim();
+      const existingUser = await User.findOne({ username: cleanUsername, _id: { $ne: userId } }).select("_id").lean();
       if (existingUser) {
         return res.status(400).json({ message: "Username is already taken" });
+      }
+    }
+    if (profilePic !== undefined && (typeof profilePic !== "string" || profilePic.length > 2048)) {
+      return res.status(400).json({ message: "Invalid profile picture" });
+    }
+    if (bio !== undefined && (typeof bio !== "string" || bio.length > 300)) {
+      return res.status(400).json({ message: "Bio too long (max 300 chars)" });
+    }
+    if (status !== undefined && (typeof status !== "string" || status.length > 140)) {
+      return res.status(400).json({ message: "Status too long (max 140 chars)" });
+    }
+    if (readReceipts !== undefined && typeof readReceipts !== "boolean") {
+      return res.status(400).json({ message: "Invalid readReceipts value" });
+    }
+    if (chatPreferences !== undefined) {
+      const size = (() => {
+        try {
+          return JSON.stringify(chatPreferences).length;
+        } catch {
+          return Infinity;
+        }
+      })();
+      if (size > 20000) {
+        return res.status(400).json({ message: "Chat preferences too large" });
       }
     }
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
-        ...(username && { username }),
+        ...(cleanUsername && { username: cleanUsername }),
         ...(profilePic !== undefined && { profilePic }),
         ...(bio !== undefined && { bio }),
         ...(status !== undefined && { status }),

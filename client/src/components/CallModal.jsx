@@ -45,6 +45,13 @@ const CallModal = () => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const reactionTimeouts = useRef([]);
+  useEffect(() => {
+    return () => {
+      reactionTimeouts.current.forEach((t) => clearTimeout(t));
+      reactionTimeouts.current = [];
+    };
+  }, []);
   const [reactions, setReactions] = useState([]);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   
@@ -68,9 +75,11 @@ const CallModal = () => {
     const left = Math.floor(Math.random() * 60) + 20;
     setReactions((prev) => [...prev, { id, emoji, left }]);
     setShowReactionPicker(false);
-    setTimeout(() => {
+    const t = setTimeout(() => {
       setReactions((prev) => prev.filter((r) => r.id !== id));
     }, 1500);
+    // Avoid setState-after-unmount if modal closes within 1.5s.
+    reactionTimeouts.current.push(t);
   }, []);
 
   const isConnected = callState === "connected";
@@ -194,6 +203,7 @@ const CallModal = () => {
   // Callback refs to instantly attach streams whenever elements mount or swap
   const bindLocalVideo = useCallback((node) => {
     localVideoRef.current = node;
+    if (!node) return;
     if (node) {
       const streamToBind = isScreenSharing && screenStream ? screenStream : localStream;
       if (node.srcObject !== streamToBind) {
@@ -208,6 +218,7 @@ const CallModal = () => {
 
   const bindRemoteVideo = useCallback((node) => {
     remoteVideoRef.current = node;
+    if (!node) return;
     if (node && remoteStream) {
       if (node.srcObject !== remoteStream) {
         node.srcObject = remoteStream;
@@ -215,6 +226,10 @@ const CallModal = () => {
       node.play?.().catch(() => {});
       const size = readVideoSize(node);
       if (size) setRemoteVideoSize(size);
+    } else if (node && !remoteStream && node.srcObject) {
+      try {
+        node.srcObject = null;
+      } catch {}
     }
   }, [remoteStream]);
 
@@ -232,12 +247,26 @@ const CallModal = () => {
 
   // Synchronize remote video
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      if (remoteVideoRef.current.srcObject !== remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
+    const el = remoteVideoRef.current;
+    if (el) {
+      if (remoteStream) {
+        if (el.srcObject !== remoteStream) {
+          el.srcObject = remoteStream;
+        }
+        el.play?.().catch(() => {});
+      } else if (el.srcObject) {
+        try {
+          el.srcObject = null;
+        } catch {}
       }
-      remoteVideoRef.current.play?.().catch(() => {});
     }
+    return () => {
+      // Detach on unmount to release decoder reference.
+      try {
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+        if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      } catch {}
+    };
   }, [remoteStream, isSwapped, hasRemoteVideo]);
 
   // Dedicated remote audio playback and speaker volume control

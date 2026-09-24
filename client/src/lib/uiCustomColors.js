@@ -124,7 +124,11 @@ export const CUSTOM_COLOR_GROUPS = [
 
 export const CUSTOM_COLOR_STORAGE_KEY = "pulse-ui-custom-vars";
 
-const clampByte = (n) => Math.max(0, Math.min(255, Math.round(n)));
+const clampByte = (n) => {
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(255, v));
+};
 
 export const hexToRgb = (hex) => {
   if (typeof hex !== "string") return null;
@@ -141,9 +145,20 @@ export const rgbToHex = (r, g, b) =>
 export const cssToHex = (value) => {
   if (typeof value !== "string") return null;
   const v = value.trim();
+  if (!v || v === "transparent" || v.startsWith("var(") || v.startsWith("linear-gradient")) return null;
+  // 8-digit hex #rrggbbaa
+  const hex8 = v.match(/^#([0-9a-fA-F]{8})$/);
+  if (hex8) {
+    const h = hex8[1];
+    return {
+      hex: `#${h.slice(0, 6)}`,
+      alpha: parseInt(h.slice(6, 8), 16) / 255,
+    };
+  }
   const hex = hexToRgb(v);
   if (hex) return { hex: rgbToHex(...hex), alpha: 1 };
-  const m = v.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/i);
+  // comma syntax + space/slash syntax: rgb(1 2 3 / 0.5)
+  const m = v.match(/rgba?\(\s*(\d+)\s*[,\s]\s*(\d+)\s*[,\s]\s*(\d+)\s*(?:[,\/]\s*([\d.]+)\s*)?\)/i);
   if (m) {
     return {
       hex: rgbToHex(Number(m[1]), Number(m[2]), Number(m[3])),
@@ -158,7 +173,7 @@ export const cssToHex = (value) => {
 };
 
 /** Rebuild a CSS value in the same format as `current`, with a new hex color. */
-export const hexToCssValue = (hex, current) => {
+export const hexToCssValue = (hex, current, varName = "") => {
   const rgb = hexToRgb(hex);
   if (!rgb) return hex;
   const parsed = typeof current === "string" ? cssToHex(current) : null;
@@ -169,7 +184,8 @@ export const hexToCssValue = (hex, current) => {
       ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`
       : `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
   }
-  if (/^\d+\s+\d+\s+\d+$/.test(src)) {
+  if (/^\d+\s+\d+\s+\d+$/.test(src) || !src || /-rgb$/.test(varName)) {
+    // Triplet vars (e.g. --bg-app-rgb) must stay "r g b" so rgb(var(--x)) keeps working.
     return `${rgb[0]} ${rgb[1]} ${rgb[2]}`;
   }
   return rgbToHex(...rgb);
@@ -195,6 +211,7 @@ export const readLiveVar = (name) => {
 
 /** Resolve a field's current color as #rrggbb for the picker input. */
 export const fieldCurrentHex = (field, fallback = "#888888") => {
+  if (!field || !Array.isArray(field.vars)) return fallback;
   for (const name of field.vars) {
     const parsed = cssToHex(readLiveVar(name));
     if (parsed) return parsed.hex;
@@ -206,13 +223,22 @@ export const fieldCurrentHex = (field, fallback = "#888888") => {
  *  derived outgoing-bubble gradient so the new color is actually visible. */
 export const fieldToVars = (field, hex) => {
   const out = {};
+  if (!field || !Array.isArray(field.vars) || !hexToRgb(hex)) return out;
   for (const name of field.vars) {
-    out[name] = hexToCssValue(hex, readLiveVar(name));
+    out[name] = hexToCssValue(hex, readLiveVar(name), name);
   }
   if (field.gradient) {
     out[field.gradient] = `linear-gradient(135deg, ${hex} 0%, ${darkenHex(hex)} 100%)`;
   }
   return out;
+};
+
+/** Validate a persisted CSS value looks like a real color (not junk). */
+const isPlausibleCssColor = (v) => {
+  if (typeof v !== "string" || !v.trim() || v.length > 300) return false;
+  const s = v.trim();
+  if (/^linear-gradient|var\(|calc\(|url\(/i.test(s)) return s.length < 300 && s.startsWith("linear-gradient");
+  return cssToHex(s) !== null || /^#[0-9a-fA-F]{3,8}$/.test(s);
 };
 
 /** Read persisted overrides from localStorage (validated shape). */
@@ -224,7 +250,7 @@ export const loadCustomVars = () => {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
     const clean = {};
     for (const [k, v] of Object.entries(parsed)) {
-      if (typeof k === "string" && k.startsWith("--") && typeof v === "string" && v.length < 300) {
+      if (typeof k === "string" && k.startsWith("--") && isPlausibleCssColor(v)) {
         clean[k] = v;
       }
     }

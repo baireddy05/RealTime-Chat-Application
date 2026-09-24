@@ -38,6 +38,20 @@ const emitRoomUpdated = (room, extraUserIds = []) => {
   });
 };
 
+// Participant check: DM must involve requester; room requires membership.
+const canAccessMessage = async (message, userId) => {
+  if (!message || !userId) return false;
+  const uid = userId.toString();
+  if (message.roomId) {
+    const { isMember } = await getRoomRole(message.roomId, uid);
+    return isMember;
+  }
+  return (
+    message.senderId?.toString() === uid ||
+    message.receiverId?.toString() === uid
+  );
+};
+
 // Helper to prevent Server-Side Request Forgery (SSRF)
 export const isSafeUrl = (rawUrl) => {
   try {
@@ -458,6 +472,28 @@ export const sendMessage = async (req, res) => {
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
+    // Payload limits: prevent unbounded docs (16MB Mongo cap) and malformed polls.
+    if (typeof text === "string" && text.length > 8000) {
+      return res.status(400).json({ error: "Message text too long (max 8000 chars)" });
+    }
+    if (poll) {
+      const opts = poll.options;
+      if (!Array.isArray(opts) || opts.length < 2 || opts.length > 10) {
+        return res.status(400).json({ error: "Poll must have 2-10 options" });
+      }
+      for (const o of opts) {
+        if (typeof o?.text !== "string" || !o.text.trim() || o.text.length > 200) {
+          return res.status(400).json({ error: "Invalid poll option" });
+        }
+      }
+    }
+    if (contact && (typeof contact !== "object" || typeof contact.username !== "string")) {
+      return res.status(400).json({ error: "Invalid contact payload" });
+    }
+    if (file && (typeof file !== "object" || typeof file.url !== "string" || !isSafeUrl(file.url))) {
+      return res.status(400).json({ error: "Invalid file payload" });
+    }
+
     const resolvedVideoNote = videoNote || (typeof videoMessage === "string" ? videoMessage : videoMessage?.videoUrl) || null;
     let resolvedLocation = null;
     if (location) {
@@ -846,13 +882,17 @@ export const reactToMessage = async (req, res) => {
     const userId = req.user._id;
     const username = req.user.username;
 
-    if (!emoji) {
+    if (!emoji || typeof emoji !== "string" || emoji.length > 16) {
       return res.status(400).json({ error: "Emoji is required" });
     }
 
     const message = await Message.findById(messageId);
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
+    }
+
+    if (!(await canAccessMessage(message, userId))) {
+      return res.status(403).json({ error: "Not a participant" });
     }
 
     const existingIndex = message.reactions.findIndex(
@@ -950,6 +990,14 @@ export const votePoll = async (req, res) => {
       return res.status(404).json({ error: "Poll not found" });
     }
 
+    if (!(await canAccessMessage(message, userId))) {
+      return res.status(403).json({ error: "Not a participant" });
+    }
+
+    if (!Number.isInteger(optionIndex)) {
+      return res.status(400).json({ error: "Invalid option index" });
+    }
+
     const option = message.poll.options[optionIndex];
     if (!option) {
       return res.status(400).json({ error: "Invalid option index" });
@@ -1011,6 +1059,10 @@ export const viewWhisper = async (req, res) => {
     const message = await Message.findById(messageId);
     if (!message || !message.isWhisper) {
       return res.status(404).json({ error: "Whisper not found" });
+    }
+
+    if (!(await canAccessMessage(message, userId))) {
+      return res.status(403).json({ error: "Not a participant" });
     }
 
     if (message.isDeleted) {
@@ -1210,6 +1262,10 @@ export const toggleStarMessage = async (req, res) => {
       return res.status(404).json({ error: "Message not found" });
     }
 
+    if (!(await canAccessMessage(message, userId))) {
+      return res.status(403).json({ error: "Not a participant" });
+    }
+
     const isStarred = (message.starredBy || []).some(
       (id) => id.toString() === userId.toString()
     );
@@ -1271,48 +1327,71 @@ export const getStarredMessages = async (req, res) => {
 };
 
 export const previewLink = async (req, res) => {
+  const safeFallback = (raw) => {
+    let host = "link";
+    try {
+      host = new URL(String(raw)).hostname || host;
+    } catch {}
+    return {
+      url: typeof raw === "string" ? raw.slice(0, 2048) : "",
+      title: host,
+      description: "",
+      image: null,
+      siteName: host,
+    };
+  };
   try {
     const { url } = req.query;
-    if (!url || !url.startsWith("http") || !isSafeUrl(url)) {
+    if (typeof url !== "string" || !url.startsWith("http") || !isSafeUrl(url)) {
       return res.status(400).json({ error: "Valid public HTTP/HTTPS URL required" });
     }
 
     const response = await fetch(url, {
       headers: { "User-Agent": "PulseMessenger/1.0" },
+      redirect: "manual",
       signal: AbortSignal.timeout(3000),
     });
-    const html = await response.text();
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      return res.status(200).json(safeFallback(url));
+    }
+    if (!response.ok) return res.status(200).json(safeFallback(url));
+    const contentType = response.headers.get("content-type") || "";
+    if (!/text\/html/i.test(contentType)) return res.status(200).json(safeFallback(url));
+    const html = (await response.text()).slice(0, 500000);
 
-    const title =
-      html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-      html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ||
-      new URL(url).hostname;
+    let title = "link";
+    let siteName = "link";
+    try {
+      title =
+        html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
+        html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ||
+        new URL(url).hostname;
+      siteName =
+        html.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
+        new URL(url).hostname;
+    } catch {
+      title = safeFallback(url).title;
+      siteName = title;
+    }
+
     const description =
       html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
       html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
       "";
-    const image =
+    let image =
       html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
       null;
-    const siteName =
-      html.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
-      new URL(url).hostname;
+    if (image && (typeof image !== "string" || !isSafeUrl(image))) image = null;
 
     res.status(200).json({
       url,
-      title: title.trim(),
-      description: description.trim(),
+      title: String(title || "").trim().slice(0, 300),
+      description: String(description || "").trim().slice(0, 500),
       image,
-      siteName,
+      siteName: String(siteName || "").slice(0, 200),
     });
   } catch {
-    res.status(200).json({
-      url: req.query.url,
-      title: new URL(req.query.url).hostname,
-      description: "",
-      image: null,
-      siteName: new URL(req.query.url).hostname,
-    });
+    res.status(200).json(safeFallback(req.query.url));
   }
 };
 
@@ -1411,17 +1490,21 @@ export const kickRoomMember = async (req, res) => {
     const { roomId, userId } = req.params;
     const myId = req.user._id;
 
+    if (!mongoose.Types.ObjectId.isValid(roomId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+
     const room = await Room.findById(roomId);
     if (!room) return res.status(404).json({ error: "Room not found" });
 
-    const isCreator = room.createdBy.toString() === myId.toString();
+    const isCreator = room.createdBy?.toString() === myId.toString();
     const isAdmin = isCreator || (room.admins || []).some((a) => a.toString() === myId.toString());
 
     if (!isAdmin) {
       return res.status(403).json({ error: "Only room admins can remove members" });
     }
 
-    if (userId.toString() === room.createdBy.toString()) {
+    if (room.createdBy && userId.toString() === room.createdBy.toString()) {
       return res.status(400).json({ error: "Cannot remove room creator" });
     }
 
@@ -1513,10 +1596,14 @@ export const toggleRoomAdmin = async (req, res) => {
     const { userId } = req.body;
     const myId = req.user._id;
 
+    if (!mongoose.Types.ObjectId.isValid(roomId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+
     const room = await Room.findById(roomId);
     if (!room) return res.status(404).json({ error: "Room not found" });
 
-    const isCreator = room.createdBy.toString() === myId.toString();
+    const isCreator = room.createdBy?.toString() === myId.toString();
     if (!isCreator) {
       return res.status(403).json({ error: "Only the room creator can assign or revoke admin status" });
     }
@@ -2031,6 +2118,13 @@ export const stopLiveLocation = async (req, res) => {
 export const getThreadReplies = async (req, res) => {
   try {
     const { messageId } = req.params;
+    const parent = await Message.findById(messageId).select("senderId receiverId roomId");
+    if (!parent) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+    if (!(await canAccessMessage(parent, req.user._id))) {
+      return res.status(403).json({ error: "Not a participant" });
+    }
     const replies = await Message.find({
       parentMessageId: messageId,
       isDeleted: false,
@@ -2055,6 +2149,10 @@ export const getMessageReceipts = async (req, res) => {
 
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
+    }
+
+    if (!(await canAccessMessage(message, req.user._id))) {
+      return res.status(403).json({ error: "Not a participant" });
     }
 
     res.status(200).json({
@@ -2107,13 +2205,23 @@ export const proxyDownloadFile = async (req, res) => {
       headers: {
         "User-Agent": "PulseMessenger/1.0 (Windows NT 10.0; Win64; x64)",
       },
-      // Don't hang on slow servers; redirects are followed only to safe URLs below
+      // Don't hang on slow servers; manual redirect so each hop is re-validated
+      redirect: "manual",
       signal: AbortSignal.timeout(10000),
     });
 
+    // Re-validate redirect targets (fetch manual => no auto-follow to metadata endpoints).
+    if ([301, 302, 303, 307, 308].includes(remoteResponse.status)) {
+      const loc = remoteResponse.headers.get("location");
+      if (!loc || !isSafeUrl(new URL(loc, url).toString())) {
+        return res.status(400).json({ error: "Redirect target not allowed" });
+      }
+      return res.status(400).json({ error: "Redirects not followed for safety" });
+    }
+
     if (!remoteResponse.ok) {
-      return res.status(remoteResponse.status).json({
-        error: `Failed to fetch file from source: ${remoteResponse.statusText}`,
+      return res.status(502).json({
+        error: `Failed to fetch file from source`,
       });
     }
 
@@ -2357,14 +2465,23 @@ export const translateMessage = async (req, res) => {
     const { messageId } = req.params;
     const { targetLanguage = "en", text: clientText } = req.body;
 
-    let textToTranslate = typeof clientText === "string" && clientText.trim() ? clientText.trim() : null;
+    let textToTranslate = typeof clientText === "string" && clientText.trim() ? clientText.trim().slice(0, 2000) : null;
 
     if (!textToTranslate) {
       const message = await Message.findById(messageId);
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
       }
+      if (!(await canAccessMessage(message, req.user._id))) {
+        return res.status(403).json({ error: "Not a participant" });
+      }
       textToTranslate = message.decryptedText || message.text;
+    } else if (messageId && messageId !== "client") {
+      // Client-supplied text for a known message still requires membership.
+      const message = await Message.findById(messageId);
+      if (message && !(await canAccessMessage(message, req.user._id))) {
+        return res.status(403).json({ error: "Not a participant" });
+      }
     }
 
     if (!textToTranslate || typeof textToTranslate !== "string" || !textToTranslate.trim()) {
@@ -2982,12 +3099,13 @@ export const searchMessages = async (req, res) => {
     const blockedIds = [
       ...((meForBlock?.blockedUsers || []).map((id) => id.toString())),
       ...((await User.find({ blockedUsers: myId }).select("_id").lean()).map((u) => u._id.toString())),
-    ];
+    ].filter((id) => mongoose.Types.ObjectId.isValid(id));
     if (blockedIds.length > 0) {
+      const blockedObjIds = blockedIds.map((id) => new mongoose.Types.ObjectId(id));
       and.push({
         $or: [
           { roomId: { $ne: null } },
-          { senderId: { $nin: blockedIds }, receiverId: { $nin: blockedIds } },
+          { senderId: { $nin: blockedObjIds }, receiverId: { $nin: blockedObjIds } },
         ],
       });
     }

@@ -5,42 +5,49 @@ import { getReceiverSocketId, io } from "./socket.js";
 import { notifyNewMessage } from "./notify.js";
 
 export const startMessageScheduler = () => {
+  let running = false;
   setInterval(async () => {
+    if (running) return;
+    running = true;
     try {
       const now = new Date();
 
       // 1. Dispatch scheduled messages that have reached their scheduled time
+      // Atomic claim (isScheduled true -> false) prevents duplicate dispatch on overlapping ticks.
       const readyMessages = await Message.find({
         isScheduled: true,
         scheduledFor: { $lte: now },
       }).populate("senderId", "username profilePic");
 
       for (const msg of readyMessages) {
-        msg.isScheduled = false;
-        msg.createdAt = now;
-        await msg.save();
-
-        if (msg.roomId) {
-          io.to(msg.roomId.toString()).emit("newMessage", msg);
+        const claimed = await Message.findOneAndUpdate(
+          { _id: msg._id, isScheduled: true },
+          { $set: { isScheduled: false, createdAt: now } },
+          { new: true }
+        ).populate("senderId", "username profilePic");
+        if (!claimed) continue;
+        const sendMsg = claimed;
+        if (sendMsg.roomId) {
+          io.to(sendMsg.roomId.toString()).emit("newMessage", sendMsg);
           try {
-            const scheduledRoom = await Room.findById(msg.roomId).select("name members").lean();
+            const scheduledRoom = await Room.findById(sendMsg.roomId).select("name members").lean();
             if (scheduledRoom) {
               notifyNewMessage({
-                message: msg,
-                senderName: msg.senderId?.username,
-                room: { _id: msg.roomId, name: scheduledRoom.name, members: scheduledRoom.members || [] },
-              });
+                message: sendMsg,
+                senderName: sendMsg.senderId?.username,
+                room: { _id: sendMsg.roomId, name: scheduledRoom.name, members: scheduledRoom.members || [] },
+              }).catch(() => {});
             }
           } catch (pushErr) {
             console.error("Scheduled push failed:", pushErr.message);
           }
         } else {
-          const receiverIdStr = (msg.receiverId?._id || msg.receiverId)?.toString();
-          const senderIdStr = (msg.senderId?._id || msg.senderId)?.toString();
-          if (receiverIdStr) io.to(receiverIdStr).emit("newMessage", msg);
-          if (senderIdStr) io.to(senderIdStr).emit("newMessage", msg);
+          const receiverIdStr = (sendMsg.receiverId?._id || sendMsg.receiverId)?.toString();
+          const senderIdStr = (sendMsg.senderId?._id || sendMsg.senderId)?.toString();
+          if (receiverIdStr) io.to(receiverIdStr).emit("newMessage", sendMsg);
+          if (senderIdStr) io.to(senderIdStr).emit("newMessage", sendMsg);
           if (receiverIdStr) {
-            notifyNewMessage({ message: msg, senderName: msg.senderId?.username, receiverId: receiverIdStr });
+            notifyNewMessage({ message: sendMsg, senderName: sendMsg.senderId?.username, receiverId: receiverIdStr }).catch(() => {});
           }
         }
       }
@@ -97,6 +104,8 @@ export const startMessageScheduler = () => {
       }
     } catch (error) {
       console.error("Error in messageScheduler:", error.message);
+    } finally {
+      running = false;
     }
   }, 3000);
 };

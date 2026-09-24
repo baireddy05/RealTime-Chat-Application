@@ -107,9 +107,9 @@ export const useCallStore = create((set, get) => ({
     if (callType !== "video") return;
     const nextFacing = currentFacingMode === "user" ? "environment" : "user";
 
+    let newStream = null;
     try {
       if (!navigator?.mediaDevices?.getUserMedia) return;
-      let newStream = null;
       try {
         newStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { exact: nextFacing } },
@@ -125,11 +125,23 @@ export const useCallStore = create((set, get) => ({
         if (localStream) {
           const oldVideoTrack = localStream.getVideoTracks()[0];
           if (oldVideoTrack) {
-            oldVideoTrack.stop();
-            localStream.removeTrack(oldVideoTrack);
+            try {
+              oldVideoTrack.stop();
+            } catch {}
+            try {
+              localStream.removeTrack(oldVideoTrack);
+            } catch {}
           }
-          localStream.addTrack(newVideoTrack);
+          try {
+            localStream.addTrack(newVideoTrack);
+          } catch {}
         }
+        // Stop spare tracks (e.g. audio) from the throwaway stream.
+        try {
+          newStream.getTracks().forEach((t) => {
+            if (t !== newVideoTrack) t.stop();
+          });
+        } catch {}
 
         if (peerConnection) {
           const senders = peerConnection.getSenders();
@@ -143,8 +155,15 @@ export const useCallStore = create((set, get) => ({
           currentFacingMode: nextFacing,
           localStream: new MediaStream(localStream ? localStream.getTracks() : [newVideoTrack]),
         });
+      } else {
+        try {
+          newStream?.getTracks()?.forEach((t) => t.stop());
+        } catch {}
       }
     } catch (err) {
+      try {
+        newStream?.getTracks()?.forEach((t) => t.stop());
+      } catch {}
       console.warn("[PulseCall] Failed to switch camera facingMode:", err);
     }
   },
@@ -220,7 +239,11 @@ export const useCallStore = create((set, get) => ({
       }
 
       // Start call duration counter
-      if (timerInterval) clearInterval(timerInterval);
+      try {
+        if (timerInterval) clearInterval(timerInterval);
+        const prev = get()._timerInterval;
+        if (prev) clearInterval(prev);
+      } catch {}
       set({
         callState: "connected",
         callDuration: 0,
@@ -229,6 +252,7 @@ export const useCallStore = create((set, get) => ({
       timerInterval = setInterval(() => {
         set((state) => ({ callDuration: state.callDuration + 1 }));
       }, 1000);
+      set({ _timerInterval: timerInterval });
     });
 
     socket.on("callRejected", () => {
@@ -332,6 +356,15 @@ export const useCallStore = create((set, get) => ({
           if (!remoteStream.getTracks().some((t) => t.id === track.id)) {
             remoteStream.addTrack(track);
           }
+          // Force new ref so React re-renders (same object set may bail out).
+          track.onmute = () => set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
+          track.onunmute = () => set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
+          track.onended = () => {
+            try {
+              remoteStream.removeTrack(track);
+            } catch {}
+            set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
+          };
         });
       } else if (event.track) {
         if (!remoteStream.getTracks().some((t) => t.id === event.track.id)) {
@@ -339,11 +372,7 @@ export const useCallStore = create((set, get) => ({
         }
       }
 
-      event.track.onmute = () => set({ remoteStream });
-      event.track.onunmute = () => set({ remoteStream });
-      event.track.onended = () => set({ remoteStream });
-
-      set({ remoteStream });
+      set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
     };
 
     // Handle ICE candidates
@@ -357,8 +386,25 @@ export const useCallStore = create((set, get) => ({
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-        if (pc.restartIce) pc.restartIce();
+      const st = pc.iceConnectionState;
+      if (st === "disconnected" || st === "failed") {
+        const attempts = (get()._iceRestarts || 0) + 1;
+        set({ _iceRestarts: attempts });
+        if (attempts <= 3) {
+          // Backoff: 1s, 2s, 4s — then give up to avoid hot loop.
+          setTimeout(() => {
+            try {
+              if (pc.restartIce && get().callState !== "idle") pc.restartIce();
+            } catch {}
+          }, 1000 * Math.pow(2, attempts - 1));
+        } else {
+          try {
+            soundManager.stopRinging?.();
+          } catch {}
+          get().cleanupCall();
+        }
+      } else if (st === "closed") {
+        get().cleanupCall();
       }
     };
 
@@ -419,6 +465,7 @@ export const useCallStore = create((set, get) => ({
     }
 
     let stream = null;
+    let effectiveCallType = callType;
     get().checkMultipleCameras();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -427,18 +474,33 @@ export const useCallStore = create((set, get) => ({
       });
     } catch (err) {
       console.warn("[PulseCall] Could not obtain optimal camera on answer, falling back:", err);
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: callType === "video" ? { facingMode: "user" } : false,
-        });
-      } catch {
+      const name = err?.name || "";
+      if (name === "NotFoundError" || name === "OverconstrainedError" || name === "NotReadableError") {
+        // No camera — continue audio-only but reflect it in state.
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          stream = await navigator.mediaDevices.getUserMedia({ audio: getAudioConstraints(), video: false });
+          effectiveCallType = "audio";
         } catch {
-          alert("Camera or Microphone permission was denied or unavailable.");
+          alert("Microphone unavailable — cannot answer call.");
           get().rejectCall();
           return;
+        }
+      } else {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: callType === "video" ? { facingMode: "user" } : false,
+          });
+        } catch {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            effectiveCallType = "audio";
+          } catch {
+            if (name === "NotAllowedError") alert("Camera/Microphone permission denied.");
+            else alert("Camera or Microphone unavailable.");
+            get().rejectCall();
+            return;
+          }
         }
       }
     }
@@ -507,19 +569,25 @@ export const useCallStore = create((set, get) => ({
         deviceInfo: getDeviceLayout(),
       });
 
-      if (timerInterval) clearInterval(timerInterval);
+      try {
+        if (timerInterval) clearInterval(timerInterval);
+        const prev = get()._timerInterval;
+        if (prev) clearInterval(prev);
+      } catch {}
       timerInterval = setInterval(() => {
         set((state) => ({ callDuration: state.callDuration + 1 }));
       }, 1000);
+      set({ _timerInterval: timerInterval });
 
       set({
         callState: "connected",
+        callType: effectiveCallType,
         localStream: stream,
         remoteStream,
         peerConnection: pc,
         callDuration: 0,
         isMuted: false,
-        isVideoOff: callType !== "video",
+        isVideoOff: effectiveCallType !== "video",
         isPeerMuted: false,
         isPeerVideoOff: false,
       });
@@ -654,24 +722,55 @@ export const useCallStore = create((set, get) => ({
 
   // Clean up all resources
   cleanupCall: () => {
-    if (timerInterval) {
-      clearInterval(timerInterval);
+    try {
+      const t = get()._timerInterval;
+      if (t) clearInterval(t);
+    } catch {}
+    if (typeof timerInterval !== "undefined" && timerInterval) {
+      try {
+        clearInterval(timerInterval);
+      } catch {}
       timerInterval = null;
     }
     pendingIceCandidates = [];
+    try {
+      soundManager.stopRinging?.();
+    } catch {}
 
-    const { localStream, screenStream, peerConnection } = get();
+    const { localStream, screenStream, remoteStream, peerConnection } = get();
     if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
+      try {
+        localStream.getTracks().forEach((track) => track.stop());
+      } catch {}
     }
     if (screenStream) {
-      screenStream.getTracks().forEach((track) => track.stop());
+      try {
+        screenStream.getTracks().forEach((track) => track.stop());
+      } catch {}
+    }
+    if (remoteStream) {
+      try {
+        remoteStream.getTracks().forEach((track) => track.stop());
+      } catch {}
     }
     if (peerConnection) {
       try {
+        peerConnection.ontrack = null;
+        peerConnection.onicecandidate = null;
+        peerConnection.oniceconnectionstatechange = null;
+        peerConnection.onconnectionstatechange = null;
         peerConnection.close();
       } catch {}
     }
+    // Detach current socket call listeners so old sockets don't ghost-ring.
+    try {
+      const sock = useAuthStore.getState().socket;
+      sock?.off?.("incomingCall");
+      sock?.off?.("callAccepted");
+      sock?.off?.("callRejected");
+      sock?.off?.("callEnded");
+      sock?.off?.("iceCandidate");
+    } catch {}
 
     set({
       callState: "idle",
@@ -689,6 +788,10 @@ export const useCallStore = create((set, get) => ({
       isScreenSharing: false,
       currentFacingMode: "user",
       isSwapped: false,
+      isSpeakerOn: true,
+      peerIsPortrait: false,
+      peerIsMobile: false,
+      _timerInterval: null,
     });
     // Refresh history in the background so the log stays current
     try {

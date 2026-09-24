@@ -12,24 +12,42 @@ const ACOUSTIC_WAVE_PROFILE = [
 const audioDurationCache = new Map();
 
 // Helper to decode WebM / audio duration accurately using Web Audio API
-const fetchExactAudioDuration = async (url) => {
+// Shared singleton context (browsers cap ~6 contexts) + abortable decode.
+let sharedAudioCtx = null;
+const getSharedAudioCtx = () => {
+  try {
+    if (sharedAudioCtx && sharedAudioCtx.state !== "closed") return sharedAudioCtx;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    sharedAudioCtx = new AudioCtx();
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+};
+const fetchExactAudioDuration = async (url, signal) => {
   if (!url) return 0;
   if (audioDurationCache.has(url)) return audioDurationCache.get(url);
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, signal ? { signal } : undefined);
+    if (!response.ok) return 0;
     const arrayBuffer = await response.arrayBuffer();
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      const ctx = new AudioCtx();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    if (signal?.aborted) return 0;
+    const ctx = getSharedAudioCtx();
+    if (ctx) {
+      try {
+        if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      } catch {}
+      const copy = arrayBuffer.slice(0);
+      const audioBuffer = await ctx.decodeAudioData(copy);
       const dur = audioBuffer.duration;
-      ctx.close();
       if (dur && isFinite(dur) && dur > 0) {
         audioDurationCache.set(url, dur);
         return dur;
       }
     }
-  } catch {
+  } catch (err) {
+    if (err?.name === "AbortError") return 0;
     // Fallback gracefully if fetch or decode is blocked
   }
   return 0;
@@ -73,8 +91,9 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
   // Fetch audio duration via Web Audio API decode on mount
   useEffect(() => {
     let isMounted = true;
+    const ctrl = new AbortController();
     if (audioUrl && (!duration || duration === 0)) {
-      fetchExactAudioDuration(audioUrl).then((dur) => {
+      fetchExactAudioDuration(audioUrl, ctrl.signal).then((dur) => {
         if (isMounted && dur > 0) {
           setDuration(dur);
         }
@@ -82,8 +101,11 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
     }
     return () => {
       isMounted = false;
+      try {
+        ctrl.abort();
+      } catch {}
     };
-  }, [audioUrl, duration]);
+  }, [audioUrl]);
 
   // Handle native audio element lifecycle
   useEffect(() => {
@@ -146,6 +168,9 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
 
     return () => {
       stopProgressTracking();
+      try {
+        audio.pause();
+      } catch {}
       audio.removeEventListener("loadedmetadata", setAudioData);
       audio.removeEventListener("durationchange", setAudioData);
       audio.removeEventListener("canplay", setAudioData);
@@ -154,7 +179,7 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [audioUrl, isSeeking, startProgressTracking, stopProgressTracking]);
+  }, [audioUrl, startProgressTracking, stopProgressTracking]);
 
   const togglePlay = () => {
     const audio = audioRef.current;

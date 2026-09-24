@@ -46,14 +46,19 @@ class DesktopNotificationManager {
   }
 
   hasPermission() {
-    return this.isSupported() && this.permission === "granted";
+    if (!this.isSupported()) return false;
+    try {
+      // Re-read live permission; cached value goes stale if user changes it in browser UI.
+      this.permission = Notification.permission;
+    } catch {}
+    return this.permission === "granted";
   }
 
   async sendNotification({
     title,
     body,
     icon = "/favicon.png",
-    tag = "pulse-message",
+    tag = null,
     data = null,
     onClick = null,
   }) {
@@ -65,16 +70,24 @@ class DesktopNotificationManager {
     }
 
     try {
+      // Unique tag per conversation/message so stacked messages don't replace each other.
+      const effectiveTag = tag || `pulse-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       // Try to use Service Worker notification if available
       if (this.swRegistration && "showNotification" in this.swRegistration) {
         await this.swRegistration.showNotification(title || "Pulse Message", {
           body: body || "New message received",
           icon: icon || "/favicon.png",
           badge: "/favicon.png",
-          tag,
+          tag: effectiveTag,
           vibrate: [150, 80, 150],
-          data: data || { url: window.location.href },
+          data: { ...(data || { url: typeof window !== "undefined" ? window.location.href : "/" }), onClickId: effectiveTag },
         });
+        // Store click handler for SW notifications; HomePage wires notificationclick via service worker message.
+        try {
+          if (typeof onClick === "function" && typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("pulse:notification-queued", { detail: { tag: effectiveTag } }));
+          }
+        } catch {}
         return true;
       }
 
@@ -83,7 +96,7 @@ class DesktopNotificationManager {
         body: body || "New message received",
         icon: icon || "/favicon.png",
         badge: "/favicon.png",
-        tag,
+        tag: effectiveTag,
         silent: true,
       });
 

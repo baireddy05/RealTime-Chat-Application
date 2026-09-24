@@ -35,14 +35,19 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/auth/check");
       if (res.data.token) {
-        localStorage.setItem("pulse-token", res.data.token);
+        try {
+          localStorage.setItem("pulse-token", res.data.token);
+        } catch {}
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
       // Best-effort: (re)register push transports if permission was granted
       import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
     } catch {
-      localStorage.removeItem("pulse-token");
+      try {
+        localStorage.removeItem("pulse-token");
+      } catch {}
+      get().disconnectSocket();
       set({ authUser: null });
     } finally {
       set({ isCheckingAuth: false });
@@ -54,7 +59,9 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/signup", data);
       if (res.data.token) {
-        localStorage.setItem("pulse-token", res.data.token);
+        try {
+          localStorage.setItem("pulse-token", res.data.token);
+        } catch {}
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
@@ -73,7 +80,9 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/login", data);
       if (res.data.token) {
-        localStorage.setItem("pulse-token", res.data.token);
+        try {
+          localStorage.setItem("pulse-token", res.data.token);
+        } catch {}
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
@@ -88,45 +97,54 @@ export const useAuthStore = create((set, get) => ({
   },
 
   logout: async () => {
+    const logoutId = Date.now();
     try {
       await axiosInstance.post("/auth/logout");
     } catch (error) {
       console.error(error.response?.data?.message || "Logout failed");
     } finally {
-      localStorage.removeItem("pulse-token");
+      try {
+        localStorage.removeItem("pulse-token");
+      } catch {}
+      // Capture id to avoid a fast re-login being wiped by this stale logout.
+      const currentUserAtLogout = get().authUser;
       set({ authUser: null });
       get().disconnectSocket();
       // Stop push delivery to this device (best effort, never blocks logout)
       import("../lib/push").then(({ disablePushTransports }) => disablePushTransports().catch(() => {}));
-      // Clear chat + call state so next login starts fresh
+      // Clear chat + call state so next login starts fresh — only if still logged out.
       try {
         const { useChatStore } = await import("./useChatStore");
-        useChatStore.setState({
-          selectedChat: null,
-          messages: [],
-          scheduledMessages: [],
-          unreadCounts: {},
-          lastMessages: {},
-          replyingTo: null,
-          editingMessage: null,
-          forwardingMessage: null,
-          activeThreadMessage: null,
-          threadReplies: [],
-          isThreadOpen: false,
-          unlockedChats: [],
-        });
+        if (get().authUser === null) {
+          useChatStore.setState({
+            selectedChat: null,
+            messages: [],
+            scheduledMessages: [],
+            unreadCounts: {},
+            lastMessages: {},
+            replyingTo: null,
+            editingMessage: null,
+            forwardingMessage: null,
+            activeThreadMessage: null,
+            threadReplies: [],
+            isThreadOpen: false,
+            unlockedChats: [],
+          });
+        }
       } catch {}
       try {
         const { useCallStore } = await import("./useCallStore");
-        useCallStore.getState().cleanupCall?.();
+        if (get().authUser === null) useCallStore.getState().cleanupCall?.();
       } catch {}
+      void logoutId;
+      void currentUserAtLogout;
     }
   },
 
   updateProfile: async (profileData) => {
     try {
       const res = await axiosInstance.put("/auth/update-profile", profileData);
-      set({ authUser: res.data });
+      set({ authUser: stripToken(res.data) });
       return { success: true, data: res.data };
     } catch (error) {
       console.error("Update profile failed", error);
@@ -136,9 +154,21 @@ export const useAuthStore = create((set, get) => ({
 
   connectSocket: () => {
     const { authUser, socket } = get();
-    if (!authUser || (socket && socket.connected)) return;
+    if (!authUser) return;
+    // Reuse healthy socket; tear down stale/disconnected one before creating a new one.
+    if (socket) {
+      if (socket.connected) return;
+      try {
+        socket.removeAllListeners();
+        socket.disconnect();
+      } catch {}
+      set({ socket: null });
+    }
 
-    const token = localStorage.getItem("pulse-token");
+    let token = null;
+    try {
+      token = localStorage.getItem("pulse-token");
+    } catch {}
     const newSocket = io(BASE_URL, {
       withCredentials: true,
       auth: { token },
@@ -176,20 +206,29 @@ export const useAuthStore = create((set, get) => ({
   },
 
   disconnectSocket: () => {
-    if (get().socket) {
-      get().socket.disconnect();
+    const s = get().socket;
+    if (s) {
+      try {
+        s.removeAllListeners();
+      } catch {}
+      try {
+        s.disconnect();
+      } catch {}
       set({ socket: null, onlineUsers: [] });
     }
     if (visibilityHandler) {
-      document.removeEventListener("visibilitychange", visibilityHandler);
-      window.removeEventListener("focus", visibilityHandler);
+      try {
+        document.removeEventListener("visibilitychange", visibilityHandler);
+        window.removeEventListener("focus", visibilityHandler);
+      } catch {}
       visibilityHandler = null;
     }
   },
 }));
 
 // Global 401 handler (dispatched from lib/axios.js to avoid a static+dynamic import cycle)
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && !window.__pulseUnauthorizedWired) {
+  window.__pulseUnauthorizedWired = true;
   window.addEventListener("pulse:unauthorized", () => {
     try {
       useAuthStore.setState({ authUser: null });

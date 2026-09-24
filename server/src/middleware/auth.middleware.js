@@ -3,6 +3,10 @@ import User from "../models/User.model.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is not configured");
+      return res.status(500).json({ message: "Server auth misconfigured" });
+    }
     let token = req.cookies.jwt;
 
     // Fallback to Bearer token header if cross-origin cookie was blocked
@@ -16,14 +20,14 @@ export const protectRoute = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded) {
+    if (!decoded?.userId) {
       return res.status(401).json({ message: "Unauthorized - Invalid Token" });
     }
 
     const user = await User.findById(decoded.userId).select("-password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(401).json({ message: "Unauthorized - Invalid Token" });
     }
 
     req.user = user;

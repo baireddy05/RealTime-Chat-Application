@@ -19,7 +19,17 @@ export const useGroupCallStore = create((set, get) => ({
   isVideoOff: false,
 
   initSocketListeners: (socket) => {
-    if (!socket || get().activeSocket === socket) return;
+    if (!socket) return;
+    const prev = get().activeSocket;
+    if (prev && prev !== socket) {
+      try {
+        prev.off("allUsersInCall");
+        prev.off("userJoinedGroupCall");
+        prev.off("receivingReturnedGroupSignal");
+        prev.off("userLeftGroupCall");
+      } catch {}
+    }
+    if (prev === socket) return;
     set({ activeSocket: socket });
 
     socket.off("allUsersInCall");
@@ -27,31 +37,62 @@ export const useGroupCallStore = create((set, get) => ({
     socket.off("receivingReturnedGroupSignal");
     socket.off("userLeftGroupCall");
 
+    // Pending ICE queue per peer (candidate may arrive before remote description).
+    const iceQueue = get()._iceQueue || {};
+    set({ _iceQueue: iceQueue });
+
     // We joined the room; now initiate connections with everyone already in the room
     socket.on("allUsersInCall", ({ users }) => {
       const { localStream } = get();
       if (!localStream) return;
-      users.forEach(userId => {
-        const peer = get().createPeer(userId, true, localStream);
-        set(state => ({ peers: { ...state.peers, [userId]: peer } }));
+      (users || []).forEach(userId => {
+        if (get().peers[userId]) return;
+        try {
+          const peer = get().createPeer(userId, true, localStream);
+          set(state => ({ peers: { ...state.peers, [userId]: peer } }));
+        } catch {}
       });
     });
 
     // Someone else joined the room; they sent us an offer or ICE candidate
     socket.on("userJoinedGroupCall", async ({ signal, callerId }) => {
       const { localStream, activeSocket } = get();
-      if (!localStream) return;
+      if (!localStream || !callerId) return;
       let peer = get().peers[callerId];
       if (!peer) {
-        peer = get().createPeer(callerId, false, localStream);
+        try {
+          peer = get().createPeer(callerId, false, localStream);
+        } catch {
+          return;
+        }
         set(state => ({ peers: { ...state.peers, [callerId]: peer } }));
       }
       
       try {
         if (signal?.candidate) {
-          await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          if (!peer.remoteDescription) {
+            const q = get()._iceQueue || {};
+            (q[callerId] = q[callerId] || []).push(new RTCIceCandidate(signal.candidate));
+            set({ _iceQueue: q });
+          } else {
+            await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          }
         } else if (signal?.sdp || signal?.type) {
           await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp || signal));
+          // Flush queued candidates after remote description.
+          try {
+            const q = get()._iceQueue || {};
+            const pending = q[callerId] || [];
+            if (pending.length) {
+              delete q[callerId];
+              set({ _iceQueue: q });
+              for (const c of pending) {
+                try {
+                  await peer.addIceCandidate(c);
+                } catch {}
+              }
+            }
+          } catch {}
           if (signal.type === "offer" || signal.sdp?.type === "offer") {
             const answer = await peer.createAnswer();
             await peer.setLocalDescription(answer);
@@ -70,7 +111,13 @@ export const useGroupCallStore = create((set, get) => ({
       if (peer) {
         try {
           if (signal?.candidate) {
-            await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            if (!peer.remoteDescription) {
+              const q = get()._iceQueue || {};
+              (q[id] = q[id] || []).push(new RTCIceCandidate(signal.candidate));
+              set({ _iceQueue: q });
+            } else {
+              await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            }
           } else if (signal?.sdp || signal?.type) {
             await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp || signal));
           }
@@ -84,8 +131,16 @@ export const useGroupCallStore = create((set, get) => ({
     socket.on("userLeftGroupCall", ({ userId }) => {
       const { peers, remoteStreams } = get();
       if (peers[userId]) {
-        peers[userId].close();
+        try {
+          peers[userId].ontrack = null;
+          peers[userId].onicecandidate = null;
+          peers[userId].onnegotiationneeded = null;
+          peers[userId].close();
+        } catch {}
       }
+      try {
+        remoteStreams[userId]?.getTracks()?.forEach((t) => t.stop());
+      } catch {}
       const newPeers = { ...peers };
       delete newPeers[userId];
       
@@ -98,17 +153,34 @@ export const useGroupCallStore = create((set, get) => ({
 
   createPeer: (userToSignal, isInitiator, stream) => {
     const { activeSocket } = get();
+    if (!stream) throw new Error("No local stream");
     const peer = new RTCPeerConnection(ICE_SERVERS);
     
-    stream.getTracks().forEach(track => {
-      peer.addTrack(track, stream);
-    });
+    try {
+      stream.getTracks().forEach(track => {
+        peer.addTrack(track, stream);
+      });
+    } catch {}
 
     peer.ontrack = (e) => {
       const newStream = e.streams[0];
-      set(state => ({
-        remoteStreams: { ...state.remoteStreams, [userToSignal]: newStream }
-      }));
+      set(state => {
+        const prev = state.remoteStreams[userToSignal];
+        // Stop replaced tracks to avoid decoder leak on renegotiation.
+        try {
+          if (prev && prev !== newStream) prev.getTracks().forEach((t) => t.stop());
+        } catch {}
+        return {
+          remoteStreams: { ...state.remoteStreams, [userToSignal]: newStream }
+        };
+      });
+      // Flush queued ICE candidates now that remote description may exist.
+      try {
+        const q = get()._iceQueue?.[userToSignal] || [];
+        if (q.length) {
+          q.splice(0).forEach((c) => peer.addIceCandidate(c).catch(() => {}));
+        }
+      } catch {}
     };
 
     peer.onicecandidate = (event) => {
@@ -139,8 +211,12 @@ export const useGroupCallStore = create((set, get) => ({
   },
 
   joinGroupCall: async (roomId) => {
+    let stream = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       soundManager.initContext();
       set({ 
         localStream: stream, 
@@ -154,29 +230,52 @@ export const useGroupCallStore = create((set, get) => ({
         activeSocket.emit("joinGroupCall", { roomId });
       }
     } catch (err) {
-      alert("Microphone/Camera permission required for group calls.");
+      try {
+        stream?.getTracks()?.forEach((t) => t.stop());
+      } catch {}
+      const name = err?.name || "";
+      if (name === "NotAllowedError") alert("Microphone/Camera permission denied for group calls.");
+      else if (name === "NotFoundError" || name === "OverconstrainedError") alert("No camera/microphone found for group calls.");
+      else alert("Microphone/Camera unavailable for group calls.");
       console.error(err);
     }
   },
 
   leaveGroupCall: () => {
-    const { activeSocket, roomId, localStream, peers } = get();
+    const { activeSocket, roomId, localStream, peers, remoteStreams } = get();
     if (activeSocket && roomId) {
-      activeSocket.emit("leaveGroupCall", { roomId });
+      try {
+        activeSocket.emit("leaveGroupCall", { roomId });
+      } catch {}
     }
     
     if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+      try {
+        localStream.getTracks().forEach(track => track.stop());
+      } catch {}
     }
+    try {
+      Object.values(remoteStreams || {}).forEach((s) => s?.getTracks()?.forEach((t) => t.stop()));
+    } catch {}
     
-    Object.values(peers).forEach(peer => peer.close());
+    Object.values(peers).forEach(peer => {
+      try {
+        peer.ontrack = null;
+        peer.onicecandidate = null;
+        peer.onnegotiationneeded = null;
+        peer.close();
+      } catch {}
+    });
 
     set({
       groupCallState: "idle",
       roomId: null,
       localStream: null,
       peers: {},
-      remoteStreams: {}
+      remoteStreams: {},
+      isMuted: false,
+      isVideoOff: false,
+      _iceQueue: {},
     });
   },
 

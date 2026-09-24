@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -25,6 +25,24 @@ import { downloadFile } from "../lib/download";
 const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
   const isGallery = images.length > 0;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    // Lock background scroll while open.
+    const prev = document.body.style.overflow;
+    try {
+      document.body.style.overflow = "hidden";
+    } catch {}
+    return () => {
+      mountedRef.current = false;
+      try {
+        document.body.style.overflow = prev;
+      } catch {}
+      try {
+        if (window.__imageForwardCancel) window.__imageForwardCancel();
+      } catch {}
+    };
+  }, []);
   
   const currentImageUrl = isGallery ? images[currentIndex] : imageUrl;
 
@@ -84,7 +102,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
     } catch (err) {
       console.warn("Download failed:", err);
     } finally {
-      setIsDownloading(false);
+      if (mountedRef.current) setIsDownloading(false);
     }
   };
 
@@ -97,9 +115,11 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
         targetChat: selectedTarget,
       });
 
+      if (!mountedRef.current) return;
       if (res?.success) {
         setForwardSuccess(true);
         setTimeout(() => {
+          if (!mountedRef.current) return;
           setForwardSuccess(false);
           setIsForwardOpen(false);
           setSelectedTarget(null);
@@ -109,7 +129,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
     } catch (error) {
       console.error("Failed to forward:", error);
     } finally {
-      setIsForwarding(false);
+      if (mountedRef.current) setIsForwarding(false);
     }
   };
 
@@ -204,7 +224,7 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
           </button>
 
           <a
-            href={imageUrl}
+            href={currentImageUrl}
             target="_blank"
             rel="noopener noreferrer"
             title="Open Original"

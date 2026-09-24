@@ -73,9 +73,21 @@ function VideoPlayer({ stream, muted = false }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    const el = videoRef.current;
+    if (!el) return;
+    if (stream) {
+      if (el.srcObject !== stream) el.srcObject = stream;
+      el.play?.().catch(() => {});
+    } else if (el.srcObject) {
+      try {
+        el.srcObject = null;
+      } catch {}
     }
+    return () => {
+      try {
+        if (el) el.srcObject = null;
+      } catch {}
+    };
   }, [stream]);
 
   if (!stream) {
@@ -89,6 +101,7 @@ function VideoPlayer({ stream, muted = false }) {
       playsInline
       muted={muted}
       className="w-full h-full object-cover"
+      onClick={(e) => e.currentTarget.play?.().catch(() => {})}
     />
   );
 }
