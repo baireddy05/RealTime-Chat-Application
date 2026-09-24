@@ -217,22 +217,62 @@ const MessageBubble = memo(({
       setIsTranslating(false);
       return;
     }
+    const cleanTarget = String(targetLang || "en").toLowerCase();
+    // In-memory cache: same message + target never translates twice.
+    try {
+      const cacheKey = `${message._id}:${cleanTarget}`;
+      const cached = MessageBubble._translateCache?.get(cacheKey);
+      if (cached) {
+        setTranslatedData(cached);
+        setIsTranslating(false);
+        return;
+      }
+    } catch {}
+    // 1) On-device first — free, unlimited, offline (Chrome/Edge built-in AI).
+    try {
+      const { translateOnDevice } = await import("../lib/onDeviceTranslate");
+      const done = await translateOnDevice(textToTranslate, cleanTarget);
+      const payload = {
+        text: done.text,
+        targetLang: done.targetLang,
+        sourceLang: done.sourceLang,
+        engine: "on-device",
+      };
+      try {
+        (MessageBubble._translateCache ??= new Map()).set(`${message._id}:${cleanTarget}`, payload);
+      } catch {}
+      setTranslatedData(payload);
+      setIsTranslating(false);
+      return;
+    } catch (onDeviceErr) {
+      // UNSUPPORTED/UNAVAILABLE on Firefox/Safari or missing language pack —
+      // fall through to server (now quota-free gtx) instead of failing.
+      if (onDeviceErr?.code && !["UNSUPPORTED", "UNAVAILABLE", "FAILED"].includes(onDeviceErr.code)) {
+        console.warn("On-device translate error:", onDeviceErr);
+      }
+    }
+    // 2) Server fallback (quota-free gtx endpoint + cache).
     try {
       const { axiosInstance } = await import("../lib/axios");
       const res = await axiosInstance.post(`/chat/message/${message._id}/translate`, {
-        targetLanguage: targetLang,
+        targetLanguage: cleanTarget,
         text: textToTranslate,
       });
       if (res.data?.translatedText) {
-        setTranslatedData({
+        const payload = {
           text: res.data.translatedText,
-          targetLang: res.data.targetLanguage || targetLang,
+          targetLang: res.data.targetLanguage || cleanTarget,
           sourceLang: res.data.sourceLanguage || "auto",
-        });
+          engine: res.data.engine || "server",
+        };
+        try {
+          (MessageBubble._translateCache ??= new Map()).set(`${message._id}:${cleanTarget}`, payload);
+        } catch {}
+        setTranslatedData(payload);
       }
     } catch (err) {
       console.error("Translation failed:", err);
-      alert("Translation failed. Please try again.");
+      alert(err?.response?.data?.error || "Translation failed. Please try again.");
     } finally {
       setIsTranslating(false);
     }
@@ -928,6 +968,12 @@ const MessageBubble = memo(({
                                   {translatedData.sourceLang && translatedData.sourceLang !== "auto" && (
                                     <span className="opacity-60 text-[9.5px]">from {translatedData.sourceLang.toUpperCase()}</span>
                                   )}
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-px rounded-full border ${translatedData.engine === "on-device" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-black/10 dark:bg-white/10 text-current border-current/20"}`}
+                                    title={translatedData.engine === "on-device" ? "Translated on this device — free and unlimited" : "Translated via server"}
+                                  >
+                                    {translatedData.engine === "on-device" ? "on-device" : "server"}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button

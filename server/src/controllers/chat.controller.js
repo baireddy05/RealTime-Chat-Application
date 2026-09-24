@@ -2460,6 +2460,8 @@ export const cancelReminder = async (req, res) => {
   }
 };
 
+let translateCache = null;
+
 export const translateMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -2493,35 +2495,98 @@ export const translateMessage = async (req, res) => {
       return res.status(400).json({ error: "Encrypted message requires client decrypted text" });
     }
 
-    const targetLang = (targetLanguage || "en").toLowerCase();
+    const targetLang = (targetLanguage || "en").toLowerCase().slice(0, 10);
     let translatedText = "";
     let sourceLanguage = "auto";
+    let engine = "server";
 
-    // Attempt primary Google Translate
+    // Server is fallback only (client prefers on-device). Quota-free chain:
+    // 1) Google gtx endpoint (no key, generous) 2) MyMemory last resort.
+    // In-memory cache avoids repeat paid/quota calls for the same message.
+    const cacheKey = `${String(messageId || "client")}:${targetLang}:${String(textToTranslate).slice(0, 100)}`;
     try {
-      const { translate } = await import('@vitalets/google-translate-api');
-      const result = await translate(textToTranslate, { to: targetLang });
-      translatedText = result.text;
-      sourceLanguage = result.raw?.src || "auto";
-    } catch (googleErr) {
-      console.warn("Primary Google Translate failed, trying MyMemory fallback:", googleErr.message);
-      // Fallback to free MyMemory API
-      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=Autodetect|${encodeURIComponent(targetLang)}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data?.responseData?.translatedText) {
-        translatedText = data.responseData.translatedText;
-        sourceLanguage = data.responseData.detectedLanguage || "auto";
-      } else {
-        throw new Error("All translation services temporarily unavailable");
+      translateCache ??= new Map();
+      const hit = translateCache.get(cacheKey);
+      if (hit) {
+        return res.status(200).json({
+          translatedText: hit.translatedText,
+          originalText: textToTranslate,
+          targetLanguage: targetLang,
+          sourceLanguage: hit.sourceLanguage,
+          engine: hit.engine,
+        });
+      }
+    } catch {}
+    const putCache = (entry) => {
+      try {
+        translateCache ??= new Map();
+        if (translateCache.size > 500) {
+          const oldest = translateCache.keys().next().value;
+          translateCache.delete(oldest);
+        }
+        translateCache.set(cacheKey, entry);
+      } catch {}
+    };
+
+    // Attempt primary Google gtx endpoint (no key required)
+    try {
+      const gtxUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(textToTranslate.slice(0, 2000))}`;
+      const gtxRes = await fetch(gtxUrl, { signal: AbortSignal.timeout(8000) });
+      if (gtxRes.ok) {
+        const gtxData = await gtxRes.json();
+        const joined = Array.isArray(gtxData?.[0])
+          ? gtxData[0].map((seg) => seg?.[0] || "").join("")
+          : "";
+        const detected = gtxData?.[2] || "auto";
+        if (joined && joined.trim()) {
+          translatedText = joined;
+          sourceLanguage = detected;
+          engine = "server-gtx";
+          putCache({ translatedText, sourceLanguage, engine });
+          return res.status(200).json({
+            translatedText,
+            originalText: textToTranslate,
+            targetLanguage: targetLang,
+            sourceLanguage
+            , engine
+          });
+        }
+      }
+      throw new Error("gtx empty");
+    } catch (gtxErr) {
+      console.warn("gtx translate failed, trying npm package:", gtxErr?.message);
+      // Attempt npm package
+      try {
+        const { translate } = await import('@vitalets/google-translate-api');
+        const result = await translate(textToTranslate, { to: targetLang });
+        translatedText = result.text;
+        sourceLanguage = result.raw?.src || "auto";
+        engine = "server";
+      } catch (googleErr) {
+        console.warn("Package translate failed, trying MyMemory fallback:", googleErr.message);
+        // Fallback to free MyMemory API
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=Autodetect|${encodeURIComponent(targetLang)}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const data = await response.json();
+        const candidate = data?.responseData?.translatedText;
+        // MyMemory returns quota warnings inside translatedText — never show those as a translation.
+        if (candidate && !/^MYMEMORY WARNING/i.test(candidate)) {
+          translatedText = candidate;
+          sourceLanguage = data.responseData.detectedLanguage || "auto";
+          engine = "server-mymemory";
+        } else {
+          throw new Error("Translation quota exceeded. Try on-device translation (Chrome/Edge) for unlimited use.");
+        }
       }
     }
 
+    putCache({ translatedText, sourceLanguage, engine });
     res.status(200).json({
       translatedText,
       originalText: textToTranslate,
       targetLanguage: targetLang,
-      sourceLanguage
+      sourceLanguage,
+      engine
     });
   } catch (error) {
     console.error("Error in translateMessage: ", error.message);
