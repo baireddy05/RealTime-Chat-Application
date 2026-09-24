@@ -15,7 +15,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      if (isOriginAllowed(origin)) {
+      if (!origin || isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         callback(new Error(`Socket CORS origin not allowed: ${origin}`));

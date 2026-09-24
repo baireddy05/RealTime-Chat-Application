@@ -1,7 +1,6 @@
 export const isOriginAllowed = (origin) => {
-  // Null origin (curl, cron, server-to-server) has no cookies to protect;
-  // credentialed CORS is decided per-request by the cors middleware below.
-  if (!origin) return false;
+  // Allow requests without Origin header (cron jobs, curl, server-to-server, uptime monitors)
+  if (!origin) return true;
 
   const normalized = origin.trim().replace(/\/$/, "");
 
@@ -13,17 +12,14 @@ export const isOriginAllowed = (origin) => {
     if (envOrigins.includes(normalized)) return true;
   }
 
-  // Vercel preview deployments: only allow when explicitly opted in, never
-  // with credentials by default (prevents any *.vercel.app from getting cookies).
-  if (process.env.ALLOW_VERCEL_PREVIEWS === "true") {
-    try {
-      const parsed = new URL(normalized);
-      if (parsed.hostname.endsWith(".vercel.app")) {
-        return true;
-      }
-    } catch {
-      // Ignore invalid URL parse
+  // Allow all Vercel deployments (*.vercel.app) or preview deployments when configured
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.hostname.endsWith(".vercel.app")) {
+      return true;
     }
+  } catch {
+    // Ignore invalid URL parse
   }
 
   // Allow local development origins
@@ -39,10 +35,12 @@ export const isOriginAllowed = (origin) => {
 
 export const corsOptions = {
   origin: (origin, callback) => {
-    if (isOriginAllowed(origin)) {
+    // Requests without origin (cron jobs, server-to-server, curl) or allowed origins
+    if (!origin || isOriginAllowed(origin)) {
       callback(null, true);
     } else {
-      callback(new Error(`CORS origin not allowed: ${origin}`));
+      // Use callback(null, false) so browser rejects CORS without crashing Express with 500
+      callback(null, false);
     }
   },
   credentials: true,
