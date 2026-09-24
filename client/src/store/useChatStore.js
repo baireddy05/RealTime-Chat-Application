@@ -856,7 +856,8 @@ export const useChatStore = create((set, get) => ({
         window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
       }
         
-      const endpoint = `/chat/send/${selectedChat.type === "user" ? selectedChat.id : ""}`;
+      const targetId = selectedChat.id || selectedChat._id;
+      const endpoint = selectedChat.type === "user" ? `/chat/send/${targetId}` : "/chat/send";
       const res = await axiosInstance.post(endpoint, payload);
 
       const msgDataWithDecrypted = {

@@ -892,7 +892,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
 
     window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-    let scheduledFor;
+    let scheduledDateIso = null;
     if (currentSchedule) {
       const d = new Date(currentSchedule);
       if (isNaN(d.getTime())) {
@@ -903,14 +903,14 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
         alert("Scheduled time must be in the future.");
         return;
       }
-      scheduledFor = d.toISOString();
+      scheduledDateIso = d.toISOString();
     }
     await sendMessage({
       text: currentText,
       image: imageUrl,
       viewOnce: !!currentImage && isViewOnce,
       file: filePayload,
-      scheduledFor,
+      scheduledFor: scheduledDateIso,
       replyTo: currentReply ? {
         messageId: currentReply._id,
         senderName: currentReply.senderId?.username || currentReply.senderName || "User",

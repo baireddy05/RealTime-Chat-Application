@@ -469,7 +469,7 @@ export const sendMessage = async (req, res) => {
       liveUntil,
       viewOnce,
     } = req.body;
-    const { id: receiverId } = req.params;
+    const receiverId = req.params.id || req.body.receiverId;
     const senderId = req.user._id;
 
     // Payload limits: prevent unbounded docs (16MB Mongo cap) and malformed polls.
