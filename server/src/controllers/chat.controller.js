@@ -2266,28 +2266,27 @@ export const toggleArchiveChat = async (req, res) => {
     const { id: chatId } = req.params;
     const userId = req.user._id;
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (!user.chatPreferences) {
-      user.chatPreferences = new Map();
+    if (!chatId || typeof chatId !== "string" || chatId.length > 64 || chatId.includes(".") || chatId.includes("$")) {
+      return res.status(400).json({ error: "Invalid chat id" });
     }
-    
-    const currentPrefs = user.chatPreferences.get(chatId) || {};
-    const isArchived = currentPrefs.archived || false;
-    
-    user.chatPreferences.set(chatId, {
-      ...currentPrefs,
-      archived: !isArchived
-    });
-    
-    await user.save();
-    
-    res.status(200).json({ 
+
+    const existing = await User.findById(userId).select("chatPreferences").lean();
+    if (!existing) return res.status(404).json({ error: "User not found" });
+    const isArchived = existing?.chatPreferences?.[chatId]?.archived || false;
+
+    // Atomic dot-notation update: spreading a Mongoose Map subdocument loses
+    // its paths, so read-modify-save silently drops repeat writes.
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      { $set: { [`chatPreferences.${chatId}.archived`]: !isArchived } },
+      { returnDocument: "after" }
+    ).select("chatPreferences").lean();
+
+    res.status(200).json({
       success: true,
       chatId,
       archived: !isArchived,
-      preferences: user.chatPreferences.get(chatId)
+      preferences: updated?.chatPreferences?.[chatId] || { archived: !isArchived }
     });
   } catch (error) {
     console.error("Error in toggleArchiveChat: ", error.message);
@@ -2303,7 +2302,7 @@ export const setChatPreferences = async (req, res) => {
     const { disappearing, tone } = req.body || {};
     const userId = req.user._id;
 
-    if (!chatId || typeof chatId !== "string" || chatId.length > 64) {
+    if (!chatId || typeof chatId !== "string" || chatId.length > 64 || chatId.includes(".") || chatId.includes("$")) {
       return res.status(400).json({ error: "Invalid chat id" });
     }
     if (disappearing !== null && disappearing !== undefined && ![5, 60, 3600, 86400].includes(Number(disappearing))) {
@@ -2313,25 +2312,31 @@ export const setChatPreferences = async (req, res) => {
       return res.status(400).json({ error: "Invalid notification tone" });
     }
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    // Atomic dot-notation update: spreading a Mongoose Map subdocument loses
+    // its paths, so read-modify-save silently drops every write after the first.
+    const update = {};
+    if (disappearing !== undefined) update[`chatPreferences.${chatId}.disappearing`] = disappearing;
+    if (tone !== undefined) update[`chatPreferences.${chatId}.tone`] = tone;
 
-    if (!user.chatPreferences) {
-      user.chatPreferences = new Map();
+    if (Object.keys(update).length === 0) {
+      const existing = await User.findById(userId).select("chatPreferences").lean();
+      if (!existing) return res.status(404).json({ error: "User not found" });
+      return res.status(200).json({
+        success: true,
+        chatId,
+        preferences: existing?.chatPreferences?.[chatId] || {},
+      });
     }
 
-    const currentPrefs = user.chatPreferences.get(chatId) || {};
-    const nextPrefs = { ...currentPrefs };
-    if (disappearing !== undefined) nextPrefs.disappearing = disappearing;
-    if (tone !== undefined) nextPrefs.tone = tone;
-    user.chatPreferences.set(chatId, nextPrefs);
-
-    await user.save();
+    const updated = await User.findByIdAndUpdate(userId, { $set: update }, { returnDocument: "after" })
+      .select("chatPreferences")
+      .lean();
+    if (!updated) return res.status(404).json({ error: "User not found" });
 
     res.status(200).json({
       success: true,
       chatId,
-      preferences: user.chatPreferences.get(chatId),
+      preferences: updated?.chatPreferences?.[chatId] || {},
     });
   } catch (error) {
     console.error("Error in setChatPreferences: ", error.message);
