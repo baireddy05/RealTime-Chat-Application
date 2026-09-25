@@ -201,6 +201,7 @@ const Sidebar = ({
   const cardLongPressTimerRef = useRef(null);
   const cardLongPressFiredRef = useRef(false);
   const [openMenuChat, setOpenMenuChat] = useState(null); // { id, chatType: 'room'|'user', name, room? }
+  const [savingToneId, setSavingToneId] = useState(null);
   const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
   const [showChannelsModal, setShowChannelsModal] = useState(false);
 
@@ -466,12 +467,50 @@ const Sidebar = ({
   };
 
   const handleMenuTone = async (toneId) => {
-    if (!openMenuChat) return;
+    if (!openMenuChat || savingToneId) return;
+    const chatId = openMenuChat.id;
+    const prevTone = authUser?.chatPreferences?.[chatId]?.tone || "chime";
+    if (prevTone === toneId) {
+      // Still preview so the user hears what the current tone sounds like.
+      try {
+        await soundManager.previewTone(toneId);
+      } catch {}
+      return;
+    }
+    // Audible preview even if global sounds are muted / context suspended.
     try {
-      soundManager.initContext();
+      await soundManager.previewTone(toneId);
     } catch {}
-    soundManager.playReceiveSound(toneId);
-    await setChatTone(openMenuChat.id, toneId);
+    // Optimistic highlight so taps feel instant.
+    const prevPrefs = authUser?.chatPreferences || {};
+    try {
+      if (authUser) {
+        useAuthStore.setState({
+          authUser: {
+            ...authUser,
+            chatPreferences: { ...prevPrefs, [chatId]: { ...(prevPrefs[chatId] || {}), tone: toneId } },
+          },
+        });
+      }
+    } catch {}
+    setSavingToneId(toneId);
+    const res = await setChatTone(chatId, toneId);
+    setSavingToneId(null);
+    if (!res?.success) {
+      // Roll back highlight on failure so the UI never lies.
+      try {
+        if (useAuthStore.getState().authUser) {
+          const cur = useAuthStore.getState().authUser;
+          useAuthStore.setState({
+            authUser: {
+              ...cur,
+              chatPreferences: { ...(cur.chatPreferences || {}), [chatId]: { ...((cur.chatPreferences || {})[chatId] || {}), tone: prevTone } },
+            },
+          });
+        }
+      } catch {}
+      alert(`Couldn't save "${toneId}" tone: ${res?.error || "network error"}`);
+    }
   };
 
   // ---- Filter-tabs overflow: arrows + mouse-wheel support for laptop
@@ -2226,19 +2265,21 @@ const Sidebar = ({
                 {CHAT_TONES.map((t) => {
                   const active =
                     (authUser?.chatPreferences?.[openMenuChat.id]?.tone || "chime") === t.id;
+                  const saving = savingToneId === t.id;
                   return (
                     <button
                       key={t.id}
                       type="button"
+                      disabled={!!savingToneId}
                       onClick={() => handleMenuTone(t.id)}
                       title={`Preview & set ${t.name}`}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all disabled:opacity-60 ${
                         active
                           ? "border-accent-primary bg-accent-primary/15 text-accent-primary"
                           : "border-[var(--glass-border)] text-theme-muted hover:text-theme-main"
                       }`}
                     >
-                      {t.name}
+                      {saving ? "Saving…" : t.name}
                     </button>
                   );
                 })}

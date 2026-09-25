@@ -8,7 +8,7 @@
 | Submitted by | Byreddy Rithwik Reddy |
 | Submitted to | Navodita Infotech |
 | Date | September 2026 |
-| Stack | MongoDB, Express.js, React, Node.js + Socket.io, Cloudinary |
+| Stack | MongoDB, Express.js, React, Node.js + Socket.io, Cloudinary, on-device AI translation |
 | Repository layout | `client/` (React + Vite PWA) and `server/` (Express + Socket.io API) |
 
 ---
@@ -38,7 +38,7 @@
 
 ## 1. Executive Summary
 
-Pulse Messenger is a fully working, real-time instant messaging application built with the MERN stack and Socket.io. It supports one-to-one chats, group chats, broadcast channels, 24-hour status stories, audio/video calling (including group calls), and a wide set of modern messaging features such as quoted replies, message editing, scheduled messages, starred messages, polls, tasks, events, reminders, live location sharing, and end-to-end encrypted messaging.
+Pulse Messenger is a fully working, real-time instant messaging application built with the MERN stack and Socket.io. It supports one-to-one chats, group chats, broadcast channels, 24-hour status stories, audio/video calling (including group calls), and a wide set of modern messaging features such as quoted replies, message editing, scheduled messages, starred messages, polls, tasks, events, reminders, live location sharing, on-device translation, and end-to-end encrypted messaging.
 
 The application is responsive across desktop and mobile, installable as a Progressive Web App (PWA). Document sharing uses a private backend store (MongoDB GridFS) with authenticated downloads, while images, audio, and video are served through Cloudinary. The project includes automated browser tests (Playwright), health-monitoring endpoints, seed data for evaluation, and full setup documentation.
 
@@ -78,7 +78,8 @@ The application is responsive across desktop and mobile, installable as a Progre
 | Media store | Cloudinary | Images, audio, video, avatars |
 | Auth | JWT in HttpOnly cookies + bcryptjs (12 salt rounds) | Session management, password hashing |
 | Encryption | Web Crypto API (AES-GCM 256-bit) | Client-side end-to-end message encryption |
-| Calls | WebRTC (peer-to-peer, Socket.io signalling) | Audio/video and group calls |
+| Calls | WebRTC (peer-to-peer, Socket.io signalling, per-peer ICE queue, capped backoff) | Audio/video and group calls |
+| Translation | Chrome Translator + LanguageDetector APIs with server `gtx` fallback | Free unlimited on-device translation |
 | Push | Web Push (VAPID) + Firebase Cloud Messaging | Background message/call alerts, deep links |
 | PWA support | Web app manifest + service worker | Installable Add-to-Home-Screen app |
 | Testing | Playwright (7 spec files) | Automated end-to-end browser tests |
@@ -123,7 +124,7 @@ The application is responsive across desktop and mobile, installable as a Progre
 - `pages/` - `HomePage` (3-zone layout: activity rail, conversation sidebar, chat workstation), `LoginPage`, `SignUpPage`, `WelcomePage`.
 - `components/` - `Sidebar` (search, filter tabs, swipeable mobile pager, bottom nav), `ChatPane` (virtualized feed, composer), `MessageBubble`, `MessageInput` (text, voice, camera, location, GIF, polls, sketches, code), plus ~45 feature modals/drawers (groups, calls, status, starred, labels, tasks, events, reminders, broadcasts, channels, themes, settings, profile).
 - `store/` - `useAuthStore`, `useChatStore`, `useFriendStore`, `useCallStore`, `useGroupCallStore`, `useThemeStore`.
-- `lib/` - `axios` (credentialed instance + 401 handling), `crypto` (E2EE), `download` (multi-stage file downloader), `sound` (Web-Audio synthesized tones), `chatLock`, `backNavigation` (Android back-button mapping), `push`, `notification`, `vcard`, `chatThemes`.
+- `lib/` - `axios` (credentialed instance + 401 handling), `crypto` (E2EE), `onDeviceTranslate` (Chrome Translator/LanguageDetector, unlimited free translation), `download` (multi-stage file downloader), `sound` (Web-Audio synthesized tones), `chatLock`, `backNavigation` (Android back-button mapping), `push`, `notification`, `vcard`, `chatThemes`.
 
 **Server (`server/src/`)**
 
@@ -151,9 +152,9 @@ The application is responsive across desktop and mobile, installable as a Progre
 
 **Organization:** Saved Messages self-chat, chat labels/folders, pin chats, archive, per-chat notification tones, mute, disappearing-message timers, whisper (view-once text) mode, chat lock behind device PIN, drafts with indicators, date dividers.
 
-**Productivity:** reminders, broadcast lists (up to 50 recipients), live location sharing (15m/1h/8h), conversation export (HTML/JSON/TXT), scratchpad/quick notes with send-to-chat, code snippet composer (13+ languages), sketch/whiteboard composer, voice typing (Speech-to-Text), message readout (Text-to-Speech), translation.
+**Productivity:** reminders, broadcast lists (up to 50 recipients), live location sharing (15m/1h/8h), conversation export (HTML/JSON/TXT), scratchpad/quick notes with send-to-chat, code snippet composer (13+ languages), sketch/whiteboard composer, voice typing (Speech-to-Text), message readout (Text-to-Speech, on-device unlimited), on-device translation with server `gtx` fallback and `on-device`/`server` badges.
 
-**Mobile and desktop:** responsive 3-zone layout, WhatsApp-style swipeable bottom tabs (Chats/Updates/Groups/Calls) with drag physics, safe-area support, Android back-button/gesture interception, PWA install, Capacitor Android shell with FCM, desktop notifications, Web-Audio synthesized tones, chat themes with doodle backgrounds.
+**Mobile and desktop:** responsive 3-zone layout, WhatsApp-style swipeable bottom tabs (Chats/Updates/Groups/Calls) with drag physics, safe-area support, Android back-button/gesture interception, PWA install, Capacitor Android shell with FCM, desktop notifications, Web-Audio synthesized tones, chat themes with doodle backgrounds, appearance studio with standalone dockable live preview (left/right on desktop, popup on mobile).
 
 ---
 
@@ -163,12 +164,12 @@ The application is responsive across desktop and mobile, installable as a Progre
 |---|---|
 | Password storage | bcryptjs, 12 salt rounds; minimum length enforced |
 | Sessions | JWT in HttpOnly cookies (`Secure` + `SameSite=None` in production, `Lax` locally); Bearer-token fallback for WebView contexts |
-| Brute force | `express-rate-limit` on auth endpoints |
-| Transport | CORS origin allow-list (HTTP + Socket.io), `trust proxy`, `x-powered-by` disabled |
-| Payload abuse | 1 MB JSON body cap; 50 MB document cap; 25 MB proxy cap; allow-listed document types/MIMEs; executable/HTML/SVG uploads rejected |
-| SSRF | `isSafeUrl` guard on server-side fetches (blocks localhost, private ranges, metadata IPs, odd ports) |
-| Injection | Regex-escaped username lookup; Mongoose models; unique indexes on email/username; filename sanitization on downloads |
-| Content privacy | AES-GCM 256-bit client-side E2EE; locked chats hide previews behind SHA-256 device PIN |
+| Brute force | `express-rate-limit` on auth endpoints (50/15min; 1000 in test env) |
+| Transport | CORS origin allow-list (HTTP + Socket.io; null origins rejected; `*.vercel.app` only with `ALLOW_VERCEL_PREVIEWS=true`), `trust proxy`, `x-powered-by` disabled |
+| Payload abuse | 1 MB JSON body cap; 50 MB document cap; 25 MB proxy cap; message text 8000 chars; polls 2–10 options; profile/preference length caps; allow-listed document types/MIMEs; executable/HTML/SVG uploads rejected |
+| SSRF | `isSafeUrl` + manual-redirect guards on server-side fetches (blocks localhost, private ranges, metadata IPs, odd ports); preview HTML capped; proxy never reflects upstream status |
+| Injection | Regex-escaped username lookup with collation uniqueness; Mongoose models; uniform 401 (no enumeration); `ObjectId` validation on room/admin/message routes; filename sanitization on downloads |
+| Content privacy | AES-GCM 256-bit client-side E2EE (single vault, validated keys); locked chats hide previews behind validated SHA-256 device PIN; whispers/reactions/polls/threads/receipts/translation gated by participant checks |
 | File access | GridFS downloads require owner-or-conversation-participant; served as `attachment` with `nosniff` |
 
 ---
@@ -190,12 +191,17 @@ CLIENT_URL=http://localhost:5173
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=mailto:you@example.com
+NODE_ENV=development
+FIREBASE_SERVICE_ACCOUNT=
+ALLOW_VERCEL_PREVIEWS=false
+PLAYWRIGHT=1
 ```
 
 Create `client/.env`:
 
 ```env
 VITE_API_URL=http://localhost:5000
+VITE_GIPHY_API_KEY=
 ```
 
 **Install and run:**
@@ -240,7 +246,7 @@ Seeded content: a "General Group" with welcome messages; User1 and User2 start a
 - **Automated (Playwright, `client/tests/`):** 7 spec files covering auth, 1-to-1 chat, groups, file/media sharing, media playback, mobile navigation, and settings/profile, executed on Chromium, Mobile Chrome (Pixel 5), and Mobile Safari (iPhone 12). Final full run: **29 passed, 1 skipped, 0 failed**. Important: `playwright.config.ts` has its `webServer` block commented out, so **both dev servers must already be running** before the suite (`npm start` in `server/` on :5000 and `npm run dev` in `client/` on :5173, default). If port 5173 is taken by another local project, start the client on a free port (`npm run dev -- --port 5174 --strictPort`) and point the suite at it (`PLAYWRIGHT_BASE_URL=http://localhost:5174 npx playwright test`) - always verify the port serves this app (a wrong app on the port fails every test). Warm up a fresh dev server with one spec first, and prefer `--workers=4` on a laptop: 8 parallel workers cold-starting Vite plus bcrypt-12 signups can exceed timeouts and flake. Final full run: **29 passed, 1 skipped, 0 failed** (Chromium, Mobile Chrome, Mobile Safari).; otherwise every test fails with `page.goto: Could not connect to server`. The assertion timeout is raised to 15 s (`expect.timeout`) because cold dev-server boot plus parallel load exceeds the 5 s default. Use plain `npm start` (not `npm run dev` watch mode) for the backend during test runs: the watcher restarts on stray file changes and drops in-flight test requests. Run from `client/` with `npx playwright test` and inspect results via `npx playwright show-report`.
 - **Server smoke scripts:** `npm run test:push` (Web Push), `test_calls_offline.mjs` (call signalling), `test_features.mjs` (socket feature pass), plus `/`, `/health`, `/api/health`, `/ping` endpoints for uptime monitoring.
 - **Server smoke scripts:** `npm run test:push` (Web Push), `test_calls_offline.mjs` (call signalling), `test_features.mjs` (socket feature pass), plus `/`, `/health`, `/api/health`, `/ping` endpoints for uptime monitoring.
-- **Manual verification performed:** production `vite build` passes cleanly; `oxlint` reports no new warnings from recent changes; mobile swipe pager, group creation (no auto keyboard popup), and the PDF download chain were exercised during development.
+- **Manual verification performed:** production `vite build` passes cleanly (2284 modules); `node --check` clean on edited server controllers/libs; `oxlint` 0 errors; mobile swipe pager, group creation (no auto keyboard popup), PDF download chain, on-device translation with server fallback, and dockable appearance preview exercised during development.
 - **Known test gap:** server controllers rely on per-handler checks rather than a dedicated unit-test suite; recommended as future work.
 
 ---
@@ -258,6 +264,12 @@ Seeded content: a "General Group" with welcome messages; User1 and User2 start a
 
 ## 13. Recent Improvements (Development Log)
 
+- On-device translation (free/unlimited): Chrome/Edge Translator + LanguageDetector first with `on-device`/`server` badges and per-message cache; server fallback switched to quota-free Google `gtx` + cache (MyMemory last; quota warnings filtered).
+- Appearance studio standalone preview: dockable left/right panel on desktop, popup on mobile, 1:1 coverage of every customizable group (backgrounds, text, bubbles, accents, presence, panels, borders, pills, senders).
+- Push reliability: corrected `/push/*` paths, SW-ready timeouts, explicit-endpoint unsubscribe, foreign-endpoint 409, extended FCM pruning; notification tags made unique with live permission re-read.
+- Realtime hardening: socket user-existence checks, membership-checked typing/room joins, pending-call-gated signaling, participant-checked delivery acks and message actions, scheduler atomic claims + overlap guard.
+- Calls/media: per-call timers, full track/listener cleanup, ICE backoff, audio-only fallback state, group-call ICE queues, shared audio-decode context with abort, mount-safe modals, debounced Giphy search with env key (no bundled secret).
+- Auth hardening: strict signup/login validation, uniform 401s, no token echo, no public-profile email leak, profile/prefs caps, tightened CORS and auth rate limits, no production memory-DB fallback.
 - WhatsApp-style swipeable mobile tabs (Chats / Updates / Groups / Calls) with real drag-transition physics.
 - Group-add keyboard auto-popup fix.
 - PDF/file download reliability: `fileId`-based authorization, removal of the Cloudinary document fallback, dead-file detection with user-facing messaging, web-only streamlined downloader.
@@ -267,7 +279,7 @@ Seeded content: a "General Group" with welcome messages; User1 and User2 start a
 
 ## 14. Limitations and Future Scope
 
-**Current limitations:** demo seed accounts ship with a publicly documented password (fine for evaluation, must be disabled for any real deployment); no centralized error-tracking or request-logging service; confirmation dialogs still use native `confirm`/`prompt` in places; server-side unit test coverage is thin.
+**Current limitations:** demo seed accounts ship with a publicly documented password (fine for evaluation, must be disabled for any real deployment); on-device translation requires Chrome/Edge (other browsers use the server fallback; first use may download a language pack); no centralized error-tracking or request-logging service; confirmation dialogs still use native `confirm`/`prompt` in places; server-side unit test coverage is thin.
 
 **Future scope:** replace native dialogs with a custom modal/toast system; add `helmet` security headers and structured logging; add server unit + integration tests; move scheduled-message delivery to a persistent job queue; database indexes for the file-access fallback query; admin/moderation dashboard.
 
@@ -298,7 +310,8 @@ Base URL: `http://localhost:5000/api` (auth via HttpOnly JWT cookie; Bearer fall
 | GET | `/upload/signature` | Signed Cloudinary media upload params |
 | GET/POST | `/statuses` | 24-hour stories (post, view, viewers, delete) |
 | GET/POST | `/calls` | Call history, redial data, clearing |
-| GET/POST | `/push/*` | VAPID subscriptions, test push |
+| GET/POST | `/push/*` | VAPID subscriptions (correct paths; baseURL already includes `/api`), test push |
+| POST | `/chat/message/:messageId/translate` | Translation (client prefers on-device; server `gtx` fallback + cache) |
 | GET | `/`, `/health`, `/api/health`, `/ping` | Liveness/uptime checks |
 
 Real-time events (Socket.io, cookie/token authenticated): `message`, `typing`/`stopTyping`, `messageDelivered`/`messageRead`, room updates, call signalling (`joinGroupCall`, offers/answers/ICE), presence.
@@ -315,7 +328,8 @@ RealTime Chat Application/
 |   |   |-- components/      # Sidebar, ChatPane, MessageBubble/Input, ~45 modals/drawers
 |   |   |-- store/           # useAuthStore, useChatStore, useFriendStore,
 |   |   |                    # useCallStore, useGroupCallStore, useThemeStore
-|   |   |-- lib/             # axios, crypto (E2EE), download, sound, push,
+|   |   |-- lib/             # axios, crypto (E2EE), onDeviceTranslate,
+|   |   |                    # download, sound, push,
 |   |   |                    # chatLock, backNavigation, vcard, themes
 |   |   |-- hooks/           # usePWAInstall
 |   |-- tests/               # 7 Playwright spec files

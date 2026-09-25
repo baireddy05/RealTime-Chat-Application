@@ -113,6 +113,31 @@ class SoundEffects {
     } catch {}
   }
 
+  // Preview a per-chat tone even when sounds are muted or the context is
+  // suspended (mobile autoplay policy). Explicit user gesture → always audible.
+  // Returns true if the preview was actually scheduled.
+  async previewTone(tone = "chime") {
+    try {
+      this.initContext();
+      if (!this.ctx) return false;
+      if (this.ctx.state === "suspended") {
+        try {
+          await this.ctx.resume();
+        } catch {}
+      }
+      if (this.ctx.state !== "running") return false;
+      const wasMuted = this.muted;
+      this.muted = false;
+      try {
+        this.playReceiveSound(tone);
+      } finally {
+        this.muted = wasMuted;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
   // Notification chime for alerts / requests
   playAlertSound() {
     if (this.muted) return;
