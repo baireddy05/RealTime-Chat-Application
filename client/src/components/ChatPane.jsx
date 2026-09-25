@@ -266,7 +266,12 @@ const ChatPane = ({ onBack }) => {
   }, [messages]);
 
   const prevMessagesCountRef = useRef(messages.length);
-  const isInitialChatLoadRef = useRef(true);
+  // Deadline (ms epoch) until which the feed is pinned to the latest messages.
+  // Replaces the old one-shot boolean: late-loading images used to expand older
+  // bubbles AFTER the single initial scroll, pushing recent messages below the
+  // fold so chats sometimes opened on older history.
+  const initialPinUntilRef = useRef(0);
+  const didInitialLockRef = useRef(false);
 
   const scrollToBottom = useCallback((behavior = "auto") => {
     const el = scrollerElementRef.current;
@@ -332,13 +337,15 @@ const ChatPane = ({ onBack }) => {
     }
   }, []);
 
-  // Keep scroll pinned to bottom as images and layout elements render during initial load
+  // Keep scroll pinned to bottom while content is still settling after a chat
+  // switch (images/fonts trickling in), and whenever the user sits at bottom.
+  // Readers scrolled up are never yanked — except inside the initial pin window.
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container || typeof ResizeObserver === "undefined") return;
 
     const observer = new ResizeObserver(() => {
-      if (isAtBottomRef.current || isInitialChatLoadRef.current) {
+      if (isAtBottomRef.current || Date.now() < initialPinUntilRef.current) {
         const el = scrollerElementRef.current;
         if (el) {
           el.scrollTop = el.scrollHeight;
@@ -350,16 +357,25 @@ const ChatPane = ({ onBack }) => {
     return () => observer.disconnect();
   }, [selectedChat?.id]);
 
-  // Snap instantly on chat load / switch, smooth scroll on new messages
+  // Snap instantly on chat load / switch (pinned until content settles),
+  // smooth scroll on new messages afterwards.
   useLayoutEffect(() => {
     if (isMessagesLoading || !selectedChat?.id) return;
 
-    if (isInitialChatLoadRef.current) {
-      if (messages.length > 0 || !isMessagesLoading) {
+    if (Date.now() < initialPinUntilRef.current) {
+      if (messages.length === 0) return;
+      if (!didInitialLockRef.current) {
+        // First paint: multi-frame locking across image/font layout passes.
+        didInitialLockRef.current = true;
         const cleanup = performInitialScrollToBottom();
-        isInitialChatLoadRef.current = false;
         prevMessagesCountRef.current = messages.length;
         return cleanup;
+      }
+      // Still settling (late images/decryption): re-pin on fresh arrivals only
+      // so we don't fight the user; ResizeObserver covers pure layout shifts.
+      if (messages.length !== prevMessagesCountRef.current) {
+        scrollToBottom("instant");
+        prevMessagesCountRef.current = messages.length;
       }
       return;
     }
@@ -417,7 +433,8 @@ const ChatPane = ({ onBack }) => {
     if (!selectedChat) return;
     if (loadedChatIdRef.current !== selectedChat.id) {
       loadedChatIdRef.current = selectedChat.id;
-      isInitialChatLoadRef.current = true;
+      initialPinUntilRef.current = Date.now() + 3000;
+      didInitialLockRef.current = false;
       prevMessagesCountRef.current = 0;
       getMessages(selectedChat.id, selectedChat.type);
       getScheduledMessages(selectedChat.id, selectedChat.type);
@@ -431,7 +448,8 @@ const ChatPane = ({ onBack }) => {
   useEffect(() => {
     if (prevSelectedChatIdRef.current !== selectedChat?.id) {
       prevSelectedChatIdRef.current = selectedChat?.id;
-      isInitialChatLoadRef.current = true;
+      initialPinUntilRef.current = Date.now() + 3000;
+      didInitialLockRef.current = false;
       prevMessagesCountRef.current = 0;
       setVisibleCount(MESSAGE_PAGE_SIZE);
       setIsSearchOpen(false);
@@ -513,7 +531,21 @@ const ChatPane = ({ onBack }) => {
   };
 
   const displayedMessages = useMemo(() => {
-    const sorted = [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    // Stable chronological sort: invalid/missing dates (NaN) used to make the
+    // comparator return NaN, scrambling order so recent messages could render
+    // mid-list. Undated items go last with insertion-order tiebreak.
+    const withIdx = messages.map((m, i) => ({ m, i }));
+    withIdx.sort((a, b) => {
+      const ta = new Date(a.m.createdAt).getTime();
+      const tb = new Date(b.m.createdAt).getTime();
+      const aBad = isNaN(ta);
+      const bBad = isNaN(tb);
+      if (aBad && bBad) return a.i - b.i;
+      if (aBad) return 1;
+      if (bBad) return -1;
+      return ta - tb || a.i - b.i;
+    });
+    const sorted = withIdx.map((x) => x.m);
     if (showAnnouncementsOnly) return sorted.filter((m) => m.isAnnouncement && !m.isDeleted);
     return sorted;
   }, [messages, showAnnouncementsOnly]);
