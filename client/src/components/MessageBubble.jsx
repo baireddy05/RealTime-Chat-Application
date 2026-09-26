@@ -356,6 +356,18 @@ const MessageBubble = memo(({
       ? { ...message, image: null, audio: null }
       : message;
 
+  // Double-click / double-tap to reply (laptop-friendly; mirrors swipe-to-reply).
+  // Ignores deleted/optimistic messages (same as swipe), selection mode, and
+  // double-clicks on interactive elements (links, buttons, media controls).
+  const handleDoubleClick = (e) => {
+    if (message.isDeleted || message.isOptimistic || isSelectionMode) return;
+    if (isLongPressTriggeredRef.current) return;
+    try {
+      if (e.target?.closest?.("a, button, input, textarea, select, video, audio")) return;
+    } catch {}
+    setReplyingTo(replySafeMessage);
+  };
+
   // Long press handling for touch devices (mobile) & context menu support
   const bubbleRef = useRef(null);
   const longPressTimerRef = useRef(null);
@@ -581,6 +593,8 @@ const MessageBubble = memo(({
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
                 onContextMenu={handleContextMenu}
+                onDoubleClick={handleDoubleClick}
+                title="Double-click to reply"
                 onClickCapture={(e) => {
                   if (isLongPressTriggeredRef.current) {
                     e.preventDefault();
