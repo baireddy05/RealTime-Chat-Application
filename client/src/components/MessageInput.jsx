@@ -322,14 +322,28 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     };
   }, []);
 
+  // Auto-resize the composer for ANY text change — typing, pasting,
+  // dictation, draft restore, or edit prefill. Typing alone used to be the
+  // only path that resized, so programmatic sets left long text clipped.
+  const autoResizeInput = (el) => {
+    const target = el || inputRef.current;
+    if (!target) return;
+    try {
+      target.style.height = "auto";
+      target.style.height = Math.min(target.scrollHeight, 120) + "px";
+    } catch {}
+  };
+
+  useEffect(() => {
+    autoResizeInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
   const handleTextChange = (e) => {
     const val = e.target.value;
     const isAddingChar = val.length > text.length;
     setText(val);
-    
-    // Auto-resize textarea
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    autoResizeInput(e.target);
 
     // Satisfying, localized tactile keystroke pulse
     setIsTypingPulse(true);
