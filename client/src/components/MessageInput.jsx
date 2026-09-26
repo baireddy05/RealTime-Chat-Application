@@ -23,7 +23,7 @@ import {
   MonitorPlay,
   PenTool,
   Code2,
-  Mic,
+  AudioLines,
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
@@ -1782,7 +1782,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               )}
             </div>
 
-            {/* In-capsule controls: Timer, Schedule, Mic & Send */}
+            {/* In-capsule controls: Timer, Schedule, Video/Audio notes, Dictation & Send */}
             <div className="flex items-center gap-0.5 shrink-0">
               {/* Disappearing Timer (shown if active, or on tablet/desktop) */}
               <button
@@ -1856,9 +1856,9 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                     ? "bg-red-500 text-white animate-pulse shadow-glow ring-2 ring-red-400"
                     : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
                 } ${hasContent && !isDictating ? "hidden sm:flex" : "flex"}`}
-                title={isDictating ? "Listening... Click to stop" : "Voice Typing (Speech-to-Text)"}
+                title={isDictating ? "Listening... Click to stop" : "Dictate (voice to text)"}
               >
-                <Mic size={18} className={isDictating ? "animate-bounce" : ""} />
+                <AudioLines size={18} className={isDictating ? "animate-bounce" : ""} />
               </button>
 
               {/* Send Button: visible on mobile when text/media has content */}
