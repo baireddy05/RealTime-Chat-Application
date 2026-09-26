@@ -9,7 +9,7 @@ import LabelsManagerModal from "./LabelsManagerModal";
 import ChannelsModal from "./ChannelsModal";
 import MessageTicks from "./MessageTicks";
 import { soundManager, CHAT_TONES } from "../lib/sound";
-import { isChatLocked, setChatLocked, hasChatPin } from "../lib/chatLock";
+import { isChatLocked, isChatLockedAnywhere, setChatLocked, hasChatPin } from "../lib/chatLock";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -133,6 +133,7 @@ const Sidebar = ({
   const toggleArchiveChat = useChatStore((s) => s.toggleArchiveChat);
   const togglePinChat = useChatStore((s) => s.togglePinChat);
   const setChatTone = useChatStore((s) => s.setChatTone);
+  const setChatLockedRemote = useChatStore((s) => s.setChatLockedRemote);
   const markMessagesAsRead = useChatStore((s) => s.markMessagesAsRead);
   const setIsGroupInfoOpen = useChatStore((s) => s.setIsGroupInfoOpen);
   const globalSearchResults = useChatStore((s) => s.globalSearchResults);
@@ -450,18 +451,28 @@ const Sidebar = ({
     closeChatMenu();
   };
 
-  const handleMenuLock = () => {
+  const handleMenuLock = async () => {
     if (!openMenuChat) return;
-    if (isChatLocked(openMenuChat.id)) {
-      setChatLocked(openMenuChat.id, false);
-      relockChat(openMenuChat.id);
+    const chatId = openMenuChat.id;
+    if (isChatLocked(chatId) || isChatLockedAnywhere(chatId, authUser?.chatPreferences, unlockedChats)) {
+      // Remove the lock everywhere: local + other devices.
+      setChatLocked(chatId, false);
+      relockChat(chatId);
+      try {
+        await setChatLockedRemote(chatId, false);
+      } catch {}
     } else {
       if (!hasChatPin()) {
         alert("Set a chat lock PIN first in Settings → Privacy.");
         return;
       }
-      setChatLocked(openMenuChat.id, true);
-      relockChat(openMenuChat.id);
+      setChatLocked(chatId, true);
+      relockChat(chatId);
+      // Sync the lock flag so the PIN gate appears on mobile too.
+      // The PIN hash itself never leaves this device.
+      try {
+        await setChatLockedRemote(chatId, true);
+      } catch {}
     }
     closeChatMenu();
   };
@@ -819,7 +830,7 @@ const Sidebar = ({
     const lastMsg = lastMessages[roomId] || room.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     // Locked chats hide their contents until unlocked (PIN gate)
-    const roomLocked = isChatLocked(roomId) && !unlockedChats.includes(roomId);
+    const roomLocked = isChatLockedAnywhere(roomId, authUser?.chatPreferences, unlockedChats);
     const previewText = roomLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
     const authUserId = authUser?._id?.toString();
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
@@ -966,7 +977,7 @@ const Sidebar = ({
     const lastMsg = lastMessages[friendId] || friend.lastMessage;
     const timeStr = lastMsg?.createdAt ? formatTimeRelative(lastMsg.createdAt) : "";
     // Locked chats hide their contents until unlocked (PIN gate)
-    const friendLocked = isChatLocked(friendId) && !unlockedChats.includes(friendId);
+    const friendLocked = isChatLockedAnywhere(friendId, authUser?.chatPreferences, unlockedChats);
     const previewText = friendLocked ? "🔒 Locked chat" : getMessageSnippet(lastMsg);
     const msgSenderId = (lastMsg?.senderId?._id || lastMsg?.senderId)?.toString();
     const isOutgoing = msgSenderId === authUserId;
@@ -2347,9 +2358,9 @@ const Sidebar = ({
                 className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
               >
                 <span className="material-symbols-outlined text-[16px] text-theme-muted">
-                  {isChatLocked(openMenuChat.id) ? "lock_open" : "lock"}
+                  {isChatLockedAnywhere(openMenuChat.id, authUser?.chatPreferences, unlockedChats) ? "lock_open" : "lock"}
                 </span>
-                <span>{isChatLocked(openMenuChat.id) ? "Unlock chat" : "Lock chat"}</span>
+                <span>{isChatLockedAnywhere(openMenuChat.id, authUser?.chatPreferences, unlockedChats) ? "Unlock chat" : "Lock chat"}</span>
               </button>
               {(unreadCounts[openMenuChat.id] || 0) > 0 && (
                 <button

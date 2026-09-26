@@ -53,6 +53,7 @@ const userSchema = new mongoose.Schema(
         archived: Boolean,
         disappearing: Number,
         tone: String,
+        locked: Boolean,
       }, { _id: false }),
       default: {},
     },

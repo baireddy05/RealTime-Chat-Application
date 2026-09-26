@@ -67,6 +67,22 @@ export const isChatLocked = (chatId) => {
   return readIds().includes(String(chatId));
 };
 
+// Cross-device lock flag (server chatPreferences): a chat locked on one device
+// shows the PIN gate on this device too. The PIN hash itself stays local —
+// each device sets its own PIN in Settings → Privacy.
+export const isChatLockedRemote = (chatId, prefs) => {
+  if (!chatId || !prefs || typeof prefs !== "object") return false;
+  return prefs[String(chatId)]?.locked === true;
+};
+
+// Locked here OR locked on another device (and not unlocked this session).
+export const isChatLockedAnywhere = (chatId, prefs, unlockedIds = []) => {
+  if (!chatId) return false;
+  const id = String(chatId);
+  if ((unlockedIds || []).map(String).includes(id)) return false;
+  return isChatLocked(id) || isChatLockedRemote(id, prefs);
+};
+
 export const setChatLocked = (chatId, locked) => {
   if (!chatId) return;
   const id = String(chatId);

@@ -34,7 +34,7 @@ import RemindModal from "./RemindModal";
 import GroupCallModal from "./GroupCallModal";
 import MessageBubble from "./MessageBubble";
 import ChatLockGate from "./ChatLockGate";
-import { isChatLocked } from "../lib/chatLock";
+import { isChatLockedAnywhere } from "../lib/chatLock";
 import { useBackHandler } from "../lib/backNavigation";
 import { downloadFile } from "../lib/download";
 import { isEncryptedMessage, getConversationKey, decryptMessage } from "../lib/crypto";
@@ -616,8 +616,10 @@ const ChatPane = ({ onBack }) => {
     );
   }
 
-  // Device-locked chats render a PIN gate instead of any content
-  if (isChatLocked(selectedChat?.id) && !unlockedChats.includes(selectedChat?.id)) {
+  // Device-locked chats render a PIN gate instead of any content.
+  // The lock flag syncs across devices via chatPreferences; the PIN itself
+  // stays on each device, and unlocks last only for the current session.
+  if (isChatLockedAnywhere(selectedChat?.id, authUser?.chatPreferences, unlockedChats)) {
     return (
       <div className="h-full w-full flex flex-col overflow-hidden relative text-on-surface bg-transparent">
         <div className="flex items-center gap-2.5 px-3 sm:px-4 py-2.5 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] z-30 flex-shrink-0">

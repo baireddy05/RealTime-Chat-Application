@@ -2295,11 +2295,13 @@ export const toggleArchiveChat = async (req, res) => {
 };
 
 // Merge per-chat preferences (currently: default disappearing timer,
-// notification tone). Pass null values to clear individual settings.
+// notification tone, cross-device lock flag). Pass null values to clear
+// individual settings. NOTE: `locked` only records THAT a chat is locked so
+// other devices show the PIN gate — the PIN hash itself never leaves a device.
 export const setChatPreferences = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { disappearing, tone } = req.body || {};
+    const { disappearing, tone, locked } = req.body || {};
     const userId = req.user._id;
 
     if (!chatId || typeof chatId !== "string" || chatId.length > 64 || chatId.includes(".") || chatId.includes("$")) {
@@ -2311,12 +2313,16 @@ export const setChatPreferences = async (req, res) => {
     if (tone !== null && tone !== undefined && !["chime", "bell", "pop", "marimba"].includes(tone)) {
       return res.status(400).json({ error: "Invalid notification tone" });
     }
+    if (locked !== null && locked !== undefined && typeof locked !== "boolean") {
+      return res.status(400).json({ error: "Invalid lock flag" });
+    }
 
     // Atomic dot-notation update: spreading a Mongoose Map subdocument loses
     // its paths, so read-modify-save silently drops every write after the first.
     const update = {};
     if (disappearing !== undefined) update[`chatPreferences.${chatId}.disappearing`] = disappearing;
     if (tone !== undefined) update[`chatPreferences.${chatId}.tone`] = tone;
+    if (locked !== undefined) update[`chatPreferences.${chatId}.locked`] = locked;
 
     if (Object.keys(update).length === 0) {
       const existing = await User.findById(userId).select("chatPreferences").lean();

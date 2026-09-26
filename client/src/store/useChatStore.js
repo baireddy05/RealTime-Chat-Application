@@ -168,6 +168,29 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Cross-device lock flag: records THAT a chat is locked so the PIN gate
+  // appears on this user's other devices too. The PIN hash never leaves a device.
+  setChatLockedRemote: async (chatId, locked) => {
+    try {
+      const res = await axiosInstance.put(`/chat/preferences/${chatId}`, { locked: !!locked });
+      const prefs = res.data?.preferences;
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        const prev = authState.authUser.chatPreferences || {};
+        useAuthStore.setState({
+          authUser: {
+            ...authState.authUser,
+            chatPreferences: { ...prev, [chatId]: { ...(prev[chatId] || {}), locked: prefs?.locked ?? !!locked } },
+          },
+        });
+      }
+      return { success: true, preferences: prefs };
+    } catch (error) {
+      console.error("Error syncing chat lock:", error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
   // ---- Chat lock (PIN gate session state; locks themselves live in localStorage)
   unlockedChats: [],
   unlockChat: (chatId) =>
