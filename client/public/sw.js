@@ -1,6 +1,9 @@
 // Pulse Messenger Service Worker: Web Push, offline shell & runtime caching.
+// NOTE: __BUILD_ID__ is replaced with the git SHA / timestamp at build time
+// (see scripts/stamp-sw-dist.js) so every deploy gets a fresh cache and old
+// cached shells can never mix with new hashed chunks across releases.
 
-const CACHE_NAME = "pulse-cache-v2";
+const CACHE_NAME = "pulse-cache-__BUILD_ID__";
 const STATIC_ASSETS = ["/", "/index.html", "/offline.html", "/favicon.png", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

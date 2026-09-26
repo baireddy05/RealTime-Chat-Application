@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -27,14 +27,15 @@ import {
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import ImageModal from "./ImageModal";
-const GifPicker = lazy(() => import("./GifPicker"));
-const EmojiPicker = lazy(() => import("emoji-picker-react"));
+import { lazyWithRetry } from "../lib/lazyWithRetry";
+const GifPicker = lazyWithRetry(() => import("./GifPicker"));
+const EmojiPicker = lazyWithRetry(() => import("emoji-picker-react"));
 // Heavy composer modals are code-split: their chunks load only on first open,
 // keeping the main chat bundle (and first paint) lean.
-const DrawSketchModal = lazy(() => import("./DrawSketchModal"));
-const CodeSnippetModal = lazy(() => import("./CodeSnippetModal"));
-const ContactModal = lazy(() => import("./ContactModal"));
-const CreatePollModal = lazy(() => import("./CreatePollModal"));
+const DrawSketchModal = lazyWithRetry(() => import("./DrawSketchModal"));
+const CodeSnippetModal = lazyWithRetry(() => import("./CodeSnippetModal"));
+const ContactModal = lazyWithRetry(() => import("./ContactModal"));
+const CreatePollModal = lazyWithRetry(() => import("./CreatePollModal"));
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 

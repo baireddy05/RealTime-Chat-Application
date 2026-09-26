@@ -1,22 +1,23 @@
-import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatPane from "../components/ChatPane";
 import ErrorBoundary from "../components/ErrorBoundary";
+import { lazyWithRetry } from "../lib/lazyWithRetry";
 // Secondary modals/drawers are code-split: they load on first open instead of
 // inflating the initial HomePage bundle. Sidebar + ChatPane stay eager.
-const ProfileModal = lazy(() => import("../components/ProfileModal"));
-const CallModal = lazy(() => import("../components/CallModal"));
-const IncomingCallModal = lazy(() => import("../components/IncomingCallModal"));
-const SetStatusModal = lazy(() => import("../components/SetStatusModal"));
-const ChatThemeModal = lazy(() => import("../components/ChatThemeModal"));
-const AddFriendModal = lazy(() => import("../components/AddFriendModal"));
-const StatusModal = lazy(() => import("../components/StatusModal"));
-const StarredDrawer = lazy(() => import("../components/StarredDrawer"));
-const CreateGroupModal = lazy(() => import("../components/CreateGroupModal"));
-const JoinGroupModal = lazy(() => import("../components/JoinGroupModal"));
-const BroadcastModal = lazy(() => import("../components/BroadcastModal"));
-const CallsModal = lazy(() => import("../components/CallsModal"));
-const SettingsModal = lazy(() => import("../components/SettingsModal"));
+const ProfileModal = lazyWithRetry(() => import("../components/ProfileModal"));
+const CallModal = lazyWithRetry(() => import("../components/CallModal"));
+const IncomingCallModal = lazyWithRetry(() => import("../components/IncomingCallModal"));
+const SetStatusModal = lazyWithRetry(() => import("../components/SetStatusModal"));
+const ChatThemeModal = lazyWithRetry(() => import("../components/ChatThemeModal"));
+const AddFriendModal = lazyWithRetry(() => import("../components/AddFriendModal"));
+const StatusModal = lazyWithRetry(() => import("../components/StatusModal"));
+const StarredDrawer = lazyWithRetry(() => import("../components/StarredDrawer"));
+const CreateGroupModal = lazyWithRetry(() => import("../components/CreateGroupModal"));
+const JoinGroupModal = lazyWithRetry(() => import("../components/JoinGroupModal"));
+const BroadcastModal = lazyWithRetry(() => import("../components/BroadcastModal"));
+const CallsModal = lazyWithRetry(() => import("../components/CallsModal"));
+const SettingsModal = lazyWithRetry(() => import("../components/SettingsModal"));
 import PulseLogo from "../components/PulseLogo";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";

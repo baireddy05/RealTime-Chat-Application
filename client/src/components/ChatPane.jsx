@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, lazy, Suspense } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, Suspense } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -13,7 +13,8 @@ import GroupInfoModal from "./GroupInfoModal";
 import ContactInfoModal from "./ContactInfoModal";
 // Reaction picker is code-split: emoji-picker-react is ~200KB and only needed
 // when the user opens "More reactions".
-const EmojiPicker = lazy(() => import("emoji-picker-react"));
+import { lazyWithRetry } from "../lib/lazyWithRetry";
+const EmojiPicker = lazyWithRetry(() => import("emoji-picker-react"));
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
 import { 

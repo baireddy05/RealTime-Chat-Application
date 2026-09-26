@@ -3,6 +3,13 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react()],
+  // Single React instance across every chunk and dependency tree.
+  // Duplicate React copies (nested installs on some systems) null out the
+  // hooks dispatcher and crash lazy chunks with
+  // "Cannot read properties of null (reading 'useState')".
+  resolve: {
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'scheduler'],
+  },
   build: {
     sourcemap: false,
     cssCodeSplit: true,

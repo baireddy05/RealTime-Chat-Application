@@ -1,14 +1,15 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import { Loader } from "lucide-react";
+import { lazyWithRetry } from "./lib/lazyWithRetry";
 
 // Lazy load pages to drastically reduce the initial JS bundle size
-const HomePage = lazy(() => import("./pages/HomePage"));
-const SignUpPage = lazy(() => import("./pages/SignUpPage"));
-const LoginPage = lazy(() => import("./pages/LoginPage"));
-const WelcomePage = lazy(() => import("./pages/WelcomePage"));
+const HomePage = lazyWithRetry(() => import("./pages/HomePage"));
+const SignUpPage = lazyWithRetry(() => import("./pages/SignUpPage"));
+const LoginPage = lazyWithRetry(() => import("./pages/LoginPage"));
+const WelcomePage = lazyWithRetry(() => import("./pages/WelcomePage"));
 
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
