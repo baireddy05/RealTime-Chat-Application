@@ -148,7 +148,9 @@ const StatusModal = ({ onClose }) => {
   }, [activeViewer, onClose, goToNextStory, goToPrevStory]);
 
   useEffect(() => {
-    if (!activeViewer || !activeStory || isPaused) return;
+    // Paused while the viewers panel is open, so the story doesn't advance
+    // underneath the "Viewed by" list.
+    if (!activeViewer || !activeStory || isPaused || showViewers) return;
 
     if (activeViewer.type === "network" && activeStory.id) {
       try {
@@ -174,7 +176,7 @@ const StatusModal = ({ onClose }) => {
     }, 100);
 
     return () => clearInterval(timer);
-  }, [activeViewer, activeStory, isPaused, goToNextStory, viewStatus]);
+  }, [activeViewer, activeStory, isPaused, showViewers, goToNextStory, viewStatus]);
 
   // Reset the viewers panel whenever the viewed story changes
   useEffect(() => {
