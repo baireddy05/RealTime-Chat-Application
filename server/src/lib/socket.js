@@ -323,7 +323,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("answerCall", async ({ to, signal, deviceInfo }) => {
-    if (!to) return;
+    if (!to || !userId) return;
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("callAccepted", { signal, deviceInfo });
     try {
       const key = pendingCallKey(userId, to);
@@ -338,14 +339,16 @@ io.on("connection", (socket) => {
   });
 
   socket.on("rejectCall", async ({ to }) => {
-    if (!to) return;
+    if (!to || !userId) return;
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("callRejected");
     // Receiver actively declined: mark rejected (no missed-call notice)
     await settlePendingCall(pendingCallKey(userId, to), { status: "rejected", endedAt: new Date() });
   });
 
   socket.on("endCall", async ({ to }) => {
-    if (!to) return;
+    if (!to || !userId) return;
+    if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("callEnded");
     try {
       const key = pendingCallKey(userId, to);

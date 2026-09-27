@@ -7,19 +7,32 @@ const MessageInfoModal = ({ message, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!message?._id) return;
+    const msgId = message?._id;
+    if (!msgId) return;
+    const ctrl = new AbortController();
+    let active = true;
     const fetchReceipts = async () => {
       setIsLoading(true);
       try {
-        const res = await axiosInstance.get(`/chat/message/${message._id}/receipts`);
+        const res = await axiosInstance.get(`/chat/message/${msgId}/receipts`, {
+          signal: ctrl.signal,
+        });
+        if (!active) return;
         setReceipts(res.data);
       } catch (err) {
+        if (!active) return;
         console.error("Error fetching message receipts:", err);
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     };
     fetchReceipts();
+    return () => {
+      active = false;
+      try {
+        ctrl.abort();
+      } catch {}
+    };
   }, [message?._id]);
 
   if (!message) return null;

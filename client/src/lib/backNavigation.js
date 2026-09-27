@@ -122,8 +122,18 @@ class BackNavigationManager {
         console.error("[PulseBack] history.back error:", err);
       }
     } else {
-      // If closed out-of-order, remove from stack without popping history
+      // Closed out-of-order: the history entry pushed for this modal is
+      // still in the stack below the top, so pop exactly one entry to keep
+      // history depth and the logical stack in sync. Without this, the next
+      // hardware-back fires the wrong modal's handler.
       this.stack.splice(index, 1);
+      this.programmaticBackCount++;
+      try {
+        window.history.back();
+      } catch (err) {
+        this.programmaticBackCount = Math.max(0, this.programmaticBackCount - 1);
+        console.error("[PulseBack] history.back error:", err);
+      }
     }
   }
 

@@ -70,6 +70,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [scheduledFor, setScheduledFor] = useState(null);
   const [customScheduleDate, setCustomScheduleDate] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isTypingPulse, setIsTypingPulse] = useState(false);
   const [isWhisperMode, setIsWhisperMode] = useState(false);
@@ -441,45 +442,73 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const compressImage = (file, hd) => {
     return new Promise((resolve) => {
       if (hd) return resolve(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1280;
-          const MAX_HEIGHT = 1280;
-          let width = img.width;
-          let height = img.height;
+      const done = (fallback) => resolve(fallback || file);
+      try {
+        const reader = new FileReader();
+        reader.onerror = () => done();
+        reader.onload = (event) => {
+          try {
+            const img = new Image();
+            img.onerror = () => done();
+            img.onload = () => {
+              try {
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 1280;
+                const MAX_HEIGHT = 1280;
+                let width = img.width;
+                let height = img.height;
 
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-          
-          // if already small enough, just return original
-          if (width === img.width && height === img.height) {
-             return resolve(file);
-          }
+                if (width > height) {
+                  if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                  }
+                } else {
+                  if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                  }
+                }
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            const newFile = new File([blob], file.name, { type: "image/jpeg" });
-            resolve(newFile);
-          }, "image/jpeg", 0.7);
+                // if already small enough, just return original
+                if (width === img.width && height === img.height) {
+                  resolve(file);
+                  return;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                  done();
+                  return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                  // toBlob yields null on oversized/tainted canvases — keep original.
+                  if (!blob) {
+                    done();
+                    return;
+                  }
+                  try {
+                    resolve(new File([blob], file.name, { type: "image/jpeg" }));
+                  } catch {
+                    done();
+                  }
+                }, "image/jpeg", 0.7);
+              } catch {
+                done();
+              }
+            };
+            img.src = event.target.result;
+          } catch {
+            done();
+          }
         };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+      } catch {
+        done();
+      }
     });
   };
 
@@ -552,7 +581,25 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
   };
 
+  // Stop any in-progress capture before starting a new one: re-tapping
+  // record otherwise leaks the previous interval + mic/camera stream.
+  const stopPreviousCapture = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    try {
+      mediaRecorderRef.current?.stream?.getTracks()?.forEach((t) => t.stop());
+    } catch {}
+    try {
+      streamRef.current?.getTracks()?.forEach((t) => t.stop());
+    } catch {}
+    mediaRecorderRef.current = null;
+    streamRef.current = null;
+  };
+
   const startRecording = async () => {
+    stopPreviousCapture();
     try {
       audioChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -580,6 +627,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   };
 
   const startVideoRecording = async () => {
+    stopPreviousCapture();
     try {
       audioChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: "user" } });
@@ -743,9 +791,13 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       recognition.lang = navigator.language || "en-US";
 
       recognition.onresult = (event) => {
+        // Only FINAL results are committed: interim hypotheses re-fire on
+        // every event and would otherwise be appended over and over.
         let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            transcript += event.results[i][0].transcript;
+          }
         }
         if (transcript.trim()) {
           setText((prev) => {

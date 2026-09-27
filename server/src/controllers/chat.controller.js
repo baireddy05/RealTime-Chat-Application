@@ -314,8 +314,14 @@ export const createRoom = async (req, res) => {
     const { name, description, memberIds } = req.body;
     const userId = req.user._id;
 
-    if (!name || !name.trim()) {
+    if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "Room name is required" });
+    }
+    if (name.trim().length > 100) {
+      return res.status(400).json({ error: "Room name too long (max 100 chars)" });
+    }
+    if (description !== undefined && (typeof description !== "string" || description.length > 500)) {
+      return res.status(400).json({ error: "Description too long (max 500 chars)" });
     }
 
     const formattedName = name.startsWith("#") ? name.trim() : `#${name.trim()}`;
@@ -324,7 +330,16 @@ export const createRoom = async (req, res) => {
       return res.status(400).json({ error: "A room with this name already exists" });
     }
 
-    const members = Array.from(new Set([userId.toString(), ...(memberIds || [])]));
+    // Validate every invited member: real users only, max 100.
+    const rawIds = Array.isArray(memberIds) ? memberIds.slice(0, 100) : [];
+    const validIds = rawIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length > 0) {
+      const found = await User.countDocuments({ _id: { $in: validIds } });
+      if (found !== new Set(validIds.map(String)).size) {
+        return res.status(400).json({ error: "One or more users not found" });
+      }
+    }
+    const members = Array.from(new Set([userId.toString(), ...validIds.map(String)]));
 
     const newRoom = new Room({
       name: formattedName,
@@ -936,7 +951,16 @@ export const markMessagesAsRead = async (req, res) => {
     const myId = req.user._id;
     const sendReadReceipts = req.user.readReceipts !== false;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid chat id" });
+    }
+
     if (type === "room") {
+      // Only members may mark (and announce reads for) a room.
+      const { isMember } = await getRoomRole(id, myId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You are not a member of this room" });
+      }
       const filter = { roomId: id, readBy: { $ne: myId } };
       const updateOp = { $addToSet: { readBy: myId } };
       if (sendReadReceipts) {
@@ -1206,8 +1230,11 @@ export const editMessage = async (req, res) => {
     const { text } = req.body;
     const userId = req.user._id;
 
-    if (!text || !text.trim()) {
+    if (!text || typeof text !== "string" || !text.trim()) {
       return res.status(400).json({ error: "Text is required to edit message" });
+    }
+    if (text.trim().length > 8000) {
+      return res.status(400).json({ error: "Edited text too long (max 8000 chars)" });
     }
 
     const message = await Message.findById(messageId);
@@ -1240,7 +1267,7 @@ export const editMessage = async (req, res) => {
 
     if (message.roomId) {
       io.to(message.roomId.toString()).emit("messageEdited", payload);
-    } else {
+    } else if (message.receiverId && message.senderId) {
       io.to(message.receiverId.toString()).emit("messageEdited", payload);
       io.to(message.senderId.toString()).emit("messageEdited", payload);
     }
@@ -1465,11 +1492,24 @@ export const updateRoom = async (req, res) => {
     if (!room.createdBy) room.createdBy = myId;
     if (!room.admins || room.admins.length === 0) room.admins = [myId];
 
-    if (name && name.trim()) {
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
+        return res.status(400).json({ error: "Invalid room name (1-100 chars)" });
+      }
       room.name = name.trim().startsWith("#") ? name.trim() : `#${name.trim()}`;
     }
-    if (description !== undefined) room.description = description;
-    if (avatar !== undefined) room.avatar = avatar;
+    if (description !== undefined) {
+      if (typeof description !== "string" || description.length > 500) {
+        return res.status(400).json({ error: "Description too long (max 500 chars)" });
+      }
+      room.description = description;
+    }
+    if (avatar !== undefined) {
+      if (typeof avatar !== "string" || avatar.length > 2048) {
+        return res.status(400).json({ error: "Invalid avatar URL" });
+      }
+      room.avatar = avatar;
+    }
 
     await room.save();
     await room.populate("members", "username profilePic status");
@@ -1716,21 +1756,23 @@ export const joinRoomByCode = async (req, res) => {
       return res.status(202).json({ success: true, requested: true, roomId: room._id, name: room.name });
     }
     if (!alreadyMember) {
-      room.members.push(myId);
-      await room.save();
+      // Atomic: concurrent joins can't duplicate the member entry.
+      await Room.updateOne({ _id: room._id }, { $addToSet: { members: myId } });
     }
-    await room.populate("members", "username profilePic status");
-    await room.populate("createdBy", "username profilePic");
-    await room.populate("admins", "username profilePic");
+    // Re-read: the in-memory doc predates the atomic member update above.
+    const joined = await Room.findById(room._id);
+    await joined.populate("members", "username profilePic status");
+    await joined.populate("createdBy", "username profilePic");
+    await joined.populate("admins", "username profilePic");
 
     // Strip the invite code from what the joiner receives (admins manage it)
-    const roomObj = room.toObject();
+    const roomObj = joined.toObject();
     delete roomObj.inviteCode;
     delete roomObj.joinRequests;
 
-    io.in(myId.toString()).socketsJoin(room._id.toString());
-    io.to(myId.toString()).emit("newRoom", room);
-    emitRoomUpdated(room);
+    io.in(myId.toString()).socketsJoin(joined._id.toString());
+    io.to(myId.toString()).emit("newRoom", joined);
+    emitRoomUpdated(joined);
 
     res.status(200).json(roomObj);
   } catch (error) {
@@ -1937,11 +1979,24 @@ export const unfollowChannel = async (req, res) => {
     if (!room || !room.isChannel) {
       return res.status(404).json({ error: "Channel not found" });
     }
+    // Creators/admins can't silently orphan the channel; use Leave/Delete.
+    const isOwner =
+      room.createdBy?.toString() === myId.toString() ||
+      (room.admins || []).some((a) => a.toString() === myId.toString());
+    if (isOwner) {
+      return res.status(403).json({ error: "Channel owners must transfer or delete the channel instead" });
+    }
     // Admins/creator keep their seat; use Leave for ownership changes
     await Room.updateOne(
       { _id: roomId },
       { $pull: { members: myId, followers: myId } }
     );
+    // Drop live delivery to the unfollowed sockets immediately.
+    for (const [, sock] of io.of("/").sockets) {
+      try {
+        if (sock.userId?.toString() === myId.toString()) sock.leave(roomId.toString());
+      } catch {}
+    }
     io.to(myId.toString()).emit("roomDeleted", { roomId });
 
     res.status(200).json({ success: true, roomId });
@@ -2013,6 +2068,19 @@ export const resolveJoinRequest = async (req, res) => {
     if (!isAdmin) return res.status(403).json({ error: "Only group admins can resolve requests" });
     if (!["approve", "deny"].includes(action)) {
       return res.status(400).json({ error: "action must be approve or deny" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+    const targetExists = await User.findById(userId).select("_id").lean();
+    if (!targetExists) {
+      await Room.updateOne({ _id: roomId }, { $pull: { joinRequests: userId } });
+      return res.status(404).json({ error: "User not found" });
+    }
+    // Only users who actually requested can be approved.
+    const requested = (room.joinRequests || []).some((r) => r.toString() === userId.toString());
+    if (action === "approve" && !requested) {
+      return res.status(409).json({ error: "User did not request to join" });
     }
 
     if (action === "approve") {

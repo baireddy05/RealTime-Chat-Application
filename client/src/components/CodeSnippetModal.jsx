@@ -23,6 +23,9 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const lineNumbersRef = useRef(null);
+  // Cap pastes: huge snippets freeze the line-number column and exceed the
+  // 8000-char message limit so the send fails anyway.
+  const MAX_SNIPPET_CHARS = 30000;
 
   if (!isOpen) return null;
 
@@ -140,7 +143,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
           {/* Textarea */}
           <textarea
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => setCode(e.target.value.slice(0, MAX_SNIPPET_CHARS))}
             onKeyDown={handleKeyDown}
             onScroll={(e) => {
               if (lineNumbersRef.current) {
@@ -160,7 +163,9 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
           <div className="text-[11px] text-zinc-400 flex items-center gap-3">
             <span>{lineCount} {lineCount === 1 ? "line" : "lines"}</span>
             <span>•</span>
-            <span>{code.length} characters</span>
+            <span className={code.length >= MAX_SNIPPET_CHARS ? "text-red-400 font-semibold" : ""}>
+              {code.length.toLocaleString()}{code.length >= MAX_SNIPPET_CHARS ? " (max)" : ""} characters
+            </span>
             <span>•</span>
             <span className="text-accent-primary uppercase font-bold">{language}</span>
           </div>

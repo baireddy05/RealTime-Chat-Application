@@ -244,7 +244,22 @@ export const updateProfile = async (req, res) => {
     ).select("-password").lean();
 
     if (io) {
-      io.emit("userUpdated", updatedUser);
+      // Scoped fan-out only: friends + self receive a STRIPPED profile.
+      // Broadcasting the full doc leaks email/friends/blockedUsers/preferences.
+      try {
+        const me = await User.findById(userId).select("friends").lean();
+        const audience = new Set([(me?.friends || []).map((f) => f.toString()), userId.toString()].flat());
+        const stripped = {
+          _id: updatedUser._id,
+          username: updatedUser.username,
+          profilePic: updatedUser.profilePic,
+          status: updatedUser.status,
+          bio: updatedUser.bio,
+        };
+        audience.forEach((id) => {
+          if (id) io.to(id).emit("userUpdated", stripped);
+        });
+      } catch {}
     }
 
     res.status(200).json(updatedUser);

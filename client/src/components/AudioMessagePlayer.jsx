@@ -8,8 +8,17 @@ const ACOUSTIC_WAVE_PROFILE = [
   75, 45, 65, 40
 ];
 
-// Global duration cache so repeated mounts don't re-decode WebM audio
+// Global duration cache so repeated mounts don't re-decode WebM audio.
+// Bounded (LRU-200): hundreds of voice notes used to pin URLs forever.
 const audioDurationCache = new Map();
+const cacheAudioDuration = (url, dur) => {
+  try {
+    if (audioDurationCache.size >= 200) {
+      audioDurationCache.delete(audioDurationCache.keys().next().value);
+    }
+    cacheAudioDuration(url, dur);
+  } catch {}
+};
 
 // Helper to decode WebM / audio duration accurately using Web Audio API
 // Shared singleton context (browsers cap ~6 contexts) + abortable decode.
@@ -42,7 +51,7 @@ const fetchExactAudioDuration = async (url, signal) => {
       const audioBuffer = await ctx.decodeAudioData(copy);
       const dur = audioBuffer.duration;
       if (dur && isFinite(dur) && dur > 0) {
-        audioDurationCache.set(url, dur);
+        cacheAudioDuration(url, dur);
         return dur;
       }
     }
@@ -73,7 +82,7 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
         setCurrentTime(audio.currentTime);
         if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
           setDuration(audio.duration);
-          if (audioUrl) audioDurationCache.set(audioUrl, audio.duration);
+          if (audioUrl) cacheAudioDuration(audioUrl, audio.duration);
         }
         animFrameRef.current = requestAnimationFrame(track);
       }
@@ -118,14 +127,14 @@ const AudioMessagePlayer = ({ audioUrl, isMine }) => {
     const setAudioData = () => {
       if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
-        if (audioUrl) audioDurationCache.set(audioUrl, audio.duration);
+        if (audioUrl) cacheAudioDuration(audioUrl, audio.duration);
       } else if (audio.duration === Infinity) {
         // Chromium WebM Infinity duration bug fix: seek to huge offset to force browser to compute duration
         const onSeeked = () => {
           audio.removeEventListener("seeked", onSeeked);
           if (isFinite(audio.duration) && audio.duration > 0) {
             setDuration(audio.duration);
-            if (audioUrl) audioDurationCache.set(audioUrl, audio.duration);
+            if (audioUrl) cacheAudioDuration(audioUrl, audio.duration);
           }
           audio.currentTime = 0;
         };

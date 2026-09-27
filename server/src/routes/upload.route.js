@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import multer from "multer";
 import mongoose from "mongoose";
 import { protectRoute } from "../middleware/auth.middleware.js";
@@ -6,6 +7,15 @@ import cloudinary from "../lib/cloudinary.js";
 import Message from "../models/Message.model.js";
 
 const router = express.Router();
+
+// Signatures mint upload rights on our Cloudinary billing: throttle them.
+const signatureLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT === "1" ? 1000 : 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many upload requests. Try again later." },
+});
 
 // In-memory staging for document uploads (streamed straight into GridFS,
 // never written to disk — safe for ephemeral hosting filesystems)
@@ -66,7 +76,7 @@ const EXT_TO_MIME = {
 const bucket = () =>
   new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: "pulse_docs" });
 
-router.get("/signature", protectRoute, async (req, res) => {
+router.get("/signature", protectRoute, signatureLimiter, async (req, res) => {
   try {
     const timestamp = Math.round(new Date().getTime() / 1000);
     const signature = cloudinary.utils.api_sign_request(
@@ -108,6 +118,17 @@ router.post("/document", protectRoute, (req, res) => {
       const ext = originalName.includes(".")
         ? originalName.slice(originalName.lastIndexOf(".")).toLowerCase()
         : "";
+      // Never store executables/scripts/markup regardless of claimed MIME —
+      // the OR-gate below trusts extensions for office docs whose uploaders
+      // report generic octet-stream, so dangerous types need an explicit ban.
+      const DANGEROUS_EXTS = new Set([
+        ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".ps1", ".vbs",
+        ".js", ".mjs", ".html", ".htm", ".svg", ".xml", ".jar", ".apk",
+        ".dmg", ".pkg", ".deb", ".sh", ".py", ".php",
+      ]);
+      if (DANGEROUS_EXTS.has(ext)) {
+        return res.status(415).json({ error: `File type not allowed (${ext})` });
+      }
       const mime = req.file.mimetype || "application/octet-stream";
       if (!ALLOWED_DOC_MIMES.has(mime) && !ALLOWED_DOC_EXTS.has(ext)) {
         return res.status(415).json({ error: `File type not allowed (${ext || mime})` });
@@ -140,7 +161,7 @@ router.post("/document", protectRoute, (req, res) => {
           url: `${base}/api/upload/file/${fileId}`,
           name: originalName,
           size: req.file.size,
-          fileType: mime,
+          fileType: resolvedType,
         });
       });
       uploadStream.end(req.file.buffer);

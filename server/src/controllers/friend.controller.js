@@ -24,7 +24,7 @@ export const getFriends = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const user = await User.findById(loggedInUserId)
-      .populate("friends", "username email profilePic status bio")
+      .populate("friends", "username profilePic status bio")
       .lean();
     // Blocked contacts (either direction) disappear from the friends list
     const myBlocked = new Set((user?.blockedUsers || []).map((id) => id.toString()));
@@ -89,14 +89,14 @@ export const getFriendRequests = async (req, res) => {
       receiver: userId,
       status: "pending",
     })
-      .populate("sender", "username email profilePic status bio")
+      .populate("sender", "username profilePic status bio")
       .lean();
 
     const outgoing = await FriendRequest.find({
       sender: userId,
       status: "pending",
     })
-      .populate("receiver", "username email profilePic status bio")
+      .populate("receiver", "username profilePic status bio")
       .lean();
 
     res.status(200).json({ incoming, outgoing });
@@ -180,7 +180,6 @@ export const searchUsers = async (req, res) => {
       return {
         _id: user._id,
         username: user.username,
-        email: user.email,
         profilePic: user.profilePic,
         status: user.status,
         bio: user.bio,
@@ -201,8 +200,17 @@ export const sendFriendRequest = async (req, res) => {
     const senderId = req.user._id;
     const { targetUserId } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
     if (senderId.toString() === targetUserId.toString()) {
       return res.status(400).json({ message: "You cannot send a friend request to yourself" });
+    }
+
+    // Blocked pairs (either direction) cannot request each other.
+    if (await isBlockedPair(senderId, targetUserId)) {
+      return res.status(403).json({ message: "You cannot send a request to this user" });
     }
 
     const targetUser = await User.findById(targetUserId);
@@ -234,7 +242,7 @@ export const sendFriendRequest = async (req, res) => {
       status: "pending",
     });
 
-    await newRequest.populate("sender", "username email profilePic status bio");
+    await newRequest.populate("sender", "username profilePic status bio");
 
     // Real-time socket notification to receiver
     io.to(targetUserId.toString()).emit("newFriendRequest", newRequest.toObject ? newRequest.toObject() : newRequest);
@@ -261,6 +269,17 @@ export const acceptFriendRequest = async (req, res) => {
       return res.status(403).json({ message: "You are not authorized to accept this request" });
     }
 
+    // No replays: only pending requests can be accepted.
+    if (friendRequest.status !== "pending") {
+      return res.status(409).json({ message: "Request is no longer pending" });
+    }
+
+    // A block since the request was sent cancels the accept.
+    if (await isBlockedPair(currentUserId, friendRequest.sender)) {
+      await FriendRequest.findByIdAndDelete(requestId);
+      return res.status(403).json({ message: "You cannot accept this request" });
+    }
+
     friendRequest.status = "accepted";
     await friendRequest.save();
 
@@ -268,8 +287,8 @@ export const acceptFriendRequest = async (req, res) => {
     await User.findByIdAndUpdate(currentUserId, { $addToSet: { friends: friendRequest.sender } });
     await User.findByIdAndUpdate(friendRequest.sender, { $addToSet: { friends: currentUserId } });
 
-    const updatedSender = await User.findById(friendRequest.sender).select("username email profilePic status bio");
-    const updatedReceiver = await User.findById(currentUserId).select("username email profilePic status bio");
+    const updatedSender = await User.findById(friendRequest.sender).select("username profilePic status bio");
+    const updatedReceiver = await User.findById(currentUserId).select("username profilePic status bio");
 
     // Real-time socket notification to sender
     io.to(friendRequest.sender.toString()).emit("friendRequestAccepted", {
@@ -393,7 +412,7 @@ export const unblockUser = async (req, res) => {
 export const getBlockedUsers = async (req, res) => {
   try {
     const me = await User.findById(req.user._id)
-      .populate("blockedUsers", "username email profilePic status bio")
+      .populate("blockedUsers", "username profilePic status bio")
       .lean();
     res.status(200).json(me?.blockedUsers || []);
   } catch (error) {

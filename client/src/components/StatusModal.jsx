@@ -33,6 +33,24 @@ const StatusModal = ({ onClose }) => {
   const mediaInputRef = useRef(null);
   const [mediaPickerType, setMediaPickerType] = useState("image");
 
+  // Object URLs must be revoked or every picked photo leaks blob memory.
+  // All preview resets go through here (remove, replace, posted, unmount).
+  const mediaFileRef = useRef(null);
+  const clearMediaFile = () => {
+    try {
+      if (mediaFileRef.current?.preview) URL.revokeObjectURL(mediaFileRef.current.preview);
+    } catch {}
+    mediaFileRef.current = null;
+    setMediaFile(null);
+  };
+  useEffect(() => {
+    return () => {
+      try {
+        if (mediaFileRef.current?.preview) URL.revokeObjectURL(mediaFileRef.current.preview);
+      } catch {}
+    };
+  }, []);
+
   // Viewers panel state (own stories)
   const [showViewers, setShowViewers] = useState(false);
   const [viewersList, setViewersList] = useState([]);
@@ -46,19 +64,20 @@ const StatusModal = ({ onClose }) => {
           avatar:
             authUser?.profilePic ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`,
-          stories: myStories,
+          stories: Array.isArray(myStories) ? myStories : [],
         }
-      : networkPersons[activeViewer.personIndex]
+      : networkPersons[activeViewer.personIndex] || null
     : null;
 
-  const activeStory = activePerson?.stories?.[activeViewer?.storyIndex] || null;
+  const personStories = Array.isArray(activePerson?.stories) ? activePerson.stories : [];
+  const activeStory = personStories[activeViewer?.storyIndex] || null;
 
   const goToNextStory = useCallback(() => {
     if (!activeViewer) return;
 
     const currentStories =
       activeViewer.type === "my"
-        ? myStories
+        ? (Array.isArray(myStories) ? myStories : [])
         : networkPersons[activeViewer.personIndex]?.stories || [];
 
     if (activeViewer.storyIndex < currentStories.length - 1) {
@@ -70,21 +89,33 @@ const StatusModal = ({ onClose }) => {
     } else {
       if (activeViewer.type === "my") {
         if (networkPersons.length > 0) {
-          setActiveViewer({
-            type: "network",
-            personIndex: 0,
-            storyIndex: 0,
-          });
+          const firstWithStories = networkPersons.findIndex(
+            (p) => Array.isArray(p?.stories) && p.stories.length > 0
+          );
+          if (firstWithStories === -1) {
+            setActiveViewer(null);
+          } else {
+            setActiveViewer({
+              type: "network",
+              personIndex: firstWithStories,
+              storyIndex: 0,
+            });
+          }
           setStoryProgress(0);
         } else {
           setActiveViewer(null);
           setStoryProgress(0);
         }
       } else {
-        if (activeViewer.personIndex < networkPersons.length - 1) {
+        // Skip persons whose stories emptied (deleted while viewing).
+        let next = activeViewer.personIndex + 1;
+        while (next < networkPersons.length && !(networkPersons[next]?.stories || []).length) {
+          next++;
+        }
+        if (next < networkPersons.length) {
           setActiveViewer({
             type: "network",
-            personIndex: activeViewer.personIndex + 1,
+            personIndex: next,
             storyIndex: 0,
           });
           setStoryProgress(0);
@@ -109,14 +140,15 @@ const StatusModal = ({ onClose }) => {
       if (activeViewer.type === "network") {
         if (activeViewer.personIndex > 0) {
           const prevPersonIndex = activeViewer.personIndex - 1;
-          const prevPersonStories = networkPersons[prevPersonIndex].stories;
+          const prevPersonStories = networkPersons[prevPersonIndex]?.stories || [];
+          if (prevPersonStories.length === 0) return;
           setActiveViewer({
             type: "network",
             personIndex: prevPersonIndex,
             storyIndex: prevPersonStories.length - 1,
           });
           setStoryProgress(0);
-        } else if (myStories.length > 0) {
+        } else if ((myStories || []).length > 0) {
           setActiveViewer({
             type: "my",
             personIndex: 0,
@@ -203,7 +235,7 @@ const StatusModal = ({ onClose }) => {
       }
       await uploadStatus(newStatusText.trim(), selectedBg, media);
       setNewStatusText("");
-      setMediaFile(null);
+      clearMediaFile();
     } catch (error) {
       console.error("Failed to upload status", error);
     } finally {
@@ -245,7 +277,12 @@ const StatusModal = ({ onClose }) => {
       alert("Status media must be under 30MB");
       return;
     }
-    setMediaFile({ file, preview: URL.createObjectURL(file), type });
+    try {
+      if (mediaFileRef.current?.preview) URL.revokeObjectURL(mediaFileRef.current.preview);
+    } catch {}
+    const next = { file, preview: URL.createObjectURL(file), type };
+    mediaFileRef.current = next;
+    setMediaFile(next);
     setIsCreatingStatus(true);
   };
 
@@ -599,7 +636,7 @@ const StatusModal = ({ onClose }) => {
                       )}
                       <button
                         type="button"
-                        onClick={() => setMediaFile(null)}
+                        onClick={() => clearMediaFile()}
                         className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
                         title="Remove media"
                       >

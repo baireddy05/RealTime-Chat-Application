@@ -4,6 +4,8 @@ import User from "../models/User.model.js";
 import mongoose from "mongoose";
 import { io } from "../lib/socket.js";
 import { isBlockedPair } from "./friend.controller.js";
+import { isSafeUrl } from "./chat.controller.js";
+import { notifyNewMessage } from "../lib/notify.js";
 
 const MAX_RECIPIENTS = 50;
 
@@ -109,6 +111,17 @@ export const sendBroadcast = async (req, res) => {
     if (!text && !image && !audio && !file && !contact) {
       return res.status(400).json({ error: "Message must contain text, media, file or contact" });
     }
+    if (typeof text === "string" && text.length > 8000) {
+      return res.status(400).json({ error: "Message text too long (max 8000 chars)" });
+    }
+    for (const [label, val] of [["image", image], ["audio", audio]]) {
+      if (val !== undefined && val !== null && (typeof val !== "string" || val.length > 2048 || !isSafeUrl(val))) {
+        return res.status(400).json({ error: `Invalid ${label} URL` });
+      }
+    }
+    if (file !== undefined && file !== null && (typeof file !== "object" || typeof file.url !== "string" || !isSafeUrl(file.url))) {
+      return res.status(400).json({ error: "Invalid file payload" });
+    }
 
     const list = await BroadcastList.findOne({ _id: id, owner: senderId }).lean();
     if (!list) return res.status(404).json({ error: "Broadcast list not found" });
@@ -145,6 +158,12 @@ export const sendBroadcast = async (req, res) => {
       await msg.populate("senderId", "username profilePic");
       io.to(recipientId.toString()).emit("newMessage", msg);
       io.to(senderId.toString()).emit("newMessage", msg);
+      // Offline recipients get push like normal DMs (fire-and-forget).
+      notifyNewMessage({
+        message: msg,
+        senderName: msg.senderId?.username,
+        receiverId: recipientId.toString(),
+      }).catch(() => {});
       sent++;
     }
 

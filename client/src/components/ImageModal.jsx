@@ -26,6 +26,10 @@ const ImageModal = ({ images = [], initialIndex = 0, imageUrl, onClose }) => {
   const isGallery = images.length > 0;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const mountedRef = useRef(true);
+  // Resync when the parent opens a different image/message with the same mount.
+  useEffect(() => {
+    setCurrentIndex(initialIndex);
+  }, [initialIndex, imageUrl]);
   useEffect(() => {
     mountedRef.current = true;
     // Lock background scroll while open.

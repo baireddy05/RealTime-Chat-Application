@@ -1,19 +1,39 @@
 import Status from "../models/Status.model.js";
 import User from "../models/User.model.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+import { isSafeUrl } from "../controllers/chat.controller.js";
+
+// Backgrounds are a closed allow-list: arbitrary class strings would allow
+// UI injection into every friend's story viewer.
+const ALLOWED_STATUS_BGS = new Set([
+  "bg-gradient-to-tr from-sky-500 to-indigo-600",
+  "bg-gradient-to-tr from-emerald-500 to-teal-600",
+  "bg-gradient-to-tr from-amber-500 to-rose-600",
+  "bg-gradient-to-tr from-violet-500 to-purple-600",
+  "bg-gradient-to-tr from-slate-700 to-slate-900",
+  "bg-gradient-to-tr from-cyan-500 to-blue-600",
+  "bg-gradient-to-tr from-fuchsia-500 to-pink-600",
+  "bg-gradient-to-tr from-lime-500 to-emerald-600",
+]);
 
 export const uploadStatus = async (req, res) => {
   try {
     const { text, bg, mediaUrl, mediaType } = req.body;
     const userId = req.user._id;
 
-    if (!text && !mediaUrl) {
+    if ((!text || !String(text).trim()) && !mediaUrl) {
       return res.status(400).json({ error: "Status text or media is required" });
+    }
+    if (typeof text === "string" && text.length > 500) {
+      return res.status(400).json({ error: "Status text too long (max 500 chars)" });
+    }
+    if (bg !== undefined && (typeof bg !== "string" || !ALLOWED_STATUS_BGS.has(bg))) {
+      return res.status(400).json({ error: "Invalid status background" });
     }
     if (mediaUrl && !["image", "video"].includes(mediaType)) {
       return res.status(400).json({ error: "mediaType must be image or video" });
     }
-    if (mediaUrl && (typeof mediaUrl !== "string" || !mediaUrl.startsWith("http"))) {
+    if (mediaUrl && (typeof mediaUrl !== "string" || mediaUrl.length > 2048 || !isSafeUrl(mediaUrl))) {
       return res.status(400).json({ error: "Invalid media URL" });
     }
 
@@ -22,7 +42,7 @@ export const uploadStatus = async (req, res) => {
 
     const newStatus = new Status({
       userId,
-      text: text || "",
+      text: typeof text === "string" ? text.slice(0, 500) : "",
       bg: bg || "bg-gradient-to-tr from-sky-500 to-indigo-600",
       mediaUrl: mediaUrl || null,
       mediaType: mediaUrl ? mediaType : null,
@@ -52,8 +72,8 @@ export const uploadStatus = async (req, res) => {
 export const getStatuses = async (req, res) => {
   try {
     const userId = req.user._id;
-    const currentUser = await User.findById(userId).select("friends");
-    const allowedUserIds = [userId, ...(currentUser?.friends || [])];
+    const me = await User.findById(userId).select("friends blockedUsers").lean();
+    const allowedUserIds = [userId, ...((me?.friends) || [])];
 
     const statuses = await Status.find({
       userId: { $in: allowedUserIds },
@@ -61,7 +81,16 @@ export const getStatuses = async (req, res) => {
       .populate("userId", "username profilePic")
       .sort({ createdAt: -1 });
 
-    res.status(200).json(statuses);
+    // Never show stories from blocked contacts (either direction).
+    const hidden = new Set(((me?.blockedUsers) || []).map((id) => id.toString()));
+    const blockers = await User.find({ blockedUsers: userId }).select("_id").lean();
+    blockers.forEach((u) => hidden.add(u._id.toString()));
+    const visible = statuses.filter((s) => {
+      const owner = (s.userId?._id || s.userId)?.toString();
+      return owner === userId.toString() || !hidden.has(owner);
+    });
+
+    res.status(200).json(visible);
   } catch (error) {
     console.error("Error in getStatuses controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -100,6 +129,8 @@ export const deleteStatus = async (req, res) => {
 };
 
 // Record a view (idempotent). Owners viewing their own story don't count.
+// Only friends (or self) may view: strangers can't enumerate stories or
+// inflate viewer counts, and blocked pairs are excluded both ways.
 export const viewStatus = async (req, res) => {
   try {
     const { statusId } = req.params;
@@ -109,6 +140,17 @@ export const viewStatus = async (req, res) => {
     if (!status) return res.status(404).json({ error: "Status not found" });
     if (status.userId.toString() === userId.toString()) {
       return res.status(200).json({ success: true, viewersCount: (status.viewers || []).length });
+    }
+
+    const owner = await User.findById(status.userId).select("friends blockedUsers").lean();
+    const isFriend = (owner?.friends || []).some((f) => f.toString() === userId.toString());
+    if (!isFriend) {
+      return res.status(403).json({ error: "Not allowed to view this story" });
+    }
+    const blocked = (owner?.blockedUsers || []).some((b) => b.toString() === userId.toString());
+    const iBlocked = await User.findOne({ _id: userId, blockedUsers: status.userId }).select("_id").lean();
+    if (blocked || iBlocked) {
+      return res.status(403).json({ error: "Not allowed to view this story" });
     }
 
     await Status.updateOne(

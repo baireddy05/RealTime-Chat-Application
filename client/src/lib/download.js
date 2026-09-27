@@ -22,6 +22,8 @@ const dataUrlToBlob = (dataUrl) => {
 
 /**
  * Trigger file download via programmatic anchor (web browsers / PWA).
+ * The blob URL is revoked only after the download has had time to start:
+ * revoking too early truncates large/slow downloads (notably Safari/mobile).
  */
 const triggerBlobDownload = (blob, filename) => {
   const blobUrl = window.URL.createObjectURL(blob);
@@ -32,12 +34,14 @@ const triggerBlobDownload = (blob, filename) => {
   document.body.appendChild(a);
   a.click();
 
+  // Large blobs stream for a while after click; 30s is safe and the URL is
+  // process-local, so a late revoke leaks nothing meaningful.
   setTimeout(() => {
     if (document.body.contains(a)) {
       document.body.removeChild(a);
     }
     window.URL.revokeObjectURL(blobUrl);
-  }, 2000);
+  }, 30000);
 };
 
 /**

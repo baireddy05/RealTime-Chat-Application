@@ -344,6 +344,8 @@ export const useCallStore = create((set, get) => ({
     }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
+    // Fresh ICE budget per call: past restarts must not doom the next call.
+    set({ _iceRestarts: 0 });
 
     // Add local tracks to peer connection
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -506,18 +508,30 @@ export const useCallStore = create((set, get) => ({
     }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
+    set({ _iceRestarts: 0 });
 
     // Add local tracks
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-    // Handle remote tracks with React state reactivity
+    // Handle remote tracks with React state reactivity.
+    // NOTE: wraps in a NEW MediaStream so zustand subscribers re-render
+    // (setting the same object ref, as done previously, froze callee video).
     const remoteStream = new MediaStream();
+    const refreshRemote = () => set({ remoteStream: new MediaStream(remoteStream.getTracks()) });
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         event.streams[0].getTracks().forEach((track) => {
           if (!remoteStream.getTracks().some((t) => t.id === track.id)) {
             remoteStream.addTrack(track);
           }
+          track.onmute = refreshRemote;
+          track.onunmute = refreshRemote;
+          track.onended = () => {
+            try {
+              remoteStream.removeTrack(track);
+            } catch {}
+            refreshRemote();
+          };
         });
       } else if (event.track) {
         if (!remoteStream.getTracks().some((t) => t.id === event.track.id)) {
@@ -525,11 +539,7 @@ export const useCallStore = create((set, get) => ({
         }
       }
 
-      event.track.onmute = () => set({ remoteStream });
-      event.track.onunmute = () => set({ remoteStream });
-      event.track.onended = () => set({ remoteStream });
-
-      set({ remoteStream });
+      refreshRemote();
     };
 
     pc.onicecandidate = (event) => {
@@ -542,8 +552,24 @@ export const useCallStore = create((set, get) => ({
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-        if (pc.restartIce) pc.restartIce();
+      const st = pc.iceConnectionState;
+      if (st === "disconnected" || st === "failed") {
+        const attempts = (get()._iceRestarts || 0) + 1;
+        set({ _iceRestarts: attempts });
+        if (attempts <= 3) {
+          setTimeout(() => {
+            try {
+              if (pc.restartIce && get().callState !== "idle") pc.restartIce();
+            } catch {}
+          }, 1000 * Math.pow(2, attempts - 1));
+        } else {
+          try {
+            soundManager.stopRinging?.();
+          } catch {}
+          get().cleanupCall();
+        }
+      } else if (st === "closed") {
+        get().cleanupCall();
       }
     };
 
@@ -789,9 +815,10 @@ export const useCallStore = create((set, get) => ({
       currentFacingMode: "user",
       isSwapped: false,
       isSpeakerOn: true,
-      peerIsPortrait: false,
+      peerIsPortrait: null,
       peerIsMobile: false,
       _timerInterval: null,
+      _iceRestarts: 0,
     });
     // Refresh history in the background so the log stays current
     try {

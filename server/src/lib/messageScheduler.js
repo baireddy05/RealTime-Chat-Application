@@ -56,11 +56,19 @@ export const startMessageScheduler = () => {
       const expiredMessages = await Message.find({
         expiresAt: { $ne: null, $lte: now },
         isDeleted: false,
-      });
+      }).limit(100);
 
       for (const msg of expiredMessages) {
         msg.isDeleted = true;
         msg.text = "This message has expired and self-destructed";
+        // Wipe payloads too: text-only tombstoning left media downloadable.
+        msg.image = null;
+        msg.audio = null;
+        msg.file = null;
+        msg.location = null;
+        msg.liveUntil = null;
+        msg.poll = null;
+        msg.contact = null;
         await msg.save();
 
         const payload = {

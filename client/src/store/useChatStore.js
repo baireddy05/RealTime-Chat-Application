@@ -11,6 +11,10 @@ import {
   getConversationKey,
 } from "../lib/crypto";
 
+// Typing-indicator TTL timers (module scope: survives re-subscribes so a
+// lost `stopTyping` can never leave a permanent ghost "typing..." badge).
+const typingTimers = {};
+
 // Decrypt a single message doc with the key of ITS OWN conversation
 // (not the currently open chat) — used for starred messages & reminders.
 const decryptMessageDoc = async (m, authUserId) => {
@@ -801,8 +805,9 @@ export const useChatStore = create((set, get) => ({
     if (get()[sendKey]) return { success: false, error: "Already sending" };
 
     set({ isSending: true, [sendKey]: true });
-    // Snapshot last message for accurate rollback (not derived from post-optimistic list).
+    // Snapshot last message + reply context for accurate rollback.
     const prevLastMessage = get().lastMessages?.[selectedChat.id] ?? null;
+    const prevReplyingTo = get().replyingTo ?? null;
     const authUser = useAuthStore.getState().authUser;
     if (!authUser?._id) {
       set({ isSending: false, [sendKey]: false });
@@ -919,7 +924,8 @@ export const useChatStore = create((set, get) => ({
       return { success: true, data: msgDataWithDecrypted };
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove optimistic placeholder on failure and restore snapshotted last message
+      // Remove optimistic placeholder, restore snapshotted last message AND
+      // the reply context (a failed send must not eat the user's reply).
       set((state) => {
         const remaining = state.messages.filter((m) => m._id !== tempId);
         return {
@@ -928,6 +934,7 @@ export const useChatStore = create((set, get) => ({
             ...state.lastMessages,
             [selectedChat.id]: prevLastMessage,
           },
+          replyingTo: prevReplyingTo,
         };
       });
       return { success: false, error: error.message };
@@ -1508,8 +1515,35 @@ export const useChatStore = create((set, get) => ({
       set({ messages: updated });
     });
 
-    // Real-time typing indicators
+    // Real-time typing indicators. Entries self-expire: a lost
+    // `stopTyping` (disconnect/crash/killed tab) used to leave a permanent
+    // ghost "typing..." badge. TTL refreshed on every keystroke event.
+    const touchTypingEntry = (targetId, username) => {
+      const key = `${targetId}::${username}`;
+      if (typingTimers[key]) clearTimeout(typingTimers[key]);
+      typingTimers[key] = setTimeout(() => {
+        delete typingTimers[key];
+        const current = get().typingUsers[targetId] || [];
+        if (current.includes(username)) {
+          set({
+            typingUsers: {
+              ...get().typingUsers,
+              [targetId]: current.filter((u) => u !== username),
+            },
+          });
+        }
+      }, 5000);
+    };
+    const clearTypingTimer = (targetId, username) => {
+      const key = `${targetId}::${username}`;
+      if (typingTimers[key]) {
+        clearTimeout(typingTimers[key]);
+        delete typingTimers[key];
+      }
+    };
+
     socket.on("userTyping", ({ username, targetId }) => {
+      if (!username || !targetId) return;
       const current = get().typingUsers[targetId] || [];
       if (!current.includes(username)) {
         set({
@@ -1519,9 +1553,12 @@ export const useChatStore = create((set, get) => ({
           },
         });
       }
+      touchTypingEntry(targetId, username);
     });
 
     socket.on("userStoppedTyping", ({ targetId, username }) => {
+      if (!targetId || !username) return;
+      clearTypingTimer(targetId, username);
       const current = get().typingUsers[targetId] || [];
       set({
         typingUsers: {
@@ -1817,13 +1854,19 @@ export const useChatStore = create((set, get) => ({
   hideMessage: async (messageId) => {
     try {
       await axiosInstance.post(`/chat/message/${messageId}/hide`);
-      const { messages, threadReplies, lastMessages } = get();
+      const { messages, threadReplies, lastMessages, selectedChat } = get();
       const idStr = messageId?.toString();
       const newLastMessages = { ...lastMessages };
       let changedLast = false;
       Object.keys(newLastMessages).forEach((key) => {
         if (newLastMessages[key]?._id?.toString() === idStr) {
-          const rest = (messages || []).filter((m) => (m._id || m.id)?.toString() !== idStr);
+          // Recompute from the affected chat's own history, not the open
+          // chat's message list (which belongs to another conversation).
+          const mine =
+            selectedChat && key === selectedChat.id?.toString()
+              ? messages || []
+              : [];
+          const rest = mine.filter((m) => (m._id || m.id)?.toString() !== idStr);
           newLastMessages[key] = rest[rest.length - 1] || null;
           changedLast = true;
         }
@@ -2430,7 +2473,11 @@ export const useChatStore = create((set, get) => ({
       };
 
       const { selectedChat, messages } = get();
-      if (selectedChat && selectedChat.id === targetChat.id) {
+      if (
+        selectedChat &&
+        selectedChat.id?.toString() === targetChat.id?.toString() &&
+        (selectedChat.type || null) === (targetChat.type || null)
+      ) {
         set({ messages: [...messages, returnedMessage] });
       }
       if (!silent) soundManager.playSendSound();
@@ -2473,7 +2520,8 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get(`/chat/rooms/${roomId}/announcements`);
       const authUser = useAuthStore.getState().authUser;
-      const key = getConversationKey(get().selectedChat, authUser?._id);
+      // Key of the requested room — selectedChat may be a different chat.
+      const key = getConversationKey({ id: roomId, type: "room" }, authUser?._id);
       const decrypted = await Promise.all(
         (res.data || []).map(async (m) => {
           if (m.isEncrypted || isEncryptedMessage(m.text)) {

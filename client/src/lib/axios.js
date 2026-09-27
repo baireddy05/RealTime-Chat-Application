@@ -18,6 +18,10 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
+// Set once the direct store fallback below has fired, so concurrent 401s
+// can't each trigger their own reset cascade.
+let unauthorizedFallbackFired = false;
+
 // On 401 (expired/invalid token), clear auth so the app returns to login instead of looping
 axiosInstance.interceptors.response.use(
   (res) => res,
@@ -26,12 +30,27 @@ axiosInstance.interceptors.response.use(
       const url = error.config?.url || "";
       // Don't trigger logout loop for the auth check itself
       if (!url.includes("/auth/check") && !url.includes("/auth/login") && !url.includes("/auth/signup")) {
-        localStorage.removeItem("pulse-token");
-        // Avoid static+dynamic double import of the auth store (vite warning);
-        // notify via event and let useAuthStore handle the state reset.
+        try {
+          localStorage.removeItem("pulse-token");
+        } catch {}
+        // Primary path: event handled by useAuthStore (avoids a static import
+        // cycle). Fallback: if the store module hasn't loaded yet and nobody
+        // handles the event, reset it directly after a tick.
         try {
           window.dispatchEvent(new CustomEvent("pulse:unauthorized"));
         } catch {}
+        setTimeout(() => {
+          if (unauthorizedFallbackFired) return;
+          unauthorizedFallbackFired = true;
+          import("../store/useAuthStore").then(({ useAuthStore }) => {
+            try {
+              if (useAuthStore.getState().authUser) {
+                useAuthStore.setState({ authUser: null });
+                useAuthStore.getState().disconnectSocket?.();
+              }
+            } catch {}
+          }).catch(() => {});
+        }, 1500);
       }
     }
     return Promise.reject(error);

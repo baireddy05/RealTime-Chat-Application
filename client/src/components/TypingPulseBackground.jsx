@@ -4,8 +4,18 @@ import { getCaretCoordinates } from "../lib/pulseShockwave";
 export default function TypingPulseBackground() {
   const [pulses, setPulses] = useState([]);
   const pulseIdRef = useRef(0);
+  const timeoutsRef = useRef(new Set());
 
   useEffect(() => {
+    const pending = timeoutsRef.current;
+    const scheduleRemoval = (id) => {
+      const t = setTimeout(() => {
+        pending.delete(t);
+        setPulses((prev) => prev.filter((p) => p.id !== id));
+      }, 2200);
+      pending.add(t);
+    };
+
     const handleInput = (e) => {
       if (window.innerWidth < 768) return;
       const target = e.target;
@@ -22,10 +32,7 @@ export default function TypingPulseBackground() {
         
         // Exactly one wave per letter typed
         setPulses((prev) => [...prev.slice(-10), { id, x: coords.x, y: coords.y }]);
-
-        setTimeout(() => {
-          setPulses((prev) => prev.filter((p) => p.id !== id));
-        }, 2200);
+        scheduleRemoval(id);
       }
     };
 
@@ -34,9 +41,7 @@ export default function TypingPulseBackground() {
       if (e.detail && typeof e.detail.x === "number" && typeof e.detail.y === "number") {
         const id = ++pulseIdRef.current;
         setPulses((prev) => [...prev.slice(-10), { id, x: e.detail.x, y: e.detail.y }]);
-        setTimeout(() => {
-          setPulses((prev) => prev.filter((p) => p.id !== id));
-        }, 2200);
+        scheduleRemoval(id);
       }
     };
 
@@ -45,6 +50,8 @@ export default function TypingPulseBackground() {
     window.addEventListener("pulse-shockwave", handleCustomPulse);
 
     return () => {
+      pending.forEach((t) => clearTimeout(t));
+      pending.clear();
       window.removeEventListener("input", handleInput);
       window.removeEventListener("pulse-shockwave", handleCustomPulse);
     };

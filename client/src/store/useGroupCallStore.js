@@ -152,7 +152,6 @@ export const useGroupCallStore = create((set, get) => ({
   },
 
   createPeer: (userToSignal, isInitiator, stream) => {
-    const { activeSocket } = get();
     if (!stream) throw new Error("No local stream");
     const peer = new RTCPeerConnection(ICE_SERVERS);
     
@@ -184,8 +183,11 @@ export const useGroupCallStore = create((set, get) => ({
     };
 
     peer.onicecandidate = (event) => {
-      if (event.candidate && activeSocket) {
-        activeSocket.emit("signalGroupUser", {
+      // Read the socket at emit time: a rotation after peer creation must
+      // not send signals down the dead socket.
+      const sock = get().activeSocket;
+      if (event.candidate && sock) {
+        sock.emit("signalGroupUser", {
           userToSignal,
           signal: { candidate: event.candidate }
         });
@@ -197,7 +199,7 @@ export const useGroupCallStore = create((set, get) => ({
         try {
           const offer = await peer.createOffer();
           await peer.setLocalDescription(offer);
-          activeSocket.emit("signalGroupUser", {
+          get().activeSocket?.emit("signalGroupUser", {
             userToSignal,
             signal: offer
           });
@@ -211,6 +213,15 @@ export const useGroupCallStore = create((set, get) => ({
   },
 
   joinGroupCall: async (roomId) => {
+    // Double-join guard: re-entering without leaving used to orphan the
+    // previous mic/camera stream and its peers.
+    const cur = get();
+    if (cur.groupCallState === "connected" && cur.roomId?.toString() === roomId?.toString()) return;
+    if (cur.localStream) {
+      try {
+        cur.localStream.getTracks().forEach((t) => t.stop());
+      } catch {}
+    }
     let stream = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({

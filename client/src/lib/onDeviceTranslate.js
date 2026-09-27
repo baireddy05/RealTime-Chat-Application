@@ -4,6 +4,7 @@
 // https://developer.chrome.com/docs/ai/translator-api
 
 const translatorCache = new Map(); // `${src}=>${tgt}` -> Translator instance
+const translatorPromises = new Map(); // `${src}=>${tgt}` -> in-flight create() promise
 const availabilityCache = new Map();
 
 const getTranslatorNS = () => {
@@ -112,30 +113,45 @@ export const translateOnDevice = async (rawText, targetLang, opts = {}) => {
   }
 
   const cacheKey = `${src}=>${tgt}`;
+  // Dedupe concurrent creation: two simultaneous translates for one pair
+  // must share a single Translator.create(), or the loser leaks a model.
   let translator = translatorCache.get(cacheKey);
   if (!translator) {
-    try {
-      translator = await Translator.create({
-        sourceLanguage: src,
-        targetLanguage: tgt,
-        ...(opts.monitorProgress && typeof opts.onProgress === "function"
-          ? {
-              monitor: (m) => {
-                try {
-                  m.addEventListener?.("downloadprogress", (e) => {
-                    opts.onProgress(e.loaded ?? 0);
-                  });
-                } catch {}
-              },
-            }
-          : {}),
-      });
-      translatorCache.set(cacheKey, translator);
-    } catch (e) {
-      const err = new Error("Could not create on-device translator");
-      err.code = "UNAVAILABLE";
-      err.cause = e;
-      throw err;
+    let pending = translatorPromises.get(cacheKey);
+    if (!pending) {
+      pending = (async () => {
+        try {
+          return await Translator.create({
+            sourceLanguage: src,
+            targetLanguage: tgt,
+            ...(opts.monitorProgress && typeof opts.onProgress === "function"
+              ? {
+                  monitor: (m) => {
+                    try {
+                      m.addEventListener?.("downloadprogress", (e) => {
+                        opts.onProgress(e.loaded ?? 0);
+                      });
+                    } catch {}
+                  },
+                }
+              : {}),
+        });
+        } catch (e) {
+          const err = new Error("Could not create on-device translator");
+          err.code = "UNAVAILABLE";
+          err.cause = e;
+          throw err;
+        }
+      })();
+      translatorPromises.set(cacheKey, pending);
+      try {
+        translator = await pending;
+        translatorCache.set(cacheKey, translator);
+      } finally {
+        translatorPromises.delete(cacheKey);
+      }
+    } else {
+      translator = await pending;
     }
   }
 

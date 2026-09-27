@@ -91,8 +91,15 @@ const LiveLocationCard = memo(({ message, isMine }) => {
 
   useEffect(() => {
     if (!message.liveUntil) return;
-    const t = setInterval(() => forceTick((x) => x + 1), 30000);
-    return () => clearInterval(t);
+    // One wake-up at expiry instead of a 30s interval ticking forever —
+    // expired cards used to re-render every 30s for the rest of the session.
+    const remaining = new Date(message.liveUntil).getTime() - Date.now();
+    if (!isFinite(remaining) || remaining <= 0) {
+      forceTick((x) => x + 1);
+      return;
+    }
+    const t = setTimeout(() => forceTick((x) => x + 1), Math.min(remaining + 500, 8 * 3600 * 1000));
+    return () => clearTimeout(t);
   }, [message.liveUntil, message._id]);
 
   const live = message.liveUntil && !isNaN(new Date(message.liveUntil).getTime()) && new Date(message.liveUntil).getTime() > Date.now();
@@ -197,6 +204,16 @@ const MessageBubble = memo(({
   const [translatedData, setTranslatedData] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showTranslatePicker, setShowTranslatePicker] = useState(false);
+  // Bounded per-message translation cache (LRU-100): long sessions with
+  // many translated messages used to pin every result in memory forever.
+  const cacheTranslation = (key, payload) => {
+    try {
+      const cache = (MessageBubble._translateCache ??= new Map());
+      if (cache.size >= 100) cache.delete(cache.keys().next().value);
+      cache.set(key, payload);
+    } catch {}
+  };
+
   const [openingViewOnce, setOpeningViewOnce] = useState(false);
   const [openedAudioUrl, setOpenedAudioUrl] = useState(null);
 
@@ -239,9 +256,7 @@ const MessageBubble = memo(({
         sourceLang: done.sourceLang,
         engine: "on-device",
       };
-      try {
-        (MessageBubble._translateCache ??= new Map()).set(`${message._id}:${cleanTarget}`, payload);
-      } catch {}
+      cacheTranslation(`${message._id}:${cleanTarget}`, payload);
       setTranslatedData(payload);
       setIsTranslating(false);
       return;
@@ -266,9 +281,7 @@ const MessageBubble = memo(({
           sourceLang: res.data.sourceLanguage || "auto",
           engine: res.data.engine || "server",
         };
-        try {
-          (MessageBubble._translateCache ??= new Map()).set(`${message._id}:${cleanTarget}`, payload);
-        } catch {}
+        cacheTranslation(`${message._id}:${cleanTarget}`, payload);
         setTranslatedData(payload);
       }
     } catch (err) {

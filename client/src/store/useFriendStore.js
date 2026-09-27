@@ -248,10 +248,17 @@ export const useFriendStore = create((set, get) => ({
           ? [...blockedUsers, target]
           : blockedUsers,
       });
+      // Same eviction as blockUser: no stale previews, badges, or open chat.
       try {
         const chatState = useChatStore.getState();
         useChatStore.setState({
           users: (chatState.users || []).filter((u) => (u._id || u.id)?.toString() !== idStr),
+          lastMessages: Object.fromEntries(
+            Object.entries(chatState.lastMessages || {}).filter(([k]) => k !== idStr)
+          ),
+          unreadCounts: Object.fromEntries(
+            Object.entries(chatState.unreadCounts || {}).filter(([k]) => k !== idStr)
+          ),
           selectedChat: chatState.selectedChat?.id?.toString() === idStr ? null : chatState.selectedChat,
         });
       } catch {}

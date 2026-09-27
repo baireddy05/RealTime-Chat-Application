@@ -6,6 +6,14 @@ import { Link as LinkIcon, Loader } from "lucide-react";
 const previewCache = new Map(); // url -> preview object (or null when none)
 const MAX_PREVIEW_CACHE = 200;
 
+const safeHostname = (rawUrl, fallback) => {
+  try {
+    return new URL(rawUrl).hostname || fallback || "link";
+  } catch {
+    return fallback || (typeof rawUrl === "string" ? rawUrl.slice(0, 40) : "link");
+  }
+};
+
 const LinkPreview = ({ url }) => {
   const [preview, setPreview] = useState(() => (previewCache.has(url) ? previewCache.get(url) : undefined));
   const [loading, setLoading] = useState(() => !previewCache.has(url));
@@ -121,7 +129,7 @@ const LinkPreview = ({ url }) => {
         <div className="flex items-center gap-1.5 mt-1.5 text-accent-secondary">
           <LinkIcon size={10} />
           <span className="text-[9px] font-medium tracking-wide uppercase">
-            {preview.siteName || new URL(url).hostname}
+            {safeHostname(url, preview.siteName)}
           </span>
         </div>
       </div>

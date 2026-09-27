@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import {
   getMessages,
@@ -75,6 +76,15 @@ import {
 
 const router = express.Router();
 
+// Invite codes are short: throttle guessing (per IP, test env exempt).
+const joinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT === "1" ? 1000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many join attempts. Try again later." },
+});
+
 router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/rooms", protectRoute, getRooms);
 router.get("/channels", protectRoute, getChannels);
@@ -88,7 +98,7 @@ router.delete("/rooms/:roomId/members/:userId", protectRoute, kickRoomMember);
 router.post("/rooms/:roomId/members", protectRoute, addRoomMembers);
 router.post("/rooms/:roomId/invite", protectRoute, getOrCreateInvite);
 router.delete("/rooms/:roomId/invite", protectRoute, revokeInvite);
-router.post("/rooms/join/:code", protectRoute, joinRoomByCode);
+router.post("/rooms/join/:code", protectRoute, joinLimiter, joinRoomByCode);
 router.post("/rooms/:roomId/leave", protectRoute, leaveRoom);
 router.delete("/rooms/:roomId", protectRoute, deleteRoom);
 router.put("/rooms/:roomId/approval", protectRoute, toggleJoinApproval);

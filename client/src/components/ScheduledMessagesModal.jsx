@@ -19,14 +19,16 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
   const [tab, setTab] = useState("scheduled");
 
   useEffect(() => {
-    if (isOpen && selectedChat) {
+    if (isOpen && selectedChat?.id) {
       queueMicrotask(() => setLoading(true));
       getScheduledMessages(selectedChat.id, selectedChat.type).finally(() => setLoading(false));
     }
     if (isOpen) {
       getReminders();
     }
-  }, [isOpen, selectedChat, getScheduledMessages, getReminders]);
+    // Deps use stable chat id/type: the whole selectedChat object identity
+    // changes on unrelated store updates and used to refire these fetches.
+  }, [isOpen, selectedChat?.id, selectedChat?.type, getScheduledMessages, getReminders]);
 
   if (!isOpen) return null;
 
