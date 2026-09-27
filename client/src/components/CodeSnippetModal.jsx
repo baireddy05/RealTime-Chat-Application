@@ -65,26 +65,26 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
       <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
         {/* Header Bar */}
-        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between gap-2 bg-slate-800/40 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center shrink-0">
               <Code2 size={16} />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <span>Share Code Snippet</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-primary/20 text-accent-primary uppercase tracking-wider">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5 flex-wrap">
+                <span className="truncate">Share Code Snippet</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-primary/20 text-accent-primary uppercase tracking-wider shrink-0">
                   Syntax Highlighted
                 </span>
               </h3>
-              <p className="text-[11px] text-zinc-400">Paste code with syntax highlighting and line numbers</p>
+              <p className="text-[11px] text-zinc-400 truncate">Paste code with syntax highlighting and line numbers</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer shrink-0"
             title="Close"
           >
             <X size={18} />
@@ -129,7 +129,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
         </div>
 
         {/* Code Input Area with synchronized line numbers */}
-        <div className="relative flex bg-[#0d1117] flex-1 min-h-[180px] max-h-[380px] overflow-hidden font-mono text-[12px] leading-relaxed select-text border-b border-[var(--glass-border)]">
+        <div className="relative flex bg-[#0d1117] flex-1 min-h-[140px] sm:min-h-[180px] max-h-[380px] overflow-hidden font-mono text-[12px] leading-relaxed select-text border-b border-[var(--glass-border)]">
           {/* Line Numbers column (Synced scrolling) */}
           <div
             ref={lineNumbersRef}
@@ -159,22 +159,22 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3.5 bg-slate-800/40 flex items-center justify-between">
-          <div className="text-[11px] text-zinc-400 flex items-center gap-3">
-            <span>{lineCount} {lineCount === 1 ? "line" : "lines"}</span>
-            <span>•</span>
-            <span className={code.length >= MAX_SNIPPET_CHARS ? "text-red-400 font-semibold" : ""}>
-              {code.length.toLocaleString()}{code.length >= MAX_SNIPPET_CHARS ? " (max)" : ""} characters
+        <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-800/40 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between shrink-0">
+          <div className="text-[11px] text-zinc-400 flex items-center gap-2 min-w-0 overflow-hidden whitespace-nowrap">
+            <span className="shrink-0">{lineCount} {lineCount === 1 ? "line" : "lines"}</span>
+            <span className="shrink-0">•</span>
+            <span className={`shrink-0 ${code.length >= MAX_SNIPPET_CHARS ? "text-red-400 font-semibold" : ""}`}>
+              {code.length.toLocaleString()}{code.length >= MAX_SNIPPET_CHARS ? " (max)" : ""}
             </span>
-            <span>•</span>
-            <span className="text-accent-primary uppercase font-bold">{language}</span>
+            <span className="hidden min-[420px]:inline shrink-0">•</span>
+            <span className="hidden min-[420px]:inline text-accent-primary uppercase font-bold truncate">{language}</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-2xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+              className="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-2xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-all text-center"
             >
               Cancel
             </button>
@@ -182,7 +182,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
               type="button"
               onClick={handleSend}
               disabled={!code.trim()}
-              className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-semibold shadow-glow active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
+              className="flex-[2] sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 rounded-2xl bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-semibold shadow-glow active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all whitespace-nowrap"
             >
               <Send size={13} />
               <span>Send Snippet</span>
