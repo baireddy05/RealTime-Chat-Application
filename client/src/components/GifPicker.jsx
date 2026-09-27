@@ -20,6 +20,22 @@ export const STICKER_CATEGORIES = [
   { id: "bye", label: "👋 Bye" },
 ];
 
+// Search terms per sticker category. The offline catalog's own category ids
+// (laugh, thumbsup, animals, ...) don't match these, so the fallback matcher
+// below compares against tags/titles instead of exact category equality —
+// otherwise most sticker categories render an empty grid offline.
+const STICKER_SEARCH_TERMS = {
+  all: "",
+  reactions: "reaction",
+  love: "love",
+  cute: "cute",
+  happy: "happy",
+  party: "party",
+  anime: "anime",
+  memes: "meme",
+  bye: "bye",
+};
+
 const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => {
   const [activeTab, setActiveTab] = useState(initialTab); // 'gifs' | 'stickers'
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -80,28 +96,39 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
   }, [searchQuery]);
   const fetchGifs = useCallback(async (offset) => {
     const isStickers = activeTab === 'stickers';
-    const term = selectedCategory !== 'all' ? selectedCategory : debouncedQuery;
+    const normOffset = Math.max(0, Number(offset) || 0);
+    const term = isStickers
+      ? (STICKER_SEARCH_TERMS[selectedCategory] ?? selectedCategory)
+      : (selectedCategory !== 'all' ? selectedCategory : debouncedQuery);
+    const giphyTerm = term && term !== 'all' ? term : "";
 
     try {
       if (!gf) throw new Error("missing-giphy-key");
-      if (term) {
+      if (giphyTerm) {
         return await (isStickers
-          ? gf.search(term, { type: 'stickers', offset, limit: 20 })
-          : gf.search(term, { offset, limit: 20 }));
+          ? gf.search(giphyTerm, { type: 'stickers', offset: normOffset, limit: 20 })
+          : gf.search(giphyTerm, { offset: normOffset, limit: 20 }));
       } else {
         return await (isStickers
-          ? gf.trending({ type: 'stickers', offset, limit: 20 })
-          : gf.trending({ offset, limit: 20 }));
+          ? gf.trending({ type: 'stickers', offset: normOffset, limit: 20 })
+          : gf.trending({ offset: normOffset, limit: 20 }));
       }
     } catch (err) {
       console.warn("[GifPicker] Giphy fetch fallback triggered:", err);
-      const filtered = GIF_ITEMS.filter((item) => {
-        if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
-        if (term && !item.tags.some(t => t.toLowerCase().includes(term.toLowerCase())) && !item.title.toLowerCase().includes(term.toLowerCase())) return false;
-        return true;
+      const q = String(term || "").toLowerCase();
+      // Lenient match: category ids differ between tabs and the offline
+      // catalog, so compare against tags + title as well.
+      let filtered = GIF_ITEMS.filter((item) => {
+        if (!q || q === "all") return true;
+        if (item.category === q) return true;
+        const hay = `${item.title} ${(item.tags || []).join(" ")}`.toLowerCase();
+        return q.split(/\s+/).some((w) => w && hay.includes(w));
       });
+      // Never show a dead empty grid offline: fall back to the full catalog.
+      if (filtered.length === 0) filtered = GIF_ITEMS;
+      const page = filtered.slice(normOffset, normOffset + 20);
       return {
-        data: filtered.map(f => ({
+        data: page.map(f => ({
           id: f.id,
           title: f.title,
           images: {
@@ -109,7 +136,7 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
             fixed_width: { url: f.preview || f.url, width: 200, height: 150 },
           }
         })),
-        pagination: { total_count: filtered.length, count: filtered.length, offset: 0 }
+        pagination: { total_count: filtered.length, count: page.length, offset: normOffset }
       };
     }
   }, [activeTab, selectedCategory, debouncedQuery]);
@@ -226,8 +253,11 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
             </div>
           }
           onGifClick={(gif, e) => {
-            e.preventDefault();
-            const gifUrl = gif.images.original.url;
+            try {
+              e?.preventDefault?.();
+            } catch {}
+            const gifUrl = gif?.images?.original?.url || gif?.images?.fixed_width?.url;
+            if (!gifUrl) return;
             onGifSelect(gifUrl);
           }}
           hideAttribution={true}
