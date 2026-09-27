@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, Code2, Send, Terminal, FileCode } from "lucide-react";
 import { soundManager } from "../lib/sound";
@@ -19,14 +19,48 @@ const LANGUAGES = [
   { id: "markdown", label: "Markdown (.md)" },
 ];
 
+// Best-effort language guess so pasted code isn't mislabeled when the sender
+// never touches the dropdown (which defaults to JavaScript). Conservative:
+// returns null unless a distinctive signature matches.
+const detectLanguage = (src) => {
+  if (!src || typeof src !== "string") return null;
+  const t = src.trim();
+  if (!t) return null;
+  if (/^#!(.*\b(bash|sh)\b)/m.test(t)) return "bash";
+  if (/<\s*!doctype|<\s*html[\s>]|<\s*div[\s>]/i.test(t)) return "html";
+  if (/\bSELECT\b[\s\S]*\bFROM\b|\bCREATE\s+TABLE\b/i.test(t)) return "sql";
+  try {
+    if (/^[\[{]/.test(t)) {
+      JSON.parse(t);
+      return "json";
+    }
+  } catch {}
+  if (/^\s*import\s+java\.|public\s+class\s|System\.out\.|public\s+static\s+void\s+main/i.test(t)) return "java";
+  if (/^\s*#include\b|std::|cout\s*<<|cin\s*>>/m.test(t)) return "cpp";
+  if (/^\s*package\s+\w+|^func\s+\w+\s*\(|fmt\.Print/m.test(t)) return "go";
+  if (/^\s*fn\s+\w+|let\s+mut\s|println!\s*\(/m.test(t)) return "rust";
+  if (/^\s*def\s+\w+\s*\(|^\s*from\s+\w+\s+import\s|^\s*import\s+\w+\s*$/m.test(t)) return "python";
+  if (/^\s*[.#]?[a-zA-Z-]+\s*\{[^}]*:[^}]*;/m.test(t)) return "css";
+  if (/:\s*(string|number|boolean)\b|\binterface\s+\w+/m.test(t)) return "typescript";
+  return null;
+};
 const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
   const [language, setLanguage] = useState("javascript");
+  const [languageTouched, setLanguageTouched] = useState(false);
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const lineNumbersRef = useRef(null);
   // Cap pastes: huge snippets freeze the line-number column and exceed the
   // 8000-char message limit so the send fails anyway.
   const MAX_SNIPPET_CHARS = 30000;
+
+  // Live preview of what the badge will say: explicit pick wins, otherwise a
+  // confident guess (shown with "auto" hint in the footer).
+  // NOTE: above the early return — hooks must run unconditionally.
+  const effectiveLanguage = useMemo(
+    () => (languageTouched ? { id: language, auto: false } : { id: detectLanguage(code) || language, auto: !!detectLanguage(code) }),
+    [language, languageTouched, code]
+  );
 
   if (!isOpen) return null;
 
@@ -48,13 +82,17 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
   const handleSend = () => {
     if (!code.trim()) return;
     soundManager.playSendSound();
+
+    // If the sender never touched the dropdown, trust a confident guess over
+    // the JavaScript default — otherwise Java pastes get labeled JavaScript.
+    const finalLanguage = languageTouched ? language : detectLanguage(code) || language;
     
     // Format snippet as markdown code block
     let formatted = "";
     if (title.trim()) {
       formatted += `### 📄 \`${title.trim()}\`\n`;
     }
-    formatted += "```" + language + "\n" + code + "\n```";
+    formatted += "```" + finalLanguage + "\n" + code + "\n```";
 
     onSendSnippet(formatted);
     setCode("");
@@ -104,7 +142,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
             </label>
             <select
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => { setLanguage(e.target.value); setLanguageTouched(true); }}
               className="w-full bg-slate-950/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-accent-primary transition-colors cursor-pointer"
             >
               {LANGUAGES.map((lang) => (
@@ -170,7 +208,9 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
               {code.length.toLocaleString()}{code.length >= MAX_SNIPPET_CHARS ? " (max)" : ""}
             </span>
             <span className="hidden min-[420px]:inline shrink-0">•</span>
-            <span className="hidden min-[420px]:inline text-accent-primary uppercase font-bold truncate">{language}</span>
+            <span className="hidden min-[420px]:inline text-accent-primary uppercase font-bold truncate" title={effectiveLanguage.auto ? "Auto-detected — change the dropdown to override" : "Selected language"}>
+              {effectiveLanguage.id}{effectiveLanguage.auto ? " (auto)" : ""}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
