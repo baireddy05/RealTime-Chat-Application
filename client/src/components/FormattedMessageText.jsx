@@ -45,7 +45,7 @@ export const CodeSnippetBlock = memo(({ code, language }) => {
       </div>
 
       {/* Code Content */}
-      <pre className="p-3.5 overflow-x-auto text-zinc-200 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
+      <pre className="p-3.5 overflow-x-auto code-scroll-chain text-zinc-200 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
         <code>{code}</code>
       </pre>
     </div>

@@ -274,6 +274,14 @@ img.emoji {
     overscroll-behavior-y: contain;
   }
 
+  /* Code blocks scroll horizontally only: never trap the vertical wheel,
+     or the chat behind them becomes unscrollable under the cursor.
+     (overflow-x implies a vertical scroll container, and the contain above
+     would otherwise swallow every wheel event over code.) */
+  pre.code-scroll-chain {
+    overscroll-behavior-y: auto;
+  }
+
   .overflow-y-auto::-webkit-scrollbar, .overflow-x-auto::-webkit-scrollbar {
     width: 4px;
     height: 4px;
