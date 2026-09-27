@@ -10,6 +10,7 @@ import ChannelsModal from "./ChannelsModal";
 import MessageTicks from "./MessageTicks";
 import { soundManager, CHAT_TONES } from "../lib/sound";
 import { isChatLocked, isChatLockedAnywhere, setChatLocked, hasChatPin } from "../lib/chatLock";
+import { isStickerUrl, imageSnippet } from "../lib/attachments";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
 
@@ -58,9 +59,11 @@ const getMessageSnippet = (msg) => {
     return "🚫 This message was deleted";
   }
   if (msg.audio) return "🎤 Voice note";
-  const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
-    if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
-    if (msg.image) return "📷 Photo";
+  if (msg.image) {
+    const stickerOnly = msg.isSticker || isStickerUrl(msg.image);
+    if (stickerOnly && (!msg.text || !msg.text.trim())) return "Sticker";
+    return imageSnippet(msg);
+  }
   if (msg.file) return `📎️ ${msg.file.name || "Attachment"}`;
   if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || msg.contact.name || "Shared Contact"}`;
 
@@ -80,7 +83,7 @@ const getSearchSnippet = (msg, query) => {
     const start = Math.max(0, idx - 30);
     return (start > 0 ? "…" : "") + text.slice(start, start + 110) + (text.length > start + 110 ? "…" : "");
   }
-  if (msg.image) return "📷 Photo";
+  if (msg.image) return imageSnippet(msg);
   if (msg.audio) return "🎤 Voice note";
   if (msg.file) return `📎️ ${msg.file.name || "File"}`;
   return "Message";

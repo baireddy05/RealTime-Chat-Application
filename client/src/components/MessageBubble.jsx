@@ -8,6 +8,7 @@ import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import MessageTicks from "./MessageTicks";
 import { isOnlyEmojis, EmojiSpan } from "../lib/emoji";
+import { isGifUrl, isStickerUrl, imageSnippet } from "../lib/attachments";
 import { useChatStore } from "../store/useChatStore";
 
 const SUPPORTED_TRANSLATION_LANGUAGES = [
@@ -504,7 +505,7 @@ const MessageBubble = memo(({
   }
   const isStarred = (message.starredBy || []).some((id) => myId != null && String(id?._id || id) === String(myId));
   const isJustEmoji = !message.isDeleted && !message.image && !message.file && !message.audio && !message.videoNote && !message.location && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned && isOnlyEmojis(message.decryptedText || message.text);
-  const isSticker = message.isSticker || Boolean(message.image && (message.image.includes("/stickers/") || message.image.includes("giphy-preview.gif") || message.image.includes("sticker")));
+  const isSticker = message.isSticker || isStickerUrl(message.image);
   const isStickerOnly = !message.isDeleted && isSticker && (!message.text || !message.text.trim()) && !message.file && !message.audio && !message.videoNote && !message.location && !message.contact && !message.replyTo && !message.isForwarded && !message.isPinned;
   const isTransparentBubble = isJustEmoji || isStickerOnly;
   const isVisuallyDeleted = message.isDeleted && !isViewingWhisper;
@@ -686,7 +687,7 @@ const MessageBubble = memo(({
                       )}
                       <div className="min-w-0 flex-1">
                         <span className="font-semibold block text-[10px] opacity-90">{message.replyTo.senderName || "User"}</span>
-                        <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎️ ${message.replyTo.file.name}` : message.replyTo.contact ? `👤 Contact: ${message.replyTo.contact.fullName || message.replyTo.contact.username || "Contact"}` : "Attachment")}</p>
+                        <p className="truncate opacity-75">{message.replyTo.decryptedText || message.replyTo.text || (message.replyTo.image ? imageSnippet(message.replyTo) : message.replyTo.file ? `📎️ ${message.replyTo.file.name}` : message.replyTo.contact ? `👤 Contact: ${message.replyTo.contact.fullName || message.replyTo.contact.username || "Contact"}` : "Attachment")}</p>
                       </div>
                     </div>
                   )}
@@ -800,16 +801,21 @@ const MessageBubble = memo(({
                           </div>
                         ) : (
                           (() => {
-                            const isGif = message.image && (message.image.toLowerCase().includes('.gif') || message.image.toLowerCase().includes('tenor.com'));
+                            const isGif = isGifUrl(message.image);
                             return (
-                              <div className={`overflow-hidden rounded-2xl mb-1.5 max-w-full ${isGif ? 'sm:max-w-[260px] md:max-w-[280px]' : 'sm:max-w-[360px] md:max-w-[420px]'}`}>
+                              <div className={`relative overflow-hidden rounded-2xl mb-1.5 max-w-full ${isGif ? 'sm:max-w-[260px] md:max-w-[280px]' : 'sm:max-w-[360px] md:max-w-[420px]'}`}>
                                 <img
                                   src={message.image}
-                                  alt="Attachment"
+                                  alt={isGif ? "GIF" : "Attachment"}
                                   loading="lazy"
                                   onClick={() => setActiveImage(message.image)}
                                   className={`w-auto h-auto max-w-full ${isGif ? 'max-h-[240px] sm:max-h-[280px]' : 'max-h-[380px] sm:max-h-[460px]'} object-contain rounded-2xl cursor-pointer hover:opacity-95 transition-all active:scale-[0.99] shadow-sm block bg-black/5 dark:bg-white/5`}
                                 />
+                                {isGif && (
+                                  <span className="absolute bottom-1.5 left-1.5 px-1.5 py-px rounded-md bg-black/60 text-white text-[9px] font-bold tracking-wide pointer-events-none select-none">
+                                    GIF
+                                  </span>
+                                )}
                               </div>
                             );
                           })()
