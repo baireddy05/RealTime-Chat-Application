@@ -1,11 +1,17 @@
 import { memo, useMemo, useState } from "react";
-import { Check, Copy, Terminal } from "lucide-react";
+import { Check, Copy, Terminal, Play, Loader2, ChevronDown } from "lucide-react";
 import { parseEmojiToHtml } from "../lib/emoji";
+import { isRunnableLanguage, runCode } from "../lib/codeRunner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export const CodeSnippetBlock = memo(({ code, language }) => {
   const [copied, setCopied] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState(null);
+  const [runError, setRunError] = useState("");
+  const [showOutput, setShowOutput] = useState(false);
+  const [stdin, setStdin] = useState("");
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -13,7 +19,24 @@ export const CodeSnippetBlock = memo(({ code, language }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleRun = async () => {
+    if (running) return;
+    setRunning(true);
+    setRunError("");
+    try {
+      const result = await runCode(language, code, stdin);
+      setRunResult(result);
+      setShowOutput(true);
+    } catch (err) {
+      setRunError(err?.message || "Run failed. Try again.");
+      setShowOutput(true);
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const detectedLang = language?.trim() || "code";
+  const runnable = isRunnableLanguage(detectedLang);
 
   return (
     <div className="my-2 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-slate-950/80 shadow-glass text-left w-full font-mono text-[12px]">
@@ -42,12 +65,67 @@ export const CodeSnippetBlock = memo(({ code, language }) => {
             </>
           )}
         </button>
+        {runnable && (
+          <button
+            onClick={handleRun}
+            disabled={running}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-accent-primary/20 hover:bg-accent-primary/30 text-accent-primary transition-all active:scale-95 disabled:opacity-50"
+            title="Run this snippet (sandboxed)"
+          >
+            {running ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              <Play size={11} />
+            )}
+            <span>{running ? "Running…" : "Run"}</span>
+          </button>
+        )}
       </div>
 
       {/* Code Content */}
       <pre className="p-3.5 overflow-x-auto code-scroll-chain text-zinc-200 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
         <code>{code}</code>
       </pre>
+
+      {/* Run output */}
+      {runnable && showOutput && (
+        <div className="border-t border-[var(--glass-border)]">
+          <button
+            onClick={() => setShowOutput(false)}
+            className="w-full px-3.5 py-1.5 flex items-center justify-between text-[11px] font-semibold text-theme-muted hover:text-theme-main transition-colors"
+            title="Hide output"
+          >
+            <span>
+              Output
+              {runResult && (
+                <span className={runResult.code === 0 ? "text-emerald-400" : "text-red-400"}>
+                  {"  "}• exit {runResult.code}
+                  {runResult.ms != null ? ` • ${(runResult.ms / 1000).toFixed(1)}s` : ""}
+                </span>
+              )}
+            </span>
+            <ChevronDown size={12} />
+          </button>
+          <div className="px-3.5 pb-3 space-y-2">
+            {runError ? (
+              <p className="text-[11px] text-red-400">{runError}</p>
+            ) : runResult ? (
+              <>
+                <pre className="p-2.5 rounded-xl bg-black/40 font-mono text-[11px] leading-relaxed text-zinc-100 whitespace-pre-wrap break-words max-h-48 overflow-y-auto custom-scrollbar">
+                  {runResult.output}
+                </pre>
+                <input
+                  type="text"
+                  value={stdin}
+                  onChange={(e) => setStdin(e.target.value.slice(0, 4000))}
+                  placeholder="Program input (stdin) — e.g. 5 — then Run again"
+                  className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--glass-input)] border border-[var(--glass-border)] font-mono text-[11px] text-theme-main placeholder:text-theme-muted focus:outline-none focus:border-accent-primary"
+                />
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 });
