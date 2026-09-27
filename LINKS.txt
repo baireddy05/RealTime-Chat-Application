@@ -1,0 +1,27 @@
+Pulse Messenger – RealTime Chat Application (Navodita Infotech Full-Stack Internship Task)
+Submitted by: Byreddy Rithwik Reddy
+
+1) GitHub repository (source code):
+   https://github.com/baireddy05/RealTime-Chat-Application
+
+2) Live deployed app:
+   https://pulsechatmessenger.vercel.app
+
+3) Demo accounts (password for all: password123):
+   - User1 / user1@example.com
+   - User2 / user2@example.com
+   - User3 / user3@example.com
+   - User4 / user4@example.com
+   - User5 / user5@example.com
+
+   Suggested check: log in as User1 and User2 in two browsers,
+   exchange a text, an image and a PDF, try a voice/video call,
+   then open Settings → Appearance to try themes.
+
+4) Documentation:
+   - PROJECT_REPORT.md in the repo root (full report) + PDF version
+     in this Drive folder.
+   - README.md (setup guide), FEATURES.md (feature inventory).
+
+Stack: MongoDB, Express.js, React 19 + Vite, Node.js, Socket.io,
+Cloudinary, WebRTC, Web Push (VAPID), PWA.
