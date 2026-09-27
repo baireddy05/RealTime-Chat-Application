@@ -188,7 +188,7 @@ const ProfileModal = ({ onClose }) => {
         </div>
 
         {/* Profile Content */}
-        <form onSubmit={handleSave} className="p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+        <form id="profile-form" onSubmit={handleSave} className="p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
           {errorMessage && (
             <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs font-medium animate-fadeIn">
               {errorMessage}
@@ -401,40 +401,41 @@ const ProfileModal = ({ onClose }) => {
               <span className="truncate font-mono text-[11px]">{authUser?.email || "user@example.com"}</span>
             </div>
           </div>
-
-          {/* Footer Action Buttons */}
-          <div className="pt-2 pb-[max(0px,env(safe-area-inset-bottom))] border-t border-[var(--glass-divider)] flex justify-end items-center gap-2.5 sticky bottom-0 bg-[var(--glass-header)] backdrop-blur-xl -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 -mb-4 sm:-mb-6 mt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-full text-xs font-semibold text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] border border-[var(--glass-border)] transition-all active:scale-95"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving || savedSuccess}
-              className="px-6 py-2.5 rounded-full text-xs font-bold bg-[var(--pill-active-bg)] text-[var(--pill-active-text)] hover:opacity-90 active:scale-95 shadow-md flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Saving...</span>
-                </>
-              ) : savedSuccess ? (
-                <>
-                  <Check size={14} />
-                  <span>Saved</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={13} />
-                  <span>Save Changes</span>
-                </>
-              )}
-            </button>
-          </div>
         </form>
+
+        {/* Footer Action Buttons (fixed card footer — never overlaps content) */}
+        <div className="px-4 sm:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-[var(--glass-divider)] flex justify-end items-center gap-2.5 bg-[var(--glass-header)] shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-full text-xs font-semibold text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] border border-[var(--glass-border)] transition-all active:scale-95"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="profile-form"
+            disabled={isSaving || savedSuccess}
+            className="px-6 py-2.5 rounded-full text-xs font-bold bg-[var(--pill-active-bg)] text-[var(--pill-active-text)] hover:opacity-90 active:scale-95 shadow-md flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : savedSuccess ? (
+              <>
+                <Check size={14} />
+                <span>Saved</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={13} />
+                <span>Save Changes</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
