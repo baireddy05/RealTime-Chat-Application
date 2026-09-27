@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   X, 
   Search, 
@@ -124,7 +125,9 @@ const ContactModal = ({ isOpen, onClose, onSendContact }) => {
     onClose();
   };
 
-  return (
+  // Portaled to document.body: ancestor backdrop-blur/filter would otherwise
+  // hijack `fixed` positioning and clip the modal to the chat pane.
+  const modalContent = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn"
       onClick={onClose}
@@ -498,6 +501,8 @@ const ContactModal = ({ isOpen, onClose, onSendContact }) => {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default ContactModal;

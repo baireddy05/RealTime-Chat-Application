@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus, Trash2 } from "lucide-react";
 
 const CreatePollModal = ({ isOpen, onClose, onSubmit }) => {
@@ -48,7 +49,9 @@ const CreatePollModal = ({ isOpen, onClose, onSubmit }) => {
     onClose();
   };
 
-  return (
+  // Portaled to document.body: ancestor backdrop-blur/filter would otherwise
+  // hijack `fixed` positioning and clip the modal to the chat pane.
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
       <div className="fixed inset-0" onClick={onClose} />
       
@@ -139,6 +142,8 @@ const CreatePollModal = ({ isOpen, onClose, onSubmit }) => {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default CreatePollModal;

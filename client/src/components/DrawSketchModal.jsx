@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { 
   X, 
   Send, 
@@ -228,7 +229,9 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
 
   if (!isOpen) return null;
 
-  return (
+  // Portaled to document.body: ancestor backdrop-blur/filter would otherwise
+  // hijack `fixed` positioning and clip the modal to the chat pane.
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
       <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
         {/* Header Bar */}
@@ -426,6 +429,8 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default DrawSketchModal;
