@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Code2, Send, Terminal, FileCode } from "lucide-react";
 import { soundManager } from "../lib/sound";
@@ -61,6 +61,14 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
     () => (languageTouched ? { id: language, auto: false } : { id: detectLanguage(code) || language, auto: !!detectLanguage(code) }),
     [language, languageTouched, code]
   );
+
+  // Keep the dropdown in sync with auto-detection (until the user picks
+  // manually): no more "JavaScript dropdown + JAVA badge" mismatch.
+  useEffect(() => {
+    if (!isOpen || languageTouched) return;
+    const guessed = detectLanguage(code);
+    if (guessed && guessed !== language) setLanguage(guessed);
+  }, [isOpen, code, languageTouched, language]);
 
   if (!isOpen) return null;
 
