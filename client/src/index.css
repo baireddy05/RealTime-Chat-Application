@@ -280,6 +280,13 @@ img.emoji {
      would otherwise swallow every wheel event over code.) */
   pre.code-scroll-chain {
     overscroll-behavior-y: auto;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [data-code-block] {
+    touch-action: pan-x pan-y;
   }
 
   .overflow-y-auto::-webkit-scrollbar, .overflow-x-auto::-webkit-scrollbar {

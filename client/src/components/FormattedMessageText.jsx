@@ -1,11 +1,12 @@
 import { memo, useMemo, useState } from "react";
-import { Check, Copy, Terminal } from "lucide-react";
+import { Check, Copy, Terminal, TextWrap } from "lucide-react";
 import { parseEmojiToHtml } from "../lib/emoji";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export const CodeSnippetBlock = memo(({ code, language }) => {
   const [copied, setCopied] = useState(false);
+  const [isWrapped, setIsWrapped] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -16,37 +17,71 @@ export const CodeSnippetBlock = memo(({ code, language }) => {
   const detectedLang = language?.trim() || "code";
 
   return (
-    <div className="my-2 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-slate-950/80 shadow-glass text-left w-full font-mono text-[12px]">
+    <div 
+      data-code-block="true" 
+      data-no-swipe="true"
+      className="my-2 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-slate-950/90 shadow-glass text-left w-full font-mono text-[12px] select-text"
+      style={{ touchAction: "pan-x pan-y" }}
+    >
       {/* Code Header Bar */}
-      <div className="px-3.5 py-1.5 bg-[var(--glass-surface)]/70 border-b border-[var(--glass-border)] flex items-center justify-between">
-        <div className="flex items-center gap-2 text-theme-muted">
-          <Terminal size={12} className="text-accent-primary" />
-          <span className="text-[11px] font-semibold tracking-wider uppercase text-accent-primary/90">
+      <div className="px-3.5 py-1.5 bg-[var(--glass-surface)]/70 border-b border-[var(--glass-border)] flex items-center justify-between select-none">
+        <div className="flex items-center gap-2 text-theme-muted min-w-0">
+          <Terminal size={12} className="text-accent-primary shrink-0" />
+          <span className="text-[11px] font-semibold tracking-wider uppercase text-accent-primary/90 truncate">
             {detectedLang}
           </span>
         </div>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--glass-hover)] hover:bg-white/10 text-theme-muted hover:text-white transition-all active:scale-95"
-          title="Copy Code"
-        >
-          {copied ? (
-            <>
-              <Check size={11} className="text-white" />
-              <span className="text-white font-semibold">Copied</span>
-            </>
-          ) : (
-            <>
-              <Copy size={11} />
-              <span>Copy</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsWrapped((prev) => !prev)}
+            className={`flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg transition-all active:scale-95 ${
+              isWrapped 
+                ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/30" 
+                : "bg-[var(--glass-hover)] hover:bg-white/10 text-theme-muted hover:text-white"
+            }`}
+            title={isWrapped ? "Scroll mode: Keep original formatting" : "Wrap mode: Wrap lines to screen"}
+          >
+            <TextWrap size={11} />
+            <span>{isWrapped ? "Wrapped" : "Wrap"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--glass-hover)] hover:bg-white/10 text-theme-muted hover:text-white transition-all active:scale-95"
+            title="Copy Code"
+          >
+            {copied ? (
+              <>
+                <Check size={11} className="text-white" />
+                <span className="text-white font-semibold">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy size={11} />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Code Content */}
-      <pre className="p-3.5 overflow-x-auto code-scroll-chain text-zinc-200 font-mono text-[12px] leading-relaxed select-text no-scrollbar">
-        <code>{code}</code>
+      <pre 
+        data-code-block="true"
+        className={`p-3.5 code-scroll-chain text-zinc-200 font-mono text-[12px] leading-relaxed select-text ${
+          isWrapped 
+            ? "whitespace-pre-wrap break-words overflow-x-hidden" 
+            : "overflow-x-auto whitespace-pre"
+        }`}
+        style={{
+          touchAction: "pan-x pan-y",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehaviorX: "contain",
+          overscrollBehaviorY: "auto",
+        }}
+      >
+        <code className="select-text">{code}</code>
       </pre>
     </div>
   );

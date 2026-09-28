@@ -9,6 +9,8 @@ import { Reply } from "lucide-react";
  * - Direction-locking to preserve fluid vertical chat scrolling
  * - Unified desktop mouse/pointer drag support with window tracking
  * - Interactive element exclusion (buttons, 3-dots menu, links, reactions)
+ * - Code blocks opt out: a swipe starting inside a horizontally scrollable
+ *   <pre> belongs to the code (scroll it), never triggers reply
  * - Spring snap-back animation + haptic vibration feedback
  */
 const SwipeableMessage = ({ children, onReply, disabled = false }) => {
@@ -23,9 +25,47 @@ const SwipeableMessage = ({ children, onReply, disabled = false }) => {
   const isHorizontalRef = useRef(null);
   const hasVibratedRef = useRef(false);
   const isPointerDownRef = useRef(false);
+  // True while the active gesture started inside horizontally scrollable
+  // content (e.g. a code block). Such gestures belong to that content —
+  // the browser scrolls it natively and reply stays out of the way.
+  const onScrollableRef = useRef(false);
 
   const THRESHOLD = 38;
   const MAX_SWIPE = 75;
+
+  // Does the gesture start inside something that scrolls horizontally?
+  // Walks up to (not including) the swipe container so nested scrollers
+  // like code blocks are found but the chat scroller itself is ignored.
+  const startsInHorizontalScroller = (target) => {
+    if (!containerRef.current || !target) return false;
+    // Normalize target: if target is a text node (nodeType === 3), walk to parentElement
+    const el = target instanceof Element ? target : target.parentElement;
+    if (!el || !(el instanceof Element)) return false;
+
+    // Fast-path: any code block (container, header, pre, code), markdown table, or explicit opt-out
+    if (
+      el.closest(
+        "pre, code, [data-code-block], [data-no-swipe], .code-snippet-block, .code-scroll-chain, table, .overflow-x-auto"
+      )
+    ) {
+      return true;
+    }
+
+    let curr = el;
+    while (curr && curr !== containerRef.current) {
+      try {
+        if (curr.scrollWidth > curr.clientWidth + 2) {
+          const style = window.getComputedStyle(curr);
+          const ox = style.overflowX;
+          if (ox === "auto" || ox === "scroll") {
+            return true;
+          }
+        }
+      } catch {}
+      curr = curr.parentElement;
+    }
+    return false;
+  };
 
   // --- Touch Event Handlers (Attached natively with { passive: false }) ---
   useEffect(() => {
@@ -35,10 +75,20 @@ const SwipeableMessage = ({ children, onReply, disabled = false }) => {
     const onTouchStart = (e) => {
       if (disabled || e.touches.length > 1) return;
 
+      const targetEl = e.target instanceof Element ? e.target : e.target?.parentElement;
+
       // Do not initiate swipe if touching an interactive element (3-dots, buttons, links, etc.)
-      if (e.target.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
+      if (targetEl?.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
         return;
       }
+
+      // Gestures starting in horizontally scrollable content (code blocks)
+      // scroll that content natively — never hijack them as reply.
+      if (startsInHorizontalScroller(e.target)) {
+        onScrollableRef.current = true;
+        return;
+      }
+      onScrollableRef.current = false;
 
       const touch = e.touches[0];
       startXRef.current = touch.clientX;
@@ -51,6 +101,11 @@ const SwipeableMessage = ({ children, onReply, disabled = false }) => {
 
     const onTouchMove = (e) => {
       if (disabled || e.touches.length > 1) return;
+      // Scrollable content (code blocks) handles its own gestures natively.
+      if (onScrollableRef.current || startsInHorizontalScroller(e.target)) {
+        onScrollableRef.current = true;
+        return;
+      }
       const touch = e.touches[0];
       const deltaX = touch.clientX - startXRef.current;
       const deltaY = touch.clientY - startYRef.current;
@@ -102,6 +157,10 @@ const SwipeableMessage = ({ children, onReply, disabled = false }) => {
     };
 
     const onTouchEnd = () => {
+      if (onScrollableRef.current) {
+        onScrollableRef.current = false;
+        return;
+      }
       if (isHorizontalRef.current === true && currentOffsetRef.current >= THRESHOLD) {
         onReply?.();
         if (typeof window !== "undefined") {
@@ -134,7 +193,9 @@ const SwipeableMessage = ({ children, onReply, disabled = false }) => {
   // --- Desktop Mouse / Pointer Drag Support ---
   const handlePointerDown = (e) => {
     if (disabled || e.pointerType === "touch" || e.button !== 0) return;
-    if (e.target.closest("button, a, input, textarea, select, img, [role='button'], .quick-reaction-btn")) return;
+    if (startsInHorizontalScroller(e.target)) return;
+    const targetEl = e.target instanceof Element ? e.target : e.target?.parentElement;
+    if (targetEl?.closest("button, a, input, textarea, select, img, [role='button'], .quick-reaction-btn")) return;
 
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
