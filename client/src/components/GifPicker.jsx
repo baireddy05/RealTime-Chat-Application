@@ -97,9 +97,16 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
   const fetchGifs = useCallback(async (offset) => {
     const isStickers = activeTab === 'stickers';
     const normOffset = Math.max(0, Number(offset) || 0);
-    const term = isStickers
-      ? (STICKER_SEARCH_TERMS[selectedCategory] ?? selectedCategory)
-      : (selectedCategory !== 'all' ? selectedCategory : debouncedQuery);
+    // Search query takes precedence over category selection (they are mutually
+    // exclusive in the UI — use the raw query here so a just-cleared input
+    // can't leave a stale debounced value overriding a new category click).
+    const rawQ = searchQuery.trim();
+    let term = rawQ;
+    if (!term) {
+      term = isStickers
+        ? (STICKER_SEARCH_TERMS[selectedCategory] ?? selectedCategory)
+        : (selectedCategory !== 'all' ? selectedCategory : "");
+    }
     const giphyTerm = term && term !== 'all' ? term : "";
 
     try {
@@ -139,7 +146,7 @@ const GifPicker = ({ onGifSelect, initialTab = 'gifs', hideTopTabs = true }) => 
         pagination: { total_count: filtered.length, count: page.length, offset: normOffset }
       };
     }
-  }, [activeTab, selectedCategory, debouncedQuery]);
+  }, [activeTab, selectedCategory, debouncedQuery, searchQuery]);
 
   // Key to force Grid re-render when search/tab changes (debounced to avoid scroll reset per keystroke)
   const gridKey = `${activeTab}-${selectedCategory}-${debouncedQuery}`;
