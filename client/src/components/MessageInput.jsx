@@ -250,6 +250,16 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     }
   }, [text, selectedChat?.id, editingMessage, setDraft, isSending]);
 
+  // A draft mirrored from my other device (phone <-> laptop): fill the empty
+  // composer so I can continue there. Never clobbers in-flight typing.
+  const remoteDraftForChat = (chatKey && drafts[chatKey]) || "";
+  useEffect(() => {
+    if (!editingMessage && remoteDraftForChat && text === "") {
+      setText(remoteDraftForChat);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteDraftForChat]);
+
   // Global outside click handler to close popups
   useEffect(() => {
     const handleClickOutside = (e) => {

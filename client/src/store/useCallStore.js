@@ -177,6 +177,7 @@ export const useCallStore = create((set, get) => ({
     socket.off("callAccepted");
     socket.off("callRejected");
     socket.off("callEnded");
+    socket.off("callHandledElsewhere");
     socket.off("callUnavailable");
     socket.off("iceCandidate");
     socket.off("peerToggleVideo");
@@ -264,6 +265,14 @@ export const useCallStore = create((set, get) => ({
     socket.on("callEnded", () => {
       soundManager.stopRinging();
       soundManager.playCallEndSound();
+      get().cleanupCall();
+    });
+
+    // I answered/declined/ended on my OTHER device (phone <-> laptop):
+    // stop ringing here, but never touch an already-connected call.
+    socket.on("callHandledElsewhere", () => {
+      if (get().callState !== "incoming") return;
+      try { soundManager.stopRinging(); } catch {}
       get().cleanupCall();
     });
 

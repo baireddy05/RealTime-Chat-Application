@@ -2392,7 +2392,7 @@ export const toggleArchiveChat = async (req, res) => {
 export const setChatPreferences = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { disappearing, tone, locked } = req.body || {};
+    const { disappearing, tone, locked, theme, wallpaper } = req.body || {};
     const userId = req.user._id;
 
     if (!chatId || typeof chatId !== "string" || chatId.length > 64 || chatId.includes(".") || chatId.includes("$")) {
@@ -2407,6 +2407,15 @@ export const setChatPreferences = async (req, res) => {
     if (locked !== null && locked !== undefined && typeof locked !== "boolean") {
       return res.status(400).json({ error: "Invalid lock flag" });
     }
+    // Per-chat theme/wallpaper sync across this user's devices. Stored as
+    // compact strings (preset id or small JSON); oversized payloads such as
+    // data-URL wallpapers stay device-local (client skips sending those).
+    if (theme !== null && theme !== undefined && (typeof theme !== "string" || theme.length > 4000)) {
+      return res.status(400).json({ error: "Invalid theme value" });
+    }
+    if (wallpaper !== null && wallpaper !== undefined && (typeof wallpaper !== "string" || wallpaper.length > 2000)) {
+      return res.status(400).json({ error: "Invalid wallpaper value" });
+    }
 
     // Atomic dot-notation update: spreading a Mongoose Map subdocument loses
     // its paths, so read-modify-save silently drops every write after the first.
@@ -2414,6 +2423,8 @@ export const setChatPreferences = async (req, res) => {
     if (disappearing !== undefined) update[`chatPreferences.${chatId}.disappearing`] = disappearing;
     if (tone !== undefined) update[`chatPreferences.${chatId}.tone`] = tone;
     if (locked !== undefined) update[`chatPreferences.${chatId}.locked`] = locked;
+    if (theme !== undefined) update[`chatPreferences.${chatId}.theme`] = theme;
+    if (wallpaper !== undefined) update[`chatPreferences.${chatId}.wallpaper`] = wallpaper;
 
     if (Object.keys(update).length === 0) {
       const existing = await User.findById(userId).select("chatPreferences").lean();
@@ -2477,6 +2488,26 @@ export const togglePinChat = async (req, res) => {
     res.status(200).json({ success: true, chatId, pinned: !isPinned, pinnedChats: next });
   } catch (error) {
     console.error("Error in togglePinChat:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Lightweight self-sync snapshot for a user's other devices (phone + laptop):
+// per-chat preferences + pinned chats. Polled on app focus/reconnect so any
+// live event missed while offline still converges. No messages involved.
+export const getMySyncState = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("chatPreferences pinnedChats").lean();
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const chatPreferences = {};
+    const raw = user.chatPreferences;
+    if (raw) {
+      const entries = raw instanceof Map ? raw.entries() : Object.entries(raw);
+      for (const [k, v] of entries) chatPreferences[k] = v;
+    }
+    res.status(200).json({ chatPreferences, pinnedChats: user.pinnedChats || [] });
+  } catch (error) {
+    console.error("Error in getMySyncState: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

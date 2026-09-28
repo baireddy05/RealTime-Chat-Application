@@ -242,6 +242,19 @@ io.on("connection", (socket) => {
     } catch {}
   });
 
+  // Cross-device draft relay: typing on the laptop mirrors the draft to the
+  // phone (and vice versa). Ephemeral — never persisted. socket.to(userId)
+  // reaches all of this user's OTHER sockets, never the sender (no echo loop).
+  socket.on("draftSync", ({ chatId, text }) => {
+    if (!chatId || !userId) return;
+    try {
+      const id = String(chatId).slice(0, 64);
+      if (!id || id.includes(".") || id.includes("$")) return;
+      const snippet = String(text ?? "").slice(0, 4000);
+      socket.to(userId.toString()).emit("draftSync", { chatId: id, text: snippet });
+    } catch {}
+  });
+
   // WebRTC Audio/Video Calling Signaling (with call-history logging)
   socket.on("callUser", async ({ userToCall, signalData, callType, callerInfo, deviceInfo }) => {
     if (!userToCall) return;
@@ -326,6 +339,8 @@ io.on("connection", (socket) => {
     if (!to || !userId) return;
     if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("callAccepted", { signal, deviceInfo });
+    // Dismiss the ringing UI on my OTHER devices (answered on this phone/laptop).
+    io.to(userId.toString()).emit("callHandledElsewhere", { action: "answered" });
     try {
       const key = pendingCallKey(userId, to);
       const pending = pendingCalls.get(key);
@@ -342,6 +357,8 @@ io.on("connection", (socket) => {
     if (!to || !userId) return;
     if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("callRejected");
+    // Dismiss the ringing UI on my OTHER devices (declined on this phone/laptop).
+    io.to(userId.toString()).emit("callHandledElsewhere", { action: "rejected" });
     // Receiver actively declined: mark rejected (no missed-call notice)
     await settlePendingCall(pendingCallKey(userId, to), { status: "rejected", endedAt: new Date() });
   });
@@ -350,6 +367,8 @@ io.on("connection", (socket) => {
     if (!to || !userId) return;
     if (!pendingCalls.has(pendingCallKey(userId, to))) return;
     io.to(to.toString()).emit("callEnded");
+    // My other devices are never in this call; make sure none is stuck ringing.
+    io.to(userId.toString()).emit("callHandledElsewhere", { action: "ended" });
     try {
       const key = pendingCallKey(userId, to);
       const pending = pendingCalls.get(key);

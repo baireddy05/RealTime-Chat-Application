@@ -201,6 +201,7 @@ export const useAuthStore = create((set, get) => ({
           // Converge anything whose live event was missed while hidden:
           // stars/labels/pins/preferences are self-synced live, this is the backstop.
           useChatStore.getState().getLabels?.();
+          useChatStore.getState().refreshMySyncState?.();
         }).catch(() => {});
       }
     };

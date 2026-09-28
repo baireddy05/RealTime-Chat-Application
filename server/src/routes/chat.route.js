@@ -65,6 +65,7 @@ import {
   deleteLabel,
   setChatLabels,
   searchMessages,
+  getMySyncState,
 } from "../controllers/chat.controller.js";
 import {
   getBroadcasts,
@@ -138,6 +139,8 @@ router.delete("/labels/:labelId", protectRoute, deleteLabel);
 router.put("/labels/chat/:chatId", protectRoute, setChatLabels);
 
 router.get("/broadcasts", protectRoute, getBroadcasts);
+// Self-sync snapshot (must sit above /:id so it isn't swallowed by getMessages).
+router.get("/sync-state", protectRoute, getMySyncState);
 router.post("/broadcasts", protectRoute, createBroadcast);
 router.put("/broadcasts/:id", protectRoute, updateBroadcast);
 router.delete("/broadcasts/:id", protectRoute, deleteBroadcast);

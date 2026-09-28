@@ -122,6 +122,65 @@ export const useChatStore = create((set, get) => ({
 
   setDisappearingTimer: (seconds) => set({ disappearingTimer: seconds }),
 
+  // Pull my own prefs/pins so a device that was offline converges with the
+  // server (backstop for any live self-sync event missed while away).
+  refreshMySyncState: async () => {
+    try {
+      const res = await axiosInstance.get("/chat/sync-state");
+      const prefs = res.data?.chatPreferences || {};
+      const pinnedChats = Array.isArray(res.data?.pinnedChats) ? res.data.pinnedChats : null;
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        useAuthStore.setState({
+          authUser: {
+            ...authState.authUser,
+            chatPreferences: { ...(authState.authUser.chatPreferences || {}), ...prefs },
+            ...(pinnedChats ? { pinnedChats } : {}),
+          },
+        });
+      }
+      // Reconcile archived flags + per-chat themes from server truth.
+      set((state) => {
+        const archived = Object.entries(prefs)
+          .filter(([, p]) => p && p.archived)
+          .map(([id]) => id);
+        let changed = false;
+        const cur = new Set(state.archivedChats || []);
+        const srv = new Set([...cur, ...archived]);
+        for (const [id, p] of Object.entries(prefs)) {
+          if (p && !p.archived && srv.has(id) && !archived.includes(id)) {
+            // Server says unarchived but local lists it: drop it only if the
+            // server actually knows this chat (has any pref object for it).
+            srv.delete(id);
+            changed = true;
+          }
+        }
+        const nextThemes = { ...(state.chatThemes || {}) };
+        let themesChanged = false;
+        for (const [id, p] of Object.entries(prefs)) {
+          if (p && typeof p.theme === "string" && p.theme && nextThemes[id] === undefined) {
+            try {
+              nextThemes[id] = p.theme.startsWith("{") ? JSON.parse(p.theme) : p.theme;
+              themesChanged = true;
+            } catch {
+              nextThemes[id] = p.theme;
+              themesChanged = true;
+            }
+          }
+        }
+        if (srv.size !== cur.size) changed = true;
+        if (!changed && !themesChanged) return state;
+        const nextArchived = [...srv];
+        try { localStorage.setItem("pulse-archived-chats", JSON.stringify(nextArchived)); } catch {}
+        try { if (themesChanged) localStorage.setItem("pulse-chat-themes", JSON.stringify(nextThemes)); } catch {}
+        return { archivedChats: nextArchived, chatThemes: nextThemes };
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   // Per-chat default disappearing timer (stored on the user profile).
   // Used when neither the message nor the session timer specifies one.
   getChatDefaultDisappearing: (chatId) => {
@@ -237,6 +296,15 @@ export const useChatStore = create((set, get) => ({
       console.error(e);
     }
     set({ chatThemes: updated });
+    // Sync lightweight themes to my other devices via chat preferences.
+    // Oversized payloads (e.g. data-URL wallpapers) stay device-local.
+    try {
+      const serialized =
+        typeof themeConfigOrId === "string" ? themeConfigOrId : JSON.stringify(themeConfigOrId ?? "default");
+      if (serialized && serialized.length <= 4000 && chatId) {
+        axiosInstance.put(`/chat/preferences/${chatId}`, { theme: serialized }).catch(() => {});
+      }
+    } catch {}
   },
 
   setGlobalChatTheme: (themeConfigOrId) => {
@@ -433,7 +501,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  setDraft: (chatId, text) => {
+  setDraft: (chatId, text, opts = {}) => {
     set((state) => {
       const newDrafts = { ...state.drafts };
       if (!text || text.trim() === "") {
@@ -448,6 +516,40 @@ export const useChatStore = create((set, get) => ({
       }
       return { drafts: newDrafts };
     });
+    // Mirror the draft to my other devices (phone <-> laptop). The composer
+    // already debounces keystrokes (~500ms), so this stays cheap. Remote
+    // applies never re-emit (no echo loop — see applyRemoteDraft).
+    if (!opts.remote) {
+      try {
+        useAuthStore.getState().socket?.emit?.("draftSync", {
+          chatId: String(chatId),
+          text: !text || !text.trim() ? "" : String(text).slice(0, 4000),
+        });
+      } catch {}
+    }
+  },
+
+  // Silent draft apply for drafts arriving from my other devices.
+  applyRemoteDraft: (chatId, text) => {
+    if (!chatId) return;
+    const key = String(chatId);
+    const incoming = !text || !String(text).trim() ? "" : String(text).slice(0, 4000);
+    const { selectedChat, drafts } = get();
+    const local = drafts?.[key] || "";
+    // Last-writer-wins, except: if I'm actively looking at this chat with an
+    // unsent draft, my in-flight typing wins over the remote copy — unless the
+    // remote side cleared its draft (message sent there).
+    if (
+      incoming &&
+      local &&
+      selectedChat?.id?.toString() === key &&
+      !document.hidden &&
+      document.hasFocus?.()
+    ) {
+      return;
+    }
+    if ((local || "") === incoming) return;
+    get().setDraft(key, incoming, { remote: true });
   },
 
   toggleArchiveChat: async (chatId) => {
@@ -1117,6 +1219,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("chatPinned");
     socket.off("chatPreferencesUpdated");
     socket.off("labelsUpdated");
+    socket.off("draftSync");
     socket.off("chat:reconnect-resync");
 
     const { selectedChat } = get();
@@ -1135,6 +1238,7 @@ export const useChatStore = create((set, get) => ({
       get().getUsers();
       get().getRooms();
       get().getLabels?.();
+      get().refreshMySyncState?.();
       const current = get().selectedChat;
       if (current?.type === "room") {
         socket.emit("joinRoom", current.id);
@@ -1897,11 +2001,27 @@ export const useChatStore = create((set, get) => ({
           return state;
         });
       }
+      // Per-chat theme changed on my other device: apply it live.
+      if (preferences && typeof preferences.theme === "string" && preferences.theme) {
+        try {
+          const parsed = preferences.theme.startsWith("{") ? JSON.parse(preferences.theme) : preferences.theme;
+          set((state) => {
+            const next = { ...(state.chatThemes || {}), [key]: parsed };
+            try { localStorage.setItem("pulse-chat-themes", JSON.stringify(next)); } catch {}
+            return { chatThemes: next };
+          });
+        } catch {}
+      }
     });
 
     // Labels created/deleted/assigned on one device: refetch on the other.
     socket.on("labelsUpdated", () => {
       try { get().getLabels?.(); } catch {}
+    });
+
+    // Draft typed on my other device (phone <-> laptop): mirror it silently.
+    socket.on("draftSync", ({ chatId, text }) => {
+      try { get().applyRemoteDraft?.(chatId, text); } catch {}
     });
   },
 
@@ -1947,6 +2067,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("chatPinned");
     socket.off("chatPreferencesUpdated");
     socket.off("labelsUpdated");
+    socket.off("draftSync");
   },
 
   deleteMessage: async (messageId) => {
