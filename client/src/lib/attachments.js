@@ -5,7 +5,14 @@
 export const isGifUrl = (url) => {
   if (typeof url !== "string" || !url) return false;
   const u = url.toLowerCase();
-  return /\.gif(\?|#|$)/.test(u) || u.includes("tenor.com") || u.includes("giphy.gif");
+  // Covers Giphy (.gif, /media/ page-style URLs with or without extension),
+  // Tenor (page + direct media URLs), and plain .gif files.
+  return (
+    /\.gif(\?|#|$)/.test(u) ||
+    u.includes("giphy.com") ||
+    u.includes("tenor.com") ||
+    u.includes("giphy.gif")
+  );
 };
 
 export const isStickerUrl = (url) => {

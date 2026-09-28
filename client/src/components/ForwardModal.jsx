@@ -4,6 +4,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useFriendStore } from "../store/useFriendStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { isEncryptedMessage } from "../lib/crypto";
+import { imageSnippet } from "../lib/attachments";
 
 const ForwardModal = ({ message, messages, onClose }) => {
   const [search, setSearch] = useState("");
@@ -74,7 +75,7 @@ const ForwardModal = ({ message, messages, onClose }) => {
     ? `${messageList.length} selected messages`
     : firstMessage.decryptedText ||
       (isEncryptedMessage(firstMessage.text) ? "🔒 Encrypted Message" : firstMessage.text) ||
-      (firstMessage.image ? "Photo" : firstMessage.file ? firstMessage.file.name : firstMessage.audio ? "Voice memo" : "Message");
+      (firstMessage.image ? imageSnippet(firstMessage) : firstMessage.file ? firstMessage.file.name : firstMessage.audio ? "Voice memo" : "Message");
 
   return (
     <div

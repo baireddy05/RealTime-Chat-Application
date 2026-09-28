@@ -10,6 +10,7 @@ import {
   isEncryptedMessage,
   getConversationKey,
 } from "../lib/crypto";
+import { imageSnippet } from "../lib/attachments";
 
 // Typing-indicator TTL timers (module scope: survives re-subscribes so a
 // lost `stopTyping` can never leave a permanent ghost "typing..." badge).
@@ -837,7 +838,7 @@ export const useChatStore = create((set, get) => ({
         replyTo: messageData.replyTo !== undefined ? messageData.replyTo : (replyingTo ? {
           messageId: replyingTo._id,
           senderName: replyingTo.senderId?.username || replyingTo.senderName || "User",
-          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎️ ${replyingTo.file.name}` : replyingTo.contact ? `👤 Contact: ${replyingTo.contact.fullName || replyingTo.contact.username || "Contact"}` : "Attachment"),
+          text: replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? imageSnippet(replyingTo) : replyingTo.file ? `📎️ ${replyingTo.file.name}` : replyingTo.contact ? `👤 Contact: ${replyingTo.contact.fullName || replyingTo.contact.username || "Contact"}` : "Attachment"),
           image: replyingTo.image || null,
           file: replyingTo.file || null,
           contact: replyingTo.contact || null,
@@ -1038,7 +1039,7 @@ export const useChatStore = create((set, get) => ({
           const preview =
             msg.decryptedText ||
             (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text) ||
-            (msg.image ? "📷 Photo" : msg.file ? `📎️ ${msg.file.name}` : msg.audio ? "🎤 Voice Note" : "Message");
+            (msg.image ? imageSnippet(msg) : msg.file ? `📎️ ${msg.file.name}` : msg.audio ? "🎤 Voice Note" : "Message");
           return { ...r, messageId: msg, preview };
         })
       );
@@ -1112,6 +1113,10 @@ export const useChatStore = create((set, get) => ({
     socket.off("taskCreated");
     socket.off("taskUpdated");
     socket.off("taskDeleted");
+    socket.off("messageStarred");
+    socket.off("chatPinned");
+    socket.off("chatPreferencesUpdated");
+    socket.off("labelsUpdated");
     socket.off("chat:reconnect-resync");
 
     const { selectedChat } = get();
@@ -1129,6 +1134,7 @@ export const useChatStore = create((set, get) => ({
       get().resyncCurrentChat();
       get().getUsers();
       get().getRooms();
+      get().getLabels?.();
       const current = get().selectedChat;
       if (current?.type === "room") {
         socket.emit("joinRoom", current.id);
@@ -1219,7 +1225,7 @@ export const useChatStore = create((set, get) => ({
           const title = selectedChat.type === "room"
             ? `${selectedChat.name} • ${senderName}`
             : senderName;
-          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? imageSnippet(processedMessage) : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
           const myUsername = useAuthStore.getState().authUser?.username || "";
           const mentioned =
             selectedChat.type === "room" &&
@@ -1258,7 +1264,7 @@ export const useChatStore = create((set, get) => ({
           );
           const senderName = processedMessage.senderId?.username || "Pulse User";
           const title = newMessage.roomId ? "New Group Message" : senderName;
-          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? "📷 Photo" : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? imageSnippet(processedMessage) : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
           const myUsername = useAuthStore.getState().authUser?.username || "";
           const mentioned =
             !!newMessage.roomId &&
@@ -1389,7 +1395,7 @@ export const useChatStore = create((set, get) => ({
         const preview = msg
           ? msg.decryptedText ||
             (isEncryptedMessage(msg.text) ? "Message" : msg.text) ||
-            (msg.image ? "📷 Photo" : msg.file ? `📎️ ${msg.file.name}` : "Message")
+            (msg.image ? imageSnippet(msg) : msg.file ? `📎️ ${msg.file.name}` : "Message")
           : "You asked to be reminded about a message";
         notificationManager.sendNotification({
           title: "⏰ Message reminder",
@@ -1402,24 +1408,26 @@ export const useChatStore = create((set, get) => ({
 
     // Real-time message edited
     socket.on("messageEdited", async (payload) => {
-      const { selectedChat, messages, threadReplies } = get();
+      const { selectedChat, messages, threadReplies, lastMessages, starredMessages } = get();
       const myId = useAuthStore.getState().authUser?._id;
       let textDecrypted = payload.text;
       if (isEncryptedMessage(payload.text)) {
         const key = getConversationKey(selectedChat, myId);
         textDecrypted = await decryptMessage(payload.text, key);
       }
+      const patch = (m) =>
+        m._id === payload.messageId
+          ? { ...m, text: payload.text, decryptedText: textDecrypted, isEdited: true, updatedAt: payload.updatedAt }
+          : m;
+      const nextLast = { ...lastMessages };
+      Object.keys(nextLast).forEach((key) => {
+        if (nextLast[key]?._id === payload.messageId) nextLast[key] = patch(nextLast[key]);
+      });
       set({
-        messages: messages.map((m) =>
-          m._id === payload.messageId
-            ? { ...m, text: payload.text, decryptedText: textDecrypted, isEdited: true, updatedAt: payload.updatedAt }
-            : m
-        ),
-        threadReplies: threadReplies.map((r) =>
-          r._id === payload.messageId
-            ? { ...r, text: payload.text, decryptedText: textDecrypted, isEdited: true, updatedAt: payload.updatedAt }
-            : r
-        ),
+        messages: messages.map(patch),
+        threadReplies: threadReplies.map(patch),
+        starredMessages: (starredMessages || []).map(patch),
+        lastMessages: nextLast,
       });
     });
 
@@ -1499,20 +1507,28 @@ export const useChatStore = create((set, get) => ({
 
     // Real-time reactions
     socket.on("messageReaction", ({ messageId, reactions }) => {
-      const { messages } = get();
+      const { messages, lastMessages } = get();
       const updated = messages.map((m) =>
         m._id === messageId ? { ...m, reactions } : m
       );
-      set({ messages: updated });
+      const nextLast = { ...lastMessages };
+      Object.keys(nextLast).forEach((key) => {
+        if (nextLast[key]?._id === messageId) nextLast[key] = { ...nextLast[key], reactions };
+      });
+      set({ messages: updated, lastMessages: nextLast });
     });
 
     // Real-time polls
     socket.on("pollUpdated", ({ messageId, poll }) => {
-      const { messages } = get();
+      const { messages, lastMessages } = get();
       const updated = messages.map((m) =>
         m._id === messageId ? { ...m, poll } : m
       );
-      set({ messages: updated });
+      const nextLast = { ...lastMessages };
+      Object.keys(nextLast).forEach((key) => {
+        if (nextLast[key]?._id === messageId) nextLast[key] = { ...nextLast[key], poll };
+      });
+      set({ messages: updated, lastMessages: nextLast });
     });
 
     // Real-time typing indicators. Entries self-expire: a lost
@@ -1606,6 +1622,30 @@ export const useChatStore = create((set, get) => ({
     // Real-time read receipts
     socket.on("messagesRead", ({ chatId, readerId, type: _type }) => {
       const { messages, selectedChat, lastMessages } = get();
+      const myId = useAuthStore.getState().authUser?._id?.toString();
+      const isMyRead = readerId?.toString() === myId;
+      const chatKey = chatId?.toString();
+
+      // My own read from another device (phone/laptop): clear the badge
+      // everywhere, even for chats not currently open.
+      if (isMyRead && chatKey) {
+        set((state) => ({
+          unreadCounts: { ...state.unreadCounts, [chatKey]: 0 },
+          rooms: (state.rooms || []).map((r) =>
+            ((r._id || r.id)?.toString() === chatKey ? { ...r, unreadCount: 0 } : r)
+          ),
+        }));
+        try {
+          const fs = useFriendStore.getState();
+          if (fs?.friends) {
+            useFriendStore.setState({
+              friends: fs.friends.map((f) =>
+                ((f._id || f.id)?.toString() === chatKey ? { ...f, unreadCount: 0 } : f)
+              ),
+            });
+          }
+        } catch {}
+      }
       
       let updatedLastMessages = { ...lastMessages };
       const lastMsg = updatedLastMessages[chatId];
@@ -1696,11 +1736,15 @@ export const useChatStore = create((set, get) => ({
 
     // Real-time message pinning
     socket.on("messagePinned", ({ messageId, isPinned }) => {
-      const { messages } = get();
+      const { messages, lastMessages } = get();
       const updated = messages.map((m) =>
         m._id === messageId ? { ...m, isPinned } : m
       );
-      set({ messages: updated });
+      const nextLast = { ...lastMessages };
+      Object.keys(nextLast).forEach((key) => {
+        if (nextLast[key]?._id === messageId) nextLast[key] = { ...nextLast[key], isPinned };
+      });
+      set({ messages: updated, lastMessages: nextLast });
     });
 
     // Real-time group deletion (leave-last-out, creator delete, kick cleanup)
@@ -1777,6 +1821,88 @@ export const useChatStore = create((set, get) => ({
       if (!deletedId) return;
       set((state) => ({ tasks: state.tasks.filter((t) => t._id !== deletedId) }));
     });
+
+    // ---- Multi-device self-sync (same account on phone + laptop) ----
+    // Star toggled on one device: mirror starredBy + starred list on the other.
+    socket.on("messageStarred", ({ messageId, isStarred, starredBy }) => {
+      if (!messageId) return;
+      const myId = useAuthStore.getState().authUser?._id;
+      const { messages, starredMessages } = get();
+      const updatedMessages = messages.map((m) =>
+        (m._id || m.id)?.toString() === messageId.toString()
+          ? { ...m, starredBy: starredBy ?? m.starredBy }
+          : m
+      );
+      let updatedStarred = starredMessages || [];
+      if (isStarred) {
+        const target = updatedMessages.find((m) => (m._id || m.id)?.toString() === messageId.toString());
+        if (target && !updatedStarred.some((m) => (m._id || m.id)?.toString() === messageId.toString())) {
+          updatedStarred = [{ ...target, starredBy: starredBy ?? target.starredBy }, ...updatedStarred];
+        } else {
+          updatedStarred = updatedStarred.map((m) =>
+            (m._id || m.id)?.toString() === messageId.toString()
+              ? { ...m, starredBy: starredBy ?? m.starredBy }
+              : m
+          );
+        }
+        void myId;
+      } else {
+        updatedStarred = updatedStarred.filter(
+          (m) => (m._id || m.id)?.toString() !== messageId.toString()
+        );
+      }
+      set({ messages: updatedMessages, starredMessages: updatedStarred });
+    });
+
+    // Chat pinned/unpinned on one device: mirror pinnedChats on the other.
+    socket.on("chatPinned", ({ pinnedChats }) => {
+      if (!Array.isArray(pinnedChats)) return;
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        useAuthStore.setState({
+          authUser: { ...authState.authUser, pinnedChats },
+        });
+      }
+    });
+
+    // Archive / disappearing-timer / tone / lock flag changed on one device.
+    socket.on("chatPreferencesUpdated", ({ chatId, preferences }) => {
+      if (!chatId) return;
+      const key = chatId.toString();
+      const authState = useAuthStore.getState();
+      if (authState?.authUser) {
+        const prev = authState.authUser.chatPreferences || {};
+        useAuthStore.setState({
+          authUser: {
+            ...authState.authUser,
+            chatPreferences: { ...prev, [key]: { ...(prev[key] || {}), ...(preferences || {}) } },
+          },
+        });
+      }
+      // Keep the sidebar archived section consistent across devices.
+      if (preferences && Object.prototype.hasOwnProperty.call(preferences, "archived")) {
+        const archived = !!preferences.archived;
+        set((state) => {
+          const has = (state.archivedChats || []).includes(key);
+          if (archived && !has) {
+            const next = [...(state.archivedChats || []), key];
+            try { localStorage.setItem("pulse-archived-chats", JSON.stringify(next)); } catch {}
+            return { archivedChats: next };
+          }
+          if (!archived && has) {
+            const next = (state.archivedChats || []).filter((id) => id !== key);
+            try { localStorage.setItem("pulse-archived-chats", JSON.stringify(next)); } catch {}
+            return { archivedChats: next };
+          }
+          return state;
+        });
+      }
+    });
+
+    // Labels created/deleted/assigned on one device: refetch on the other.
+    socket.on("labelsUpdated", () => {
+      try { get().getLabels?.(); } catch {}
+    });
   },
 
   unsubscribeFromMessages: () => {
@@ -1817,6 +1943,10 @@ export const useChatStore = create((set, get) => ({
     socket.off("taskCreated");
     socket.off("taskUpdated");
     socket.off("taskDeleted");
+    socket.off("messageStarred");
+    socket.off("chatPinned");
+    socket.off("chatPreferencesUpdated");
+    socket.off("labelsUpdated");
   },
 
   deleteMessage: async (messageId) => {

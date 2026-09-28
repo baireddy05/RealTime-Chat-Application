@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { X, Clock, Trash2, Calendar, Loader, BellRing, ExternalLink } from "lucide-react";
 import { isEncryptedMessage } from "../lib/crypto";
+import { imageSnippet } from "../lib/attachments";
 
 const ScheduledMessagesModal = ({ isOpen, onClose }) => {
   const {
@@ -191,7 +192,7 @@ const ScheduledMessagesModal = ({ isOpen, onClose }) => {
                     <span>Sends {formatScheduledTime(msg.scheduledFor)}</span>
                   </div>
                   <p className="text-[13px] text-theme-main break-words">
-                    {(msg.decryptedText || (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text)) || (msg.image ? "📷 Photo" : msg.file ? `📎️ ${msg.file.name}` : "Attachment")}
+                    {(msg.decryptedText || (isEncryptedMessage(msg.text) ? "🔒 Encrypted Message" : msg.text)) || (msg.image ? imageSnippet(msg) : msg.file ? `📎️ ${msg.file.name}` : "Attachment")}
                   </p>
                 </div>
                 <button

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Clock, BellRing, Loader } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { isEncryptedMessage } from "../lib/crypto";
+import { imageSnippet } from "../lib/attachments";
 
 const PRESETS = [
   {
@@ -40,7 +41,7 @@ const RemindModal = ({ message, onClose }) => {
   const preview =
     message.decryptedText ||
     (isEncryptedMessage(message.text) ? "🔒 Encrypted message" : message.text) ||
-    (message.image ? "📷 Photo" : message.file ? `📎️ ${message.file.name}` : message.audio ? "🎤 Voice note" : "Message");
+    (message.image ? imageSnippet(message) : message.file ? `📎️ ${message.file.name}` : message.audio ? "🎤 Voice note" : "Message");
 
   const submit = async (date) => {
     if (!date || date.getTime() <= Date.now()) {

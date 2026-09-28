@@ -38,6 +38,7 @@ const ContactModal = lazyWithRetry(() => import("./ContactModal"));
 const CreatePollModal = lazyWithRetry(() => import("./CreatePollModal"));
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
+import { imageSnippet } from "../lib/attachments";
 
 const COMMON_EMOJIS = [
   "😀", "😂", "😍", "🔥", "👍", "❤️", "🎉", "🚀", 
@@ -981,7 +982,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       replyTo: currentReply ? {
         messageId: currentReply._id,
         senderName: currentReply.senderId?.username || currentReply.senderName || "User",
-        text: currentReply.decryptedText || currentReply.text || (currentReply.image ? "📷 Photo" : currentReply.file ? `📎️ ${currentReply.file.name}` : "Attachment"),
+        text: currentReply.decryptedText || currentReply.text || (currentReply.image ? imageSnippet(currentReply) : currentReply.file ? `📎️ ${currentReply.file.name}` : "Attachment"),
         image: currentReply.image || null,
         file: currentReply.file || null,
       } : undefined,
@@ -1020,7 +1021,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 Replying to {replyingTo.senderId?.username || replyingTo.senderName || "User"}
               </span>
               <p className="text-xs text-theme-muted truncate">
-                {replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? "Photo" : replyingTo.file ? replyingTo.file.name : "Attachment")}
+                {replyingTo.decryptedText || replyingTo.text || (replyingTo.image ? imageSnippet(replyingTo) : replyingTo.file ? replyingTo.file.name : "Attachment")}
               </p>
             </div>
           </div>

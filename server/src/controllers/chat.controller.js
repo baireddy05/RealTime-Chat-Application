@@ -974,6 +974,9 @@ export const markMessagesAsRead = async (req, res) => {
         updateOp
       );
       
+      // Always notify the reader's own devices (phone + laptop) so badges
+      // clear everywhere, even when read receipts to others are disabled.
+      io.to(myId.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "room", selfSync: true });
       if (sendReadReceipts) {
         io.to(id.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "room" });
       }
@@ -990,6 +993,9 @@ export const markMessagesAsRead = async (req, res) => {
         updateOp
       );
       
+      // Always notify the reader's own devices so unread badges clear on
+      // phone + laptop even when read receipts to the other side are off.
+      io.to(myId.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "user", selfSync: true });
       if (sendReadReceipts) {
         io.to(id.toString()).emit("messagesRead", { chatId: myId, readerId: myId, type: "user" });
         io.to(myId.toString()).emit("messagesRead", { chatId: id, readerId: myId, type: "user" });
@@ -1307,6 +1313,16 @@ export const toggleStarMessage = async (req, res) => {
     }
 
     await message.save();
+
+    // Self-sync: push to all of this user's devices (phone + laptop) so
+    // starring on one device reflects instantly on the other.
+    try {
+      io.to(userId.toString()).emit("messageStarred", {
+        messageId: message._id,
+        isStarred: !isStarred,
+        starredBy: message.starredBy,
+      });
+    } catch {}
 
     res.status(200).json({
       messageId: message._id,
@@ -2356,6 +2372,13 @@ export const toggleArchiveChat = async (req, res) => {
       archived: !isArchived,
       preferences: updated?.chatPreferences?.[chatId] || { archived: !isArchived }
     });
+    // Self-sync archive flag across this user's devices (phone + laptop).
+    try {
+      io.to(userId.toString()).emit("chatPreferencesUpdated", {
+        chatId,
+        preferences: updated?.chatPreferences?.[chatId] || { archived: !isArchived },
+      });
+    } catch {}
   } catch (error) {
     console.error("Error in toggleArchiveChat: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -2395,10 +2418,14 @@ export const setChatPreferences = async (req, res) => {
     if (Object.keys(update).length === 0) {
       const existing = await User.findById(userId).select("chatPreferences").lean();
       if (!existing) return res.status(404).json({ error: "User not found" });
+      const preferences = existing?.chatPreferences?.[chatId] || {};
+      try {
+        io.to(userId.toString()).emit("chatPreferencesUpdated", { chatId, preferences });
+      } catch {}
       return res.status(200).json({
         success: true,
         chatId,
-        preferences: existing?.chatPreferences?.[chatId] || {},
+        preferences,
       });
     }
 
@@ -2407,10 +2434,16 @@ export const setChatPreferences = async (req, res) => {
       .lean();
     if (!updated) return res.status(404).json({ error: "User not found" });
 
+    const preferences = updated?.chatPreferences?.[chatId] || {};
+    // Self-sync across this user's devices (phone + laptop).
+    try {
+      io.to(userId.toString()).emit("chatPreferencesUpdated", { chatId, preferences });
+    } catch {}
+
     res.status(200).json({
       success: true,
       chatId,
-      preferences: updated?.chatPreferences?.[chatId] || {},
+      preferences,
     });
   } catch (error) {
     console.error("Error in setChatPreferences: ", error.message);
@@ -2437,6 +2470,10 @@ export const togglePinChat = async (req, res) => {
       : [...current, chatId].slice(0, 20);
 
     await User.findByIdAndUpdate(myId, { $set: { pinnedChats: next } });
+    // Self-sync pinned chats across this user's devices (phone + laptop).
+    try {
+      io.to(myId.toString()).emit("chatPinned", { chatId, pinned: !isPinned, pinnedChats: next });
+    } catch {}
     res.status(200).json({ success: true, chatId, pinned: !isPinned, pinnedChats: next });
   } catch (error) {
     console.error("Error in togglePinChat:", error.message);
@@ -3148,7 +3185,12 @@ export const createLabel = async (req, res) => {
     const cleanColor = LABEL_COLORS.includes(color) ? color : LABEL_COLORS[(user.labels || []).length % LABEL_COLORS.length];
     user.labels.push({ name: cleanName, color: cleanColor });
     await user.save();
-    res.status(201).json(user.labels[user.labels.length - 1]);
+    const created = user.labels[user.labels.length - 1];
+    // Self-sync labels across this user's devices (phone + laptop).
+    try {
+      io.to(req.user._id.toString()).emit("labelsUpdated", { action: "created", label: created });
+    } catch {}
+    res.status(201).json(created);
   } catch (error) {
     console.error("Error in createLabel: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -3172,6 +3214,10 @@ export const deleteLabel = async (req, res) => {
       }
     }
     await user.save();
+    // Self-sync labels across this user's devices (phone + laptop).
+    try {
+      io.to(req.user._id.toString()).emit("labelsUpdated", { action: "deleted", labelId });
+    } catch {}
     res.status(200).json({ success: true, labelId });
   } catch (error) {
     console.error("Error in deleteLabel: ", error.message);
@@ -3199,6 +3245,10 @@ export const setChatLabels = async (req, res) => {
     if (labelIds.length === 0) user.chatLabels.delete(chatId);
     else user.chatLabels.set(chatId, labelIds.map(String));
     await user.save();
+    // Self-sync chat-label assignment across this user's devices.
+    try {
+      io.to(req.user._id.toString()).emit("labelsUpdated", { action: "assigned", chatId, labelIds: labelIds.map(String) });
+    } catch {}
     res.status(200).json({ chatId, labelIds: labelIds.map(String) });
   } catch (error) {
     console.error("Error in setChatLabels: ", error.message);

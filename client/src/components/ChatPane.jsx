@@ -38,6 +38,7 @@ import ChatLockGate from "./ChatLockGate";
 import { isChatLockedAnywhere } from "../lib/chatLock";
 import { useBackHandler } from "../lib/backNavigation";
 import { downloadFile } from "../lib/download";
+import { imageSnippet } from "../lib/attachments";
 import { isEncryptedMessage, getConversationKey, decryptMessage } from "../lib/crypto";
 
 const getPinnedPreview = (msg, fallbackDecryptedText) => {
@@ -49,7 +50,7 @@ const getPinnedPreview = (msg, fallbackDecryptedText) => {
   if (msg.audio) return "🎤 Voice Note";
   const isSticker = msg.isSticker || Boolean(msg.image && (msg.image.includes("/stickers/") || msg.image.includes("giphy-preview.gif") || msg.image.includes("sticker")));
   if (isSticker && (!msg.text || !msg.text.trim())) return "Sticker";
-  if (msg.image) return msg.decryptedText || fallbackDecryptedText || (!isEncryptedMessage(msg.text) && msg.text ? msg.text : "📷 Photo");
+  if (msg.image) return msg.decryptedText || fallbackDecryptedText || (!isEncryptedMessage(msg.text) && msg.text ? msg.text : imageSnippet(msg));
   if (msg.file) return `📎️ ${msg.file.name || "Attachment"}`;
   if (msg.contact) return `👤 Contact: ${msg.contact.fullName || msg.contact.username || "Contact"}`;
   

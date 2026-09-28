@@ -198,6 +198,9 @@ export const useAuthStore = create((set, get) => ({
           useChatStore.getState().resyncCurrentChat?.();
           useChatStore.getState().getUsers?.();
           useChatStore.getState().getRooms?.();
+          // Converge anything whose live event was missed while hidden:
+          // stars/labels/pins/preferences are self-synced live, this is the backstop.
+          useChatStore.getState().getLabels?.();
         }).catch(() => {});
       }
     };

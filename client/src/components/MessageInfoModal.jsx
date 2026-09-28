@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { axiosInstance } from "../lib/axios";
+import { imageKind } from "../lib/attachments";
 import MessageTicks from "./MessageTicks";
 
 const MessageInfoModal = ({ message, onClose }) => {
@@ -88,7 +89,7 @@ const MessageInfoModal = ({ message, onClose }) => {
             ) : message.image ? (
               <span className="text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-base">image</span>
-                <span>Photo</span>
+                <span>{imageKind(message) === "gif" ? "GIF" : imageKind(message) === "sticker" ? "Sticker" : "Photo"}</span>
               </span>
             ) : message.audio ? (
               <span className="text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
