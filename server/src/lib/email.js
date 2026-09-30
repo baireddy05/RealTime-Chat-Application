@@ -47,6 +47,7 @@ const getTransporter = () => {
  */
 export const sendOtpEmail = async ({ to, username, otp }) => {
   const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || "Pulse Messenger <no-reply@pulsemessenger.com>";
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
 
   // Prominently print OTP in server logs immediately so developers / testers are NEVER blocked
   console.log("\n============================================================");
@@ -97,11 +98,25 @@ export const sendOtpEmail = async ({ to, username, otp }) => {
                 We received a request to reset the password for your Pulse Messenger account. Use the verification code below to proceed:
               </p>
 
-              <!-- OTP Code Display Card -->
-              <div style="background: rgba(0, 240, 255, 0.04); border: 1px dashed rgba(0, 240, 255, 0.35); border-radius: 16px; padding: 24px; text-align: center; margin: 28px 0;">
-                <span style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #64748b; font-weight: 700; margin-bottom: 8px;">Your 6-Digit Verification Code</span>
-                <span style="display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #00f0ff; text-shadow: 0 0 15px rgba(0,240,255,0.4);">${otp}</span>
-                <span style="display: block; font-size: 12px; color: #64748b; margin-top: 10px;">Expires in <strong>10 minutes</strong></span>
+              <!-- OTP Code Display Card with Copy & Auto-Fill Action -->
+              <div style="background: rgba(0, 240, 255, 0.04); border: 1px dashed rgba(0, 240, 255, 0.35); border-radius: 16px; padding: 26px 20px; text-align: center; margin: 24px 0;">
+                <span style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #64748b; font-weight: 700; margin-bottom: 10px;">Your 6-Digit Verification Code</span>
+                
+                <!-- Selectable Code Display -->
+                <div style="display: inline-block; background: #070c18; padding: 12px 28px; border-radius: 14px; border: 1px solid rgba(0, 240, 255, 0.3); margin: 4px 0 12px 0;">
+                  <span style="display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #00f0ff; text-shadow: 0 0 16px rgba(0,240,255,0.45); user-select: all; -webkit-user-select: all; -moz-user-select: all; cursor: pointer;" title="Double-click or tap to select code">${otp}</span>
+                </div>
+
+                <!-- 1-Click Auto-Fill & Copy Button in Email -->
+                <div style="margin-top: 16px;">
+                  <a href="${clientUrl}/forgot-password?email=${encodeURIComponent(to)}&otp=${encodeURIComponent(otp)}&copied=1" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #00f0ff 0%, #00ff9d 100%); color: #070c18; font-size: 13.5px; font-weight: 800; text-decoration: none; padding: 12px 24px; border-radius: 12px; box-shadow: 0 4px 18px rgba(0, 240, 255, 0.35); letter-spacing: 0.3px;">
+                    📋 Copy Code & Open App
+                  </a>
+                </div>
+
+                <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 14px;">
+                  Expires in <strong>10 minutes</strong> • Click button above to auto-fill in browser
+                </span>
               </div>
 
               <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b; line-height: 1.6;">

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import PulseLogo from "../components/PulseLogo";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Loader,
   Lock,
@@ -18,6 +18,8 @@ import {
   CheckCircle2,
   RefreshCw,
   Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 
 const ForgotPasswordPage = () => {
@@ -36,10 +38,49 @@ const ForgotPasswordPage = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [devOtp, setDevOtp] = useState("");
   const [hasSmtp, setHasSmtp] = useState(true);
+  const [copiedToast, setCopiedToast] = useState("");
 
   const { requestPasswordResetOtp, verifyPasswordResetOtp, resetPasswordWithOtp } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Handle 1-click Auto-fill and Copy Code from email links
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    const otpParam = searchParams.get("otp");
+    if (emailParam) {
+      setIdentifier(emailParam);
+      setResolvedEmail(emailParam);
+      const [localPart, domain] = emailParam.split("@");
+      const masked = localPart
+        ? localPart.length <= 2
+          ? localPart[0] + "*"
+          : localPart[0] + "*".repeat(Math.max(1, localPart.length - 2)) + localPart[localPart.length - 1]
+        : emailParam;
+      setMaskedEmail(`${masked}@${domain || ""}`);
+    }
+    if (otpParam && /^\d{6}$/.test(otpParam)) {
+      setOtpDigits(otpParam.split(""));
+      setStep(2);
+      try {
+        navigator.clipboard?.writeText(otpParam);
+        setCopiedToast("Code copied to clipboard & auto-filled!");
+        setTimeout(() => setCopiedToast(""), 4000);
+      } catch {}
+    }
+  }, [searchParams]);
+
+  const handleCopyCode = (codeToCopy) => {
+    const code = codeToCopy || otpDigits.join("") || devOtp;
+    if (code) {
+      try {
+        navigator.clipboard?.writeText(code);
+        setCopiedToast("Code copied to clipboard!");
+        setTimeout(() => setCopiedToast(""), 3000);
+      } catch {}
+    }
+  };
 
   // Desktop interactive mouse spotlight
   const [mouseState, setMouseState] = useState({
@@ -328,6 +369,14 @@ const ForgotPasswordPage = () => {
               </div>
             )}
 
+            {/* Copied Success Toast */}
+            {copiedToast && (
+              <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm flex items-center gap-3 animate-fade-in shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+                <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
+                <span className="font-semibold">{copiedToast}</span>
+              </div>
+            )}
+
             {/* Error Banner */}
             {errorMessage && (
               <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm flex items-start gap-3 animate-fade-in">
@@ -457,6 +506,19 @@ const ForgotPasswordPage = () => {
                       />
                     ))}
                   </div>
+
+                  {otpDigits.join("").length === 6 && (
+                    <div className="flex justify-end -mt-3 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCode()}
+                        className="text-xs text-theme-muted hover:text-cyan-400 flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                      >
+                        <Copy size={13} />
+                        <span>Copy code</span>
+                      </button>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
