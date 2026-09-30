@@ -47,9 +47,6 @@ const getTransporter = () => {
  */
 export const sendOtpEmail = async ({ to, username, otp }) => {
   const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || "Pulse Messenger <no-reply@pulsemessenger.com>";
-  const port = process.env.PORT || "5000";
-  const baseUrl = process.env.API_URL || (process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/:5173\/?$/, `:${port}`) : `http://localhost:${port}`);
-  const copyUrl = `${baseUrl.replace(/\/api\/?$/, "")}/api/auth/copy-code?code=${encodeURIComponent(otp)}`;
 
   // Prominently print OTP in server logs immediately so developers / testers are NEVER blocked
   console.log("\n============================================================");
@@ -100,24 +97,23 @@ export const sendOtpEmail = async ({ to, username, otp }) => {
                 We received a request to reset the password for your Pulse Messenger account. Use the verification code below to proceed:
               </p>
 
-              <!-- OTP Code Display Card with Copy & Auto-Fill Action -->
+              <!-- OTP Code Display Card (Optimized for 1-Tap Mobile & Desktop Copy) -->
               <div style="background: rgba(0, 240, 255, 0.04); border: 1px dashed rgba(0, 240, 255, 0.35); border-radius: 16px; padding: 26px 20px; text-align: center; margin: 24px 0;">
-                <span style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #64748b; font-weight: 700; margin-bottom: 10px;">Your 6-Digit Verification Code</span>
+                <span style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #64748b; font-weight: 700; margin-bottom: 12px;">Your 6-Digit Verification Code</span>
                 
-                <!-- Selectable Code Display -->
-                <div style="display: inline-block; background: #070c18; padding: 12px 28px; border-radius: 14px; border: 1px solid rgba(0, 240, 255, 0.3); margin: 4px 0 12px 0;">
-                  <span style="display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #00f0ff; text-shadow: 0 0 16px rgba(0,240,255,0.45); user-select: all; -webkit-user-select: all; -moz-user-select: all; cursor: pointer;" title="Double-click or tap to select code">${otp}</span>
+                <!-- Native 1-Tap Selectable Code Display -->
+                <div style="display: inline-block; background: #070c18; padding: 14px 28px; border-radius: 14px; border: 1px solid rgba(0, 240, 255, 0.35); margin: 4px 0;">
+                  <span style="display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #00f0ff; text-shadow: 0 0 16px rgba(0,240,255,0.45); user-select: all; -webkit-user-select: all; -moz-user-select: all; cursor: pointer;" title="Tap and hold to copy">${otp}</span>
                 </div>
 
-                <!-- Dedicated Copy Code Button (Does NOT open the app) -->
-                <div style="margin-top: 16px;">
-                  <a href="${copyUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #00f0ff 0%, #00ff9d 100%); color: #070c18; font-size: 14px; font-weight: 800; text-decoration: none; padding: 12px 28px; border-radius: 12px; box-shadow: 0 4px 18px rgba(0, 240, 255, 0.35); letter-spacing: 0.3px;">
-                    📋 Copy Code
-                  </a>
+                <div style="margin-top: 14px;">
+                  <span style="display: inline-block; background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.2); color: #00f0ff; font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 9999px;">
+                    📲 Tap &amp; hold (or double-tap) code to copy
+                  </span>
                 </div>
 
-                <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 14px;">
-                  Click <strong>Copy Code</strong> or double-click code above to copy • Expires in <strong>10 minutes</strong>
+                <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 12px;">
+                  Expires in <strong>10 minutes</strong>
                 </span>
               </div>
 
