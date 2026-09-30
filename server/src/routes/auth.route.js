@@ -10,6 +10,7 @@ import {
   forgotPassword,
   verifyOtp,
   resetPasswordWithOtp,
+  copyOtpPage,
 } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
@@ -29,6 +30,7 @@ const authLimiter = rateLimit({
 router.post("/forgot-password", authLimiter, forgotPassword);
 router.post("/verify-otp", authLimiter, verifyOtp);
 router.post("/reset-password", authLimiter, resetPasswordWithOtp);
+router.get("/copy-code", copyOtpPage);
 
 router.post("/signup", authLimiter, signup);
 router.post("/login", authLimiter, login);

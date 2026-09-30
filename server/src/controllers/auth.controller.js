@@ -466,3 +466,104 @@ export const resetPasswordWithOtp = async (req, res) => {
     res.status(500).json({ message: "Failed to reset password. Please try again." });
   }
 };
+
+/**
+ * Ultra-lightweight micro-page to copy OTP to clipboard without opening the main web app
+ */
+export const copyOtpPage = (req, res) => {
+  const { code } = req.query || {};
+  const cleanCode = (code || "").toString().replace(/[^0-9]/g, "").slice(0, 6);
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse - Code Copied</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: linear-gradient(180deg, #131b2e 0%, #0d121f 100%);
+      border: 1px solid #1e293b;
+      border-radius: 20px;
+      padding: 32px 26px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #10b981;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+    .code-box {
+      background: #070c18;
+      border: 1px dashed rgba(0, 240, 255, 0.35);
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      color: #00f0ff;
+      margin: 12px 0 16px 0;
+      text-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+    }
+    .hint {
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .btn {
+      background: #1e293b;
+      color: #f3f4f6;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 22px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #334155; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✓ Copied to Clipboard!</div>
+    <div class="code-box">${cleanCode || "------"}</div>
+    <p class="hint">Code copied! Switch back to your Pulse tab and paste it.</p>
+    <button class="btn" onclick="window.close()">Close</button>
+  </div>
+  <script>
+    const code = "${cleanCode}";
+    if (code && navigator.clipboard) {
+      navigator.clipboard.writeText(code).then(() => {
+        setTimeout(() => { try { window.close(); } catch(e){} }, 1800);
+      }).catch(() => {});
+    }
+  </script>
+</body>
+</html>`);
+};

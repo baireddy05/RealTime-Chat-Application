@@ -47,7 +47,9 @@ const getTransporter = () => {
  */
 export const sendOtpEmail = async ({ to, username, otp }) => {
   const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || "Pulse Messenger <no-reply@pulsemessenger.com>";
-  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  const port = process.env.PORT || "5000";
+  const baseUrl = process.env.API_URL || (process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/:5173\/?$/, `:${port}`) : `http://localhost:${port}`);
+  const copyUrl = `${baseUrl.replace(/\/api\/?$/, "")}/api/auth/copy-code?code=${encodeURIComponent(otp)}`;
 
   // Prominently print OTP in server logs immediately so developers / testers are NEVER blocked
   console.log("\n============================================================");
@@ -107,15 +109,15 @@ export const sendOtpEmail = async ({ to, username, otp }) => {
                   <span style="display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #00f0ff; text-shadow: 0 0 16px rgba(0,240,255,0.45); user-select: all; -webkit-user-select: all; -moz-user-select: all; cursor: pointer;" title="Double-click or tap to select code">${otp}</span>
                 </div>
 
-                <!-- 1-Click Auto-Fill & Copy Button in Email -->
+                <!-- Dedicated Copy Code Button (Does NOT open the app) -->
                 <div style="margin-top: 16px;">
-                  <a href="${clientUrl}/forgot-password?email=${encodeURIComponent(to)}&otp=${encodeURIComponent(otp)}&copied=1" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #00f0ff 0%, #00ff9d 100%); color: #070c18; font-size: 13.5px; font-weight: 800; text-decoration: none; padding: 12px 24px; border-radius: 12px; box-shadow: 0 4px 18px rgba(0, 240, 255, 0.35); letter-spacing: 0.3px;">
-                    📋 Copy Code & Open App
+                  <a href="${copyUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #00f0ff 0%, #00ff9d 100%); color: #070c18; font-size: 14px; font-weight: 800; text-decoration: none; padding: 12px 28px; border-radius: 12px; box-shadow: 0 4px 18px rgba(0, 240, 255, 0.35); letter-spacing: 0.3px;">
+                    📋 Copy Code
                   </a>
                 </div>
 
                 <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 14px;">
-                  Expires in <strong>10 minutes</strong> • Click button above to auto-fill in browser
+                  Click <strong>Copy Code</strong> or double-click code above to copy • Expires in <strong>10 minutes</strong>
                 </span>
               </div>
 
