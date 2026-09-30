@@ -1,6 +1,16 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { login, logout, signup, checkAuth, updateProfile, getPublicProfile } from "../controllers/auth.controller.js";
+import {
+  login,
+  logout,
+  signup,
+  checkAuth,
+  updateProfile,
+  getPublicProfile,
+  forgotPassword,
+  verifyOtp,
+  resetPasswordWithOtp,
+} from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -14,6 +24,11 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many attempts from this IP. Please try again after 15 minutes." },
 });
+
+// Password recovery endpoints
+router.post("/forgot-password", authLimiter, forgotPassword);
+router.post("/verify-otp", authLimiter, verifyOtp);
+router.post("/reset-password", authLimiter, resetPasswordWithOtp);
 
 router.post("/signup", authLimiter, signup);
 router.post("/login", authLimiter, login);

@@ -10,6 +10,7 @@ const HomePage = lazyWithRetry(() => import("./pages/HomePage"));
 const SignUpPage = lazyWithRetry(() => import("./pages/SignUpPage"));
 const LoginPage = lazyWithRetry(() => import("./pages/LoginPage"));
 const WelcomePage = lazyWithRetry(() => import("./pages/WelcomePage"));
+const ForgotPasswordPage = lazyWithRetry(() => import("./pages/ForgotPasswordPage"));
 
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
@@ -33,6 +34,7 @@ function App() {
           <Route path="/welcome" element={!authUser ? <WelcomePage /> : <Navigate to="/" replace />} />
           <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" replace />} />
           <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" replace />} />
+          <Route path="/forgot-password" element={!authUser ? <ForgotPasswordPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

@@ -214,9 +214,17 @@ const LoginPage = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-theme-muted tracking-wider uppercase">
-                  Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-theme-muted tracking-wider uppercase">
+                    Password
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-semibold text-accent-primary hover:underline transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Lock className="size-5 text-theme-muted group-focus-within:text-accent-primary transition-colors" />

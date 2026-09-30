@@ -8,9 +8,11 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "seed": "node seed.js",
+    "reset-password": "node scripts/reset-password.js",
     "gen:vapid": "node scripts/gen-vapid.js",
     "test:push": "node test_push.mjs",
-    "test:calls": "node test_calls_offline.mjs"
+    "test:calls": "node test_calls_offline.mjs",
+    "test:forgot-password": "node scripts/test-forgot-password.mjs"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +31,7 @@
     "link-preview-js": "^5.0.0",
     "mongoose": "^9.9.4",
     "multer": "^2.4.0",
+    "nodemailer": "^10.0.13",
     "socket.io": "^4.8.3",
     "web-push": "^3.6.7"
   },

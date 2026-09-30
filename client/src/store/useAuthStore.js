@@ -96,6 +96,36 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  requestPasswordResetOtp: async (identifier) => {
+    try {
+      const res = await axiosInstance.post("/auth/forgot-password", { identifier });
+      return res.data;
+    } catch (error) {
+      console.error(error.response?.data?.message || "Failed to send reset OTP");
+      throw error;
+    }
+  },
+
+  verifyPasswordResetOtp: async (email, otp) => {
+    try {
+      const res = await axiosInstance.post("/auth/verify-otp", { email, otp });
+      return res.data;
+    } catch (error) {
+      console.error(error.response?.data?.message || "OTP verification failed");
+      throw error;
+    }
+  },
+
+  resetPasswordWithOtp: async (email, otp, newPassword) => {
+    try {
+      const res = await axiosInstance.post("/auth/reset-password", { email, otp, newPassword });
+      return res.data;
+    } catch (error) {
+      console.error(error.response?.data?.message || "Password reset failed");
+      throw error;
+    }
+  },
+
   logout: async () => {
     const logoutId = Date.now();
     try {

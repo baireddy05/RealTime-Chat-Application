@@ -28,8 +28,15 @@ axiosInstance.interceptors.response.use(
   (error) => {
     if (error?.response?.status === 401 && !error.config?._retryAuth) {
       const url = error.config?.url || "";
-      // Don't trigger logout loop for the auth check itself
-      if (!url.includes("/auth/check") && !url.includes("/auth/login") && !url.includes("/auth/signup")) {
+      // Don't trigger logout loop for auth check, credentials, or password recovery endpoints
+      if (
+        !url.includes("/auth/check") &&
+        !url.includes("/auth/login") &&
+        !url.includes("/auth/signup") &&
+        !url.includes("/auth/forgot-password") &&
+        !url.includes("/auth/verify-otp") &&
+        !url.includes("/auth/reset-password")
+      ) {
         try {
           localStorage.removeItem("pulse-token");
         } catch {}
