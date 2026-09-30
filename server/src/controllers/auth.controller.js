@@ -7,6 +7,7 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import { io } from "../lib/socket.js";
 import { sendOtpEmail } from "../lib/email.js";
+import dotenv from "dotenv";
 
 export const signup = async (req, res) => {
   const { username, email, password } = req.body || {};
@@ -342,6 +343,7 @@ export const forgotPassword = async (req, res) => {
         : localPart[0] + "*".repeat(Math.max(1, localPart.length - 2)) + localPart[localPart.length - 1];
     const maskedEmail = `${maskedLocal}@${domain}`;
 
+    dotenv.config();
     const hasSmtp = Boolean(process.env.SMTP_USER || process.env.EMAIL_USER);
     const isProduction = process.env.NODE_ENV === "production";
 

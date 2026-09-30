@@ -4,10 +4,12 @@ import dotenv from "dotenv";
 dotenv.config();
 
 let cachedTransporter = null;
-let transporterInitialized = false;
 
 const getTransporter = () => {
-  if (transporterInitialized) return cachedTransporter;
+  if (cachedTransporter) return cachedTransporter;
+
+  // Refresh environment variables in case .env was edited while server was running
+  dotenv.config();
 
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = parseInt(process.env.SMTP_PORT || "587", 10);
@@ -21,21 +23,22 @@ const getTransporter = () => {
         port,
         secure: port === 465,
         auth: { user, pass },
-        connectionTimeout: 4000,
-        greetingTimeout: 4000,
-        socketTimeout: 5000,
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
         tls: {
           rejectUnauthorized: process.env.NODE_ENV === "production",
         },
       });
       console.log(`[Email Service] Configured SMTP transport for ${user}`);
+      return cachedTransporter;
     } catch (err) {
       console.warn("[Email Service] SMTP setup error:", err.message);
+      return null;
     }
   }
 
-  transporterInitialized = true;
-  return cachedTransporter;
+  return null;
 };
 
 /**
@@ -47,21 +50,16 @@ const getTransporter = () => {
  */
 export const sendOtpEmail = async ({ to, username, otp }) => {
   const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || "Pulse Messenger <no-reply@pulsemessenger.com>";
-
-  // Prominently print OTP in server logs immediately so developers / testers are NEVER blocked
-  console.log("\n============================================================");
-  console.log(`🔐 [PULSE PASSWORD RESET OTP]`);
-  console.log(`👤 User:       ${username || "User"}`);
-  console.log(`📧 Recipient:  ${to}`);
-  console.log(`🔢 OTP Code:   ${otp}`);
-  console.log(`⏳ Validity:   10 minutes`);
-  console.log("============================================================\n");
-
   const transporter = getTransporter();
+
   if (!transporter) {
-    // In local development without SMTP, the console log above is the instant delivery mechanism
+    // Only in development when NO SMTP is configured in .env, show dev fallback in console
+    console.warn(`\n⚠️  [Email Service] No SMTP credentials detected in server/.env.`);
+    console.warn(`🔐 [DEV FALLBACK OTP]: ${otp} for ${to} (${username || "User"})\n`);
     return { success: true, simulated: true };
   }
+
+  console.log(`[Email Service] Sending password reset email to ${to}...`);
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -154,9 +152,10 @@ export const sendOtpEmail = async ({ to, username, otp }) => {
       text: `Hello ${username || "there"},\n\nYour Pulse Messenger password reset code is: ${otp}\nThis code will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`,
       html: htmlContent,
     });
+    console.log(`[Email Service] ✅ Password reset email successfully delivered to ${to}`);
     return { success: true };
   } catch (err) {
-    console.error("[Email Service] Delivery notice:", err.message);
+    console.error("[Email Service] ❌ Delivery error:", err.message);
     return { success: false, error: err.message };
   }
 };
