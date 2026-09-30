@@ -326,11 +326,13 @@ export const forgotPassword = async (req, res) => {
       attempts: 0,
     });
 
-    // Send email via nodemailer
-    await sendOtpEmail({
+    // Send email asynchronously in the background so the HTTP response returns immediately (< 50ms)
+    sendOtpEmail({
       to: user.email,
       username: user.username,
       otp: rawOtp,
+    }).catch((err) => {
+      console.error("[Email Service] Asynchronous send error:", err.message);
     });
 
     const [localPart, domain] = user.email.split("@");

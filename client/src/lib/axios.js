@@ -3,6 +3,7 @@ import axios from "axios";
 export const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
   withCredentials: true, // Crucial for sending/receiving secure cookies
+  timeout: 15000, // 15 second safety timeout to avoid indefinite spinners
 });
 
 // Automatically attach Authorization header from localStorage if available (handles cross-domain cookie blocks)

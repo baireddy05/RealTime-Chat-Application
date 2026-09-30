@@ -4,9 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 let cachedTransporter = null;
+let transporterInitialized = false;
 
-const createTransporter = async () => {
-  if (cachedTransporter) return cachedTransporter;
+const getTransporter = () => {
+  if (transporterInitialized) return cachedTransporter;
 
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = parseInt(process.env.SMTP_PORT || "587", 10);
@@ -14,36 +15,27 @@ const createTransporter = async () => {
   const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
 
   if (user && pass) {
-    cachedTransporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: {
-        rejectUnauthorized: process.env.NODE_ENV === "production",
-      },
-    });
-    return cachedTransporter;
+    try {
+      cachedTransporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 5000,
+        tls: {
+          rejectUnauthorized: process.env.NODE_ENV === "production",
+        },
+      });
+      console.log(`[Email Service] Configured SMTP transport for ${user}`);
+    } catch (err) {
+      console.warn("[Email Service] SMTP setup error:", err.message);
+    }
   }
 
-  // Fallback for development without SMTP credentials: try Ethereal or simulate
-  try {
-    const testAccount = await nodemailer.createTestAccount();
-    cachedTransporter = nodemailer.createTransport({
-      host: testAccount.smtp.host,
-      port: testAccount.smtp.port,
-      secure: testAccount.smtp.secure,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
-    console.log(`[Email Service] Using Ethereal test account: ${testAccount.user}`);
-    return cachedTransporter;
-  } catch (err) {
-    console.warn(`[Email Service] Ethereal account creation skipped (${err.message}). Logging to terminal.`);
-    return null;
-  }
+  transporterInitialized = true;
+  return cachedTransporter;
 };
 
 /**
@@ -54,10 +46,9 @@ const createTransporter = async () => {
  * @param {string} options.otp - 6-digit OTP code
  */
 export const sendOtpEmail = async ({ to, username, otp }) => {
-  const brandName = "Pulse Messenger";
   const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || "Pulse Messenger <no-reply@pulsemessenger.com>";
 
-  // Prominently log in console for development & fallback visibility
+  // Prominently print OTP in server logs immediately so developers / testers are NEVER blocked
   console.log("\n============================================================");
   console.log(`🔐 [PULSE PASSWORD RESET OTP]`);
   console.log(`👤 User:       ${username || "User"}`);
@@ -65,6 +56,12 @@ export const sendOtpEmail = async ({ to, username, otp }) => {
   console.log(`🔢 OTP Code:   ${otp}`);
   console.log(`⏳ Validity:   10 minutes`);
   console.log("============================================================\n");
+
+  const transporter = getTransporter();
+  if (!transporter) {
+    // In local development without SMTP, the console log above is the instant delivery mechanism
+    return { success: true, simulated: true };
+  }
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -137,25 +134,16 @@ export const sendOtpEmail = async ({ to, username, otp }) => {
   `;
 
   try {
-    const transporter = await createTransporter();
-    if (transporter) {
-      const info = await transporter.sendMail({
-        from: fromEmail,
-        to,
-        subject: `${otp} is your Pulse Messenger password reset code`,
-        text: `Hello ${username || "there"},\n\nYour Pulse Messenger password reset code is: ${otp}\nThis code will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`,
-        html: htmlContent,
-      });
-
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        console.log(`[Email Preview URL]: ${previewUrl}`);
-      }
-      return { success: true, previewUrl: previewUrl || null };
-    }
+    await transporter.sendMail({
+      from: fromEmail,
+      to,
+      subject: `${otp} is your Pulse Messenger password reset code`,
+      text: `Hello ${username || "there"},\n\nYour Pulse Messenger password reset code is: ${otp}\nThis code will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`,
+      html: htmlContent,
+    });
+    return { success: true };
   } catch (err) {
-    console.error("[Email Service] Transporter error:", err.message);
+    console.error("[Email Service] Delivery notice:", err.message);
+    return { success: false, error: err.message };
   }
-
-  return { success: true, simulated: true };
 };
