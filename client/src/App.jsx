@@ -4,6 +4,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import { Loader } from "lucide-react";
 import { lazyWithRetry } from "./lib/lazyWithRetry";
+import { Analytics } from "@vercel/analytics/react";
 
 // Lazy load pages to drastically reduce the initial JS bundle size
 const HomePage = lazyWithRetry(() => import("./pages/HomePage"));
@@ -38,6 +39,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <Analytics />
     </div>
   );
 }
