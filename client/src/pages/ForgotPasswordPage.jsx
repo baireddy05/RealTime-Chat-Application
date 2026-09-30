@@ -34,6 +34,8 @@ const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [devOtp, setDevOtp] = useState("");
+  const [hasSmtp, setHasSmtp] = useState(true);
 
   const { requestPasswordResetOtp, verifyPasswordResetOtp, resetPasswordWithOtp } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
@@ -91,6 +93,8 @@ const ForgotPasswordPage = () => {
       const res = await requestPasswordResetOtp(cleanInput);
       setResolvedEmail(res.email);
       setMaskedEmail(res.maskedEmail || res.email);
+      setDevOtp(res.devOtp || "");
+      setHasSmtp(res.hasSmtp !== false);
       setStep(2);
       setResendCooldown(60);
       setOtpDigits(["", "", "", "", "", ""]);
@@ -406,6 +410,34 @@ const ForgotPasswordPage = () => {
                   <p className="text-theme-muted text-sm leading-relaxed">
                     We sent a 6-digit code to <strong className="text-theme-main font-semibold">{maskedEmail}</strong>. Enter it below to continue.
                   </p>
+
+                  {devOtp ? (
+                    <div className="mt-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-500 dark:text-amber-300 text-xs flex flex-col gap-2 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1.5 text-xs text-theme-main">
+                          <Sparkles size={14} className="text-amber-400" />
+                          <span>Dev Code:</span>
+                          <strong className="text-base font-mono tracking-widest text-amber-400">{devOtp}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOtpDigits(devOtp.split(""));
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-[11px] transition-all cursor-pointer"
+                        >
+                          Auto-fill
+                        </button>
+                      </div>
+                      <span className="text-theme-muted text-[10.5px] leading-tight">
+                        No SMTP email configured in .env yet. To send real emails to your Gmail inbox, add SMTP_USER & SMTP_PASS in server/.env.
+                      </span>
+                    </div>
+                  ) : !hasSmtp ? (
+                    <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-theme-muted text-xs">
+                      <span>💡 <strong>Local Dev Note:</strong> Check your server terminal window where the OTP code is printed.</span>
+                    </div>
+                  ) : null}
                 </div>
 
                 <form onSubmit={handleVerifyOtp} noValidate className="space-y-6">

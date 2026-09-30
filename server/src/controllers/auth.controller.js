@@ -342,10 +342,17 @@ export const forgotPassword = async (req, res) => {
         : localPart[0] + "*".repeat(Math.max(1, localPart.length - 2)) + localPart[localPart.length - 1];
     const maskedEmail = `${maskedLocal}@${domain}`;
 
+    const hasSmtp = Boolean(process.env.SMTP_USER || process.env.EMAIL_USER);
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.status(200).json({
-      message: "Verification code sent to your registered email address.",
+      message: hasSmtp
+        ? "Verification code sent to your registered email address."
+        : "Verification code generated! (Check server console or use the code below)",
       email: user.email,
       maskedEmail,
+      hasSmtp,
+      ...(!hasSmtp && !isProduction && { devOtp: rawOtp }),
     });
   } catch (error) {
     console.error("Error in forgotPassword controller:", error.message);
