@@ -30,6 +30,8 @@ const messageSchema = new mongoose.Schema(
     location: {
       lat: Number,
       lng: Number,
+      name: String,
+      address: String,
     },
     liveUntil: {
       type: Date,

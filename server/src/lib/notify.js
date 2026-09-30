@@ -16,7 +16,7 @@ export const previewForMessage = (msg) => {
   if (msg.file) return `📎 ${msg.file?.name || "File"}`;
   if (msg.contact) return "👤 Shared contact";
   if (msg.poll) return "📊 New poll";
-  if (msg.location) return "📍 Shared location";
+  if (msg.location) return msg.location.name ? `📍 ${msg.location.name}` : "📍 Shared location";
   if (msg.isSticker) return "⭐ Sticker";
   return "New message";
 };

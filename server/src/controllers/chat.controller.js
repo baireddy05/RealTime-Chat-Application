@@ -515,7 +515,12 @@ export const sendMessage = async (req, res) => {
       const lat = location.lat ?? location.latitude;
       const lng = location.lng ?? location.longitude;
       if (lat !== undefined && lng !== undefined) {
-        resolvedLocation = { lat: Number(lat), lng: Number(lng) };
+        resolvedLocation = {
+          lat: Number(lat),
+          lng: Number(lng),
+          name: location.name ? String(location.name).slice(0, 150) : undefined,
+          address: location.address ? String(location.address).slice(0, 300) : undefined,
+        };
       }
     }
     // Live location: accept a future expiry timestamp (15m / 1h / 8h presets)
@@ -2164,7 +2169,12 @@ export const updateLiveLocation = async (req, res) => {
       return res.status(410).json({ error: "Live location sharing has ended" });
     }
 
-    msg.location = { lat, lng };
+    msg.location = {
+      lat,
+      lng,
+      name: msg.location?.name,
+      address: msg.location?.address,
+    };
     await msg.save();
     emitLocationUpdated(msg);
 

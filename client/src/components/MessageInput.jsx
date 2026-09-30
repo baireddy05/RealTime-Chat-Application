@@ -36,6 +36,8 @@ const DrawSketchModal = lazyWithRetry(() => import("./DrawSketchModal"));
 const CodeSnippetModal = lazyWithRetry(() => import("./CodeSnippetModal"));
 const ContactModal = lazyWithRetry(() => import("./ContactModal"));
 const CreatePollModal = lazyWithRetry(() => import("./CreatePollModal"));
+const LocationPickerModal = lazyWithRetry(() => import("./LocationPickerModal"));
+import { reverseGeocode } from "../utils/location";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 import { imageSnippet } from "../lib/attachments";
@@ -65,6 +67,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const [mediaTab, setMediaTab] = useState("emojis"); // "emojis" | "gifs" | "stickers"
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showLocationPickerModal, setShowLocationPickerModal] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showScheduleMenu, setShowScheduleMenu] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -693,21 +696,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
   const handleShareLocation = () => {
     setShowAttachMenu(false);
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-        await sendMessage({ text: "", location: { lat: latitude, lng: longitude } });
-        window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
-      },
-      (error) => {
-        alert("Unable to retrieve your location: " + error.message);
-      }
-    );
+    setShowLocationPickerModal(true);
   };
 
   const startLiveShare = (minutes) => {
@@ -725,10 +714,20 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        let placeName = "Current Location";
+        let placeAddress = "";
+        try {
+          const geo = await reverseGeocode(latitude, longitude);
+          if (geo) {
+            placeName = geo.name || placeName;
+            placeAddress = geo.fullAddress || "";
+          }
+        } catch {}
+
         window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         const res = await sendMessage({
           text: "",
-          location: { lat: latitude, lng: longitude },
+          location: { lat: latitude, lng: longitude, name: placeName, address: placeAddress },
           liveUntil,
         });
         window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
@@ -1725,6 +1724,65 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
               window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
               await sendMessage({ text: "", poll: pollData });
               window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            }}
+          />
+        </Suspense>
+      )}
+
+      {showLocationPickerModal && (
+        <Suspense fallback={null}>
+          <LocationPickerModal
+            isOpen={showLocationPickerModal}
+            onClose={() => setShowLocationPickerModal(false)}
+            isLiveSharingAlready={Boolean(liveShare)}
+            onSendLocation={async (data) => {
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              await sendMessage({
+                text: data.caption || "",
+                location: {
+                  lat: data.lat,
+                  lng: data.lng,
+                  name: data.name,
+                  address: data.address,
+                },
+              });
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+            }}
+            onStartLiveShare={async (data) => {
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              const liveUntil = new Date(Date.now() + data.minutes * 60 * 1000).toISOString();
+              const res = await sendMessage({
+                text: data.caption || "",
+                location: {
+                  lat: data.coords.lat,
+                  lng: data.coords.lng,
+                  name: data.name,
+                  address: data.address,
+                },
+                liveUntil,
+              });
+              window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
+              const messageId = res?.data?._id;
+              if (!res.success || !messageId) return;
+              setLiveShare({ messageId });
+              liveLastPushRef.current = Date.now();
+              try {
+                liveWatchIdRef.current = navigator.geolocation.watchPosition(
+                  async (pos) => {
+                    if (Date.now() - liveLastPushRef.current < 8000) return;
+                    liveLastPushRef.current = Date.now();
+                    const id = liveShareRef.current?.messageId;
+                    if (!id) return;
+                    const out = await updateLiveLocation(id, pos.coords.latitude, pos.coords.longitude);
+                    if (!out.success && out.expired) {
+                      clearLiveWatch();
+                      setLiveShare(null);
+                    }
+                  },
+                  () => {},
+                  { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+                );
+              } catch {}
             }}
           />
         </Suspense>

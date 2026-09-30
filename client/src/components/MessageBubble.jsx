@@ -1,12 +1,15 @@
 import { memo, Fragment, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X, EyeOff } from "lucide-react";
+import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X, EyeOff, MapPin, Navigation } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
 import LinkPreview from "./LinkPreview";
 import AudioMessagePlayer from "./AudioMessagePlayer";
 import ContactCard from "./ContactCard";
 import SwipeableMessage from "./SwipeableMessage";
 import MessageTicks from "./MessageTicks";
+import MapTilePreview from "./MapTilePreview";
+import LocationModal from "./LocationModal";
+import { reverseGeocode, formatCoordinatesPair, getGoogleDirectionsUrl } from "../utils/location";
 import { isOnlyEmojis, EmojiSpan } from "../lib/emoji";
 import { isGifUrl, isStickerUrl, imageSnippet } from "../lib/attachments";
 import { useChatStore } from "../store/useChatStore";
@@ -83,16 +86,23 @@ const formatDateDivider = (dateStr) => {
   });
 };
 
-// Live/static shared location card. Live pins refresh over sockets and show
-// a LIVE badge + Stop control (sender side) until liveUntil passes.
+// Live/static shared location card with real map tiles, reverse-geocoded place names,
+// directions button, and interactive in-app modal.
 const LiveLocationCard = memo(({ message, isMine }) => {
   const [, forceTick] = useState(0);
   const [stopping, setStopping] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [geoData, setGeoData] = useState({
+    name: message.location?.name || "",
+    subtitle: message.location?.address || "",
+  });
+
+  const locLat = Number(message.location?.lat);
+  const locLng = Number(message.location?.lng);
+  const hasValidLoc = Number.isFinite(locLat) && Number.isFinite(locLng);
 
   useEffect(() => {
     if (!message.liveUntil) return;
-    // One wake-up at expiry instead of a 30s interval ticking forever —
-    // expired cards used to re-render every 30s for the rest of the session.
     const remaining = new Date(message.liveUntil).getTime() - Date.now();
     if (!isFinite(remaining) || remaining <= 0) {
       forceTick((x) => x + 1);
@@ -102,11 +112,30 @@ const LiveLocationCard = memo(({ message, isMine }) => {
     return () => clearTimeout(t);
   }, [message.liveUntil, message._id]);
 
+  useEffect(() => {
+    if (!hasValidLoc) return;
+    if (message.location?.name) {
+      setGeoData({
+        name: message.location.name,
+        subtitle: message.location.address || "",
+      });
+      return;
+    }
+    let active = true;
+    reverseGeocode(locLat, locLng).then((res) => {
+      if (active) {
+        setGeoData({
+          name: res.name,
+          subtitle: res.subtitle,
+        });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [locLat, locLng, hasValidLoc, message.location?.name, message.location?.address]);
+
   const live = message.liveUntil && !isNaN(new Date(message.liveUntil).getTime()) && new Date(message.liveUntil).getTime() > Date.now();
-  const locLat = Number(message.location?.lat);
-  const locLng = Number(message.location?.lng);
-  const hasValidLoc = Number.isFinite(locLat) && Number.isFinite(locLng);
-  const mapsUrl = hasValidLoc ? `https://www.google.com/maps/search/?api=1&query=${locLat},${locLng}` : null;
 
   const handleStop = async (e) => {
     e.stopPropagation();
@@ -117,54 +146,108 @@ const LiveLocationCard = memo(({ message, isMine }) => {
     setStopping(false);
   };
 
+  const remainingMinutes = live
+    ? Math.max(1, Math.round((new Date(message.liveUntil).getTime() - Date.now()) / (60 * 1000)))
+    : 0;
+
   return (
-    <div className="mb-1 overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-black/5 dark:bg-white/5 p-1 w-[200px] sm:w-[240px]">
-      {hasValidLoc ? (
-      <a
-        href={mapsUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="block w-full h-32 rounded-xl bg-cover bg-center relative group overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0f766e 0%, #115e59 45%, #134e4a 100%)" }}
+    <>
+      <div
+        onClick={() => hasValidLoc && setShowModal(true)}
+        className="mb-1 overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-black/10 dark:bg-white/5 hover:bg-black/15 dark:hover:bg-white/10 transition-all cursor-pointer shadow-md w-[260px] sm:w-[300px] group/loc select-none"
       >
-        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), transparent 55%), radial-gradient(circle at 75% 80%, rgba(255,255,255,0.2), transparent 50%)" }} />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative">
-            {live && <span className="absolute -inset-2 rounded-full bg-red-500/30 animate-ping" />}
-            <div className={`w-10 h-10 rounded-full ${live ? "bg-red-500" : "bg-accent-primary"} flex items-center justify-center shadow-lg text-white relative`}>
-              <span className="material-symbols-outlined">location_on</span>
+        {/* Map Preview Area */}
+        <div className="relative w-full h-36 overflow-hidden">
+          {hasValidLoc ? (
+            <>
+              <div className="w-full h-full group-hover/loc:scale-105 transition-transform duration-500 ease-out">
+                <MapTilePreview lat={locLat} lng={locLng} zoom={15} isLive={live} />
+              </div>
+
+              {/* Status Pill Badge (Top Left) */}
+              <div className="absolute top-2.5 left-2.5 z-20 flex items-center gap-1.5 pointer-events-none">
+                {live ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-red-600/95 backdrop-blur-md text-white text-[10px] font-bold tracking-wider flex items-center gap-1.5 shadow-md">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    LIVE • {remainingMinutes}m left
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-black/65 backdrop-blur-md text-white/90 border border-white/15 text-[10px] font-semibold flex items-center gap-1 shadow-md">
+                    <MapPin size={11} className="text-accent-primary" /> Location
+                  </span>
+                )}
+              </div>
+
+              {/* Quick View Pill (Hover reveal on Top Right) */}
+              <div className="absolute top-2.5 right-2.5 z-20 opacity-0 group-hover/loc:opacity-100 transition-opacity pointer-events-none">
+                <span className="px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-md text-white text-[10px] font-medium border border-white/15 shadow-md">
+                  View Map ↗
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-theme-muted text-xs gap-1">
+              <MapPin size={22} className="opacity-40" />
+              <span>Location unavailable</span>
             </div>
+          )}
+        </div>
+
+        {/* Address and Action Footer */}
+        <div className="p-3 bg-[var(--bg-main)]/70 backdrop-blur-xs flex flex-col gap-1.5 border-t border-[var(--glass-border)]">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-theme-main truncate leading-tight group-hover/loc:text-accent-primary transition-colors">
+                {geoData.name || "Shared Location"}
+              </h4>
+              <p className="text-[11px] text-theme-muted truncate mt-0.5">
+                {geoData.subtitle || (hasValidLoc ? formatCoordinatesPair(locLat, locLng) : "")}
+              </p>
+            </div>
+
+            {hasValidLoc && (
+              <a
+                href={getGoogleDirectionsUrl(locLat, locLng)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="shrink-0 p-1.5 rounded-xl bg-accent-primary/15 hover:bg-accent-primary/25 text-accent-primary transition-colors flex items-center justify-center"
+                title="Get Directions"
+              >
+                <Navigation size={14} className="fill-current" />
+              </a>
+            )}
+          </div>
+
+          {/* Bottom Bar: Coordinates + Stop (if Live & sender) */}
+          <div className="pt-1 flex items-center justify-between gap-2 text-[10px] text-theme-muted border-t border-[var(--glass-border)]/50">
+            <span className="font-mono truncate opacity-80">
+              {hasValidLoc ? `${locLat.toFixed(4)}°, ${locLng.toFixed(4)}°` : ""}
+            </span>
+
+            {live && isMine && (
+              <button
+                type="button"
+                onClick={handleStop}
+                disabled={stopping}
+                className="shrink-0 px-2 py-0.5 rounded-full bg-red-500/15 text-red-500 text-[10px] font-bold hover:bg-red-500/25 disabled:opacity-50 transition-colors"
+              >
+                {stopping ? "Stopping..." : "Stop Sharing"}
+              </button>
+            )}
           </div>
         </div>
-        {live && (
-          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold tracking-wider flex items-center gap-1 shadow">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
-          </span>
-        )}
-      </a>
-      ) : (
-        <div className="block w-full h-32 rounded-xl relative overflow-hidden flex items-center justify-center text-[11px] text-theme-muted">
-          Location unavailable
-        </div>
-      )}
-      <div className="px-2 py-1.5 flex items-center justify-between gap-2 text-[10px] text-theme-muted">
-        <span className="truncate">
-          {live
-            ? `Live location • until ${new Date(message.liveUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-            : "Location"}
-        </span>
-        {live && isMine && (
-          <button
-            type="button"
-            onClick={handleStop}
-            disabled={stopping}
-            className="shrink-0 px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 text-[10px] font-bold hover:bg-red-500/25 disabled:opacity-50 transition-colors"
-          >
-            Stop
-          </button>
-        )}
       </div>
-    </div>
+
+      {showModal && hasValidLoc && (
+        <LocationModal
+          location={message.location}
+          message={message}
+          isMine={isMine}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
   );
 });
 
