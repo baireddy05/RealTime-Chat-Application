@@ -28,23 +28,31 @@ export const getAdmin = async () => {
     const trimmed = cred.trim();
     if (trimmed.startsWith("{")) {
       serviceAccount = JSON.parse(trimmed);
-    } else if (trimmed.startsWith("ey")) {
-      // Base64-encoded JSON (safe for multi-line env vars on Render/Heroku)
-      serviceAccount = JSON.parse(Buffer.from(trimmed, "base64").toString("utf8"));
     } else {
-      const fs = await import("fs");
-      const path = await import("path");
-      let resolved = path.isAbsolute(trimmed) ? trimmed : path.resolve(process.cwd(), trimmed);
-      if (!fs.existsSync(resolved)) {
-        const serverRelative = path.resolve(process.cwd(), "server", trimmed);
-        if (fs.existsSync(serverRelative)) {
-          resolved = serverRelative;
+      // Try Base64-encoded JSON first (Render/Heroku multi-line env var)
+      try {
+        const decoded = Buffer.from(trimmed, "base64").toString("utf8");
+        if (decoded.trim().startsWith("{")) {
+          serviceAccount = JSON.parse(decoded);
         }
+      } catch (ignored) {}
+
+      // If not Base64 JSON, try resolving as file path
+      if (!serviceAccount) {
+        const fs = await import("fs");
+        const path = await import("path");
+        let resolved = path.isAbsolute(trimmed) ? trimmed : path.resolve(process.cwd(), trimmed);
+        if (!fs.existsSync(resolved)) {
+          const serverRelative = path.resolve(process.cwd(), "server", trimmed);
+          if (fs.existsSync(serverRelative)) {
+            resolved = serverRelative;
+          }
+        }
+        if (!fs.existsSync(resolved)) {
+          throw new Error(`Service account file not found at ${resolved}`);
+        }
+        serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf8"));
       }
-      if (!fs.existsSync(resolved)) {
-        throw new Error(`Service account file not found at ${resolved}`);
-      }
-      serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf8"));
     }
     // Private keys pasted into .env often carry literal \n sequences
     if (serviceAccount.private_key && serviceAccount.private_key.includes("\\n")) {
