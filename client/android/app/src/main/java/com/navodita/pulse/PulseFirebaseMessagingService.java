@@ -36,29 +36,28 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
-                // High importance message channel with sound, vibration, lights
-                NotificationChannel messageChannel = nm.getNotificationChannel(CHANNEL_MESSAGE_ID);
-                if (messageChannel == null) {
-                    messageChannel = new NotificationChannel(
-                        CHANNEL_MESSAGE_ID,
-                        "Pulse Messages",
-                        NotificationManager.IMPORTANCE_HIGH
-                    );
-                    messageChannel.setDescription("Incoming chat messages and alerts");
-                    messageChannel.enableLights(true);
-                    messageChannel.setLightColor(0xFF00E5FF);
-                    messageChannel.enableVibration(true);
-                    messageChannel.setVibrationPattern(new long[]{0, 250, 250, 250});
-                    messageChannel.setShowBadge(true);
-                    messageChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                // High importance message channels with sound, vibration, lights
+                String[] messageChannels = new String[]{CHANNEL_MESSAGE_ID, "pulse_messages_v2", "pulse_messages", "default"};
+                Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build();
 
-                    Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                    AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .build();
-                    messageChannel.setSound(defaultSoundUri, audioAttributes);
-                    nm.createNotificationChannel(messageChannel);
+                for (String chId : messageChannels) {
+                    NotificationChannel ch = nm.getNotificationChannel(chId);
+                    if (ch == null) {
+                        ch = new NotificationChannel(chId, "Pulse Messages", NotificationManager.IMPORTANCE_HIGH);
+                        ch.setDescription("Incoming chat messages and alerts");
+                        ch.enableLights(true);
+                        ch.setLightColor(0xFF00E5FF);
+                        ch.enableVibration(true);
+                        ch.setVibrationPattern(new long[]{0, 250, 250, 250});
+                        ch.setShowBadge(true);
+                        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                        ch.setSound(defaultSoundUri, audioAttributes);
+                        nm.createNotificationChannel(ch);
+                    }
                 }
 
                 // Call channel with maximum importance
@@ -77,11 +76,11 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                     callChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
                     Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-                    AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                    AudioAttributes callAudioAttributes = new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                         .build();
-                    callChannel.setSound(ringtoneUri, audioAttributes);
+                    callChannel.setSound(ringtoneUri, callAudioAttributes);
                     nm.createNotificationChannel(callChannel);
                 }
             }
