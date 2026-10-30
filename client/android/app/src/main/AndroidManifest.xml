@@ -37,12 +37,11 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Native Background Sync Service for notifications when app is removed from recent apps -->
+        <!-- Legacy Background Service disabled: FCM high-priority messages handle notifications natively -->
         <service
             android:name=".PulseBackgroundService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:enabled="false"
+            android:exported="false" />
 
         <!-- Remove Capacitor's default MessagingService so PulseFirebaseMessagingService handles all FCM events -->
         <service

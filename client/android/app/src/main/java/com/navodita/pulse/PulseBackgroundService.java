@@ -295,27 +295,7 @@ public class PulseBackgroundService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
-        Log.i(TAG, "onTaskRemoved: app swiped away, scheduling restart...");
-        try {
-            Intent restartServiceIntent = new Intent(getApplicationContext(), PulseBackgroundService.class);
-            restartServiceIntent.setPackage(getPackageName());
-            PendingIntent restartServicePendingIntent = PendingIntent.getService(
-                getApplicationContext(),
-                1,
-                restartServiceIntent,
-                PendingIntent.FLAG_ONE_SHOT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
-            );
-            AlarmManager alarmService = (AlarmManager) getApplicationContext().getSystemService(Context.ALARM_SERVICE);
-            if (alarmService != null) {
-                alarmService.set(
-                    AlarmManager.ELAPSED_REALTIME,
-                    SystemClock.elapsedRealtime() + 1000,
-                    restartServicePendingIntent
-                );
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "onTaskRemoved alarm error: " + e.getMessage());
-        }
+        stopSelf();
     }
 
     @Override
