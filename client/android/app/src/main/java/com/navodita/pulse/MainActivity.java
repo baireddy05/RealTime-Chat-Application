@@ -18,6 +18,27 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
+        // Explicitly request POST_NOTIFICATIONS permission on Android 13+ (API 33+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
+
+        // Request exemption from battery optimization so background FCM wakeups arrive when app is closed
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            try {
+                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    android.content.Intent batteryIntent = new android.content.Intent(
+                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                    );
+                    batteryIntent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(batteryIntent);
+                }
+            } catch (Exception ignored) {}
+        }
+
         // Prevent Android system bars (status bar & gesture bar) from overlapping the webview
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());

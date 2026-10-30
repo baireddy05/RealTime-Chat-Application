@@ -30,7 +30,7 @@ import java.net.URL;
 public class PulseBackgroundService extends Service {
     private static final String TAG = "PulseBgService";
     public static final String CHANNEL_SERVICE_ID = "pulse_bg_keepalive";
-    public static final String CHANNEL_MESSAGE_ID = "pulse_messages_v2";
+    public static final String CHANNEL_MESSAGE_ID = "pulse_v4_messages";
 
     private volatile boolean isRunning = false;
     private Thread workerThread = null;

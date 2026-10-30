@@ -28,7 +28,7 @@ import java.util.Map;
 
 public class PulseFirebaseMessagingService extends FirebaseMessagingService {
     private static final String TAG = "PulseFCMService";
-    public static final String CHANNEL_MESSAGE_ID = "pulse_messages_v2";
+    public static final String CHANNEL_MESSAGE_ID = "pulse_v4_messages";
     public static final String CHANNEL_CALL_ID = "pulse_calls_v2";
     private static final String PREF_STACKS = "pulse_msg_stacks";
 
@@ -48,6 +48,7 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                     messageChannel.enableLights(true);
                     messageChannel.setLightColor(0xFF00E5FF);
                     messageChannel.enableVibration(true);
+                    messageChannel.setVibrationPattern(new long[]{0, 250, 250, 250});
                     messageChannel.setShowBadge(true);
                     messageChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
@@ -118,13 +119,11 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         super.onMessageReceived(remoteMessage);
         Log.i(TAG, "FCM message received from: " + remoteMessage.getFrom());
 
-        // Always forward to Capacitor plugin so in-app listeners get notified
-        PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
-
-        // If the user currently has the app open in foreground, the in-app WebSocket handles UI
-        if (MainActivity.isAppInForeground) {
-            Log.d(TAG, "App is in foreground, skipping background notification");
-            return;
+        // Always forward to Capacitor plugin safely (never crash onMessageReceived)
+        try {
+            PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
+        } catch (Throwable t) {
+            Log.w(TAG, "Capacitor push forward skipped: " + t.getMessage());
         }
 
         Map<String, String> data = remoteMessage.getData();
@@ -229,8 +228,9 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                 .setColor(0xFF00E5FF)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE);
 
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);

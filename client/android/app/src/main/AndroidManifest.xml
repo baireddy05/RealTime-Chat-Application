@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -43,18 +44,23 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Remove Capacitor's default MessagingService so PulseFirebaseMessagingService handles all FCM events -->
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            tools:node="remove" />
+
         <!-- Native Firebase Cloud Messaging Service (WhatsApp-style stacked notifications) -->
         <service
             android:name=".PulseFirebaseMessagingService"
             android:exported="false">
-            <intent-filter>
+            <intent-filter android:priority="1000">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="pulse_messages_v2" />
+            android:value="pulse_v4_messages" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_pulse" />

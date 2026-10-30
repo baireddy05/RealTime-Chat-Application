@@ -79,28 +79,21 @@ export const sendFcm = async (userId, { title, body, data = {} }) => {
       String(v),
     ])
   );
-  // Both notification and data payloads:
-  // 1. Google Play Services displays system notification even when app is force-stopped by MIUI/HyperOS
-  // 2. PulseFirebaseMessagingService updates the exact same notification (by tag) with InboxStyle stacked lines
-  const tag = data?.chatId ? `chat_${data.chatId}` : undefined;
+
+  // WhatsApp-style FCM architecture:
+  // WhatsApp and Telegram NEVER send a root "notification" payload on Android.
+  // If an FCM message has a "notification" block, Google Play Services intercepts
+  // it and BYPASSES onMessageReceived() when the app is in background or closed.
+  // When bypassed, custom Java code cannot run, messages CANNOT be stacked (InboxStyle),
+  // and each new message replaces the previous one.
+  // A pure DATA payload with priority: "high" wakes up PulseFirebaseMessagingService
+  // even when the app is swiped away from recent apps, executing onMessageReceived()
+  // to dynamically stack all unread messages per chat into an InboxStyle notification.
   const message = {
     tokens: tokens.map((t) => t.token),
-    notification: {
-      title: title || "Pulse Messenger",
-      body: body || "New activity",
-    },
     data: stringData,
     android: {
       priority: "high",
-      notification: {
-        channelId: "pulse_messages_v2",
-        sound: "default",
-        defaultSound: true,
-        defaultVibrateTimings: true,
-        icon: "ic_stat_pulse",
-        color: "#00E5FF",
-        tag,
-      },
     },
   };
 
