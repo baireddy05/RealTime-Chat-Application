@@ -1,19 +1,8 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { io } from "socket.io-client";
-
-const getSocketBaseUrl = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  try {
-    const u = new URL(apiUrl);
-    // Socket.io server lives at the origin (no /api path)
-    return u.origin;
-  } catch {
-    return apiUrl.replace(/\/api\/?$/, "") || "http://localhost:5000";
-  }
-};
-
-const BASE_URL = getSocketBaseUrl();
+import { getSocketBaseUrl } from "../lib/apiConfig";
+import { syncNativeBackgroundService, stopNativeBackgroundService } from "../lib/backgroundSync";
 
 const stripToken = (data) => {
   if (!data || typeof data !== "object") return data;
@@ -41,6 +30,7 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
+      syncNativeBackgroundService(res.data._id || res.data.id);
       // Best-effort: (re)register push transports if permission was granted
       import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
     } catch {
@@ -65,6 +55,7 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
+      syncNativeBackgroundService(res.data._id || res.data.id);
       import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
       return true;
     } catch (error) {
@@ -86,6 +77,7 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: stripToken(res.data) });
       get().connectSocket();
+      syncNativeBackgroundService(res.data._id || res.data.id);
       import("../lib/push").then(({ ensurePushTransports }) => ensurePushTransports().catch(() => {}));
       return true;
     } catch (error) {
@@ -140,6 +132,7 @@ export const useAuthStore = create((set, get) => ({
       const currentUserAtLogout = get().authUser;
       set({ authUser: null });
       get().disconnectSocket();
+      stopNativeBackgroundService();
       // Stop push delivery to this device (best effort, never blocks logout)
       import("../lib/push").then(({ disablePushTransports }) => disablePushTransports().catch(() => {}));
       // Clear chat + call state so next login starts fresh — only if still logged out.
@@ -199,7 +192,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       token = localStorage.getItem("pulse-token");
     } catch {}
-    const newSocket = io(BASE_URL, {
+    const newSocket = io(getSocketBaseUrl(), {
       withCredentials: true,
       auth: { token },
     });

@@ -106,3 +106,58 @@ export const unregisterDeviceToken = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// Active SSE notification streams: userId -> Set<Response>
+const activeStreams = new Map();
+
+export const streamNotifications = async (req, res) => {
+  const userId = req.user._id.toString();
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+    "Access-Control-Allow-Origin": "*",
+  });
+
+  res.write(`data: ${JSON.stringify({ type: "connected", userId })}\n\n`);
+
+  if (!activeStreams.has(userId)) {
+    activeStreams.set(userId, new Set());
+  }
+  activeStreams.get(userId).add(res);
+
+  const pinger = setInterval(() => {
+    try {
+      res.write(": ping\n\n");
+    } catch {
+      clearInterval(pinger);
+    }
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(pinger);
+    const userSet = activeStreams.get(userId);
+    if (userSet) {
+      userSet.delete(res);
+      if (userSet.size === 0) activeStreams.delete(userId);
+    }
+  });
+};
+
+export const sendSsePush = (userId, payload) => {
+  const uId = userId?.toString();
+  const userSet = activeStreams.get(uId);
+  if (!userSet || userSet.size === 0) return 0;
+
+  const dataStr = `data: ${JSON.stringify(payload)}\n\n`;
+  let sent = 0;
+  for (const client of userSet) {
+    try {
+      client.write(dataStr);
+      sent++;
+    } catch {}
+  }
+  return sent;
+};

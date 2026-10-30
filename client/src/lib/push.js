@@ -1,4 +1,6 @@
 import { axiosInstance } from "./axios";
+import { Capacitor } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
 
 // Web Push manager for browsers and installed PWAs. All failures are
 // local-only and silent so auth and messaging flows never break because
@@ -98,12 +100,100 @@ export function handlePushAction(data) {
   }
 }
 
-// Called after login/signup/auth-check: wires the web transport.
-// Never throws; never prompts by itself (permission UX lives in Settings).
+// --- Native Android FCM Push Notifications (WhatsApp-style) ---
+
+let nativePushRegistered = false;
+
+export async function registerNativePush() {
+  if (!Capacitor.isNativePlatform()) return { ok: false, reason: "web-platform" };
+  try {
+    let permStatus = await PushNotifications.checkPermissions();
+    if (permStatus.receive === "prompt") {
+      permStatus = await PushNotifications.requestPermissions();
+    }
+    if (permStatus.receive !== "granted") {
+      console.warn("[FCM] Push notification permission not granted");
+      return { ok: false, reason: "denied" };
+    }
+
+    // Always sync cached FCM token with server so the active logged-in user is bound to this device
+    const cachedToken = localStorage.getItem("pulse_fcm_token");
+    if (cachedToken) {
+      axiosInstance.post("/push/device-token", {
+        platform: "android",
+        token: cachedToken,
+        appVersion: "2.0.9",
+      }).catch(() => {});
+    }
+
+    if (!nativePushRegistered) {
+      nativePushRegistered = true;
+
+      PushNotifications.addListener("registration", async (token) => {
+        console.log("[FCM] Registration token received:", token?.value);
+        try {
+          if (token?.value) {
+            await axiosInstance.post("/push/device-token", {
+              platform: "android",
+              token: token.value,
+              appVersion: "2.0.9",
+            });
+            localStorage.setItem("pulse_fcm_token", token.value);
+            console.log("[FCM] Token registered with server successfully");
+          }
+        } catch (err) {
+          console.warn("[FCM] Error registering token with server:", err?.message || err);
+        }
+      });
+
+      PushNotifications.addListener("registrationError", (err) => {
+        console.warn("[FCM] Registration error:", err?.error || err);
+      });
+
+      PushNotifications.addListener("pushNotificationReceived", (notification) => {
+        console.log("[FCM] Push received in foreground:", notification);
+      });
+
+      PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+        console.log("[FCM] Push action performed:", action);
+        const data = action?.notification?.data;
+        if (data) {
+          handlePushAction(data);
+        }
+      });
+    }
+
+    await PushNotifications.register();
+    return { ok: true };
+  } catch (err) {
+    console.warn("[FCM] registerNativePush error:", err?.message || err);
+    return { ok: false, reason: "error" };
+  }
+}
+
+export async function disableNativePush() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const token = localStorage.getItem("pulse_fcm_token");
+    if (token) {
+      await axiosInstance.delete("/push/device-token", { data: { token } }).catch(() => {});
+      localStorage.removeItem("pulse_fcm_token");
+    }
+  } catch {}
+}
+
+// Called after login/signup/auth-check: wires web and native transports
 export async function ensurePushTransports() {
+  if (Capacitor.isNativePlatform()) {
+    return registerNativePush();
+  }
   return ensureWebPushSubscription();
 }
 
 export async function disablePushTransports() {
-  await disableWebPush();
+  if (Capacitor.isNativePlatform()) {
+    await disableNativePush();
+  } else {
+    await disableWebPush();
+  }
 }

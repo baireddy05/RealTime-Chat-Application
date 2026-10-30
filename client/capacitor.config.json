@@ -1,0 +1,34 @@
+{
+  "appId": "com.navodita.pulse",
+  "appName": "Pulse Chat",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "pulsechatmessenger.vercel.app",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#09090b"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#09090b",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_pulse",
+      "iconColor": "#00E5FF"
+    }
+  }
+}
+

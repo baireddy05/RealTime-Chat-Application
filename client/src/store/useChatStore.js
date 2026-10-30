@@ -810,6 +810,9 @@ export const useChatStore = create((set, get) => ({
 
   markMessagesAsRead: async (chatId, type) => {
     if (!chatId) return;
+    try {
+      notificationManager.clearNotification(chatId);
+    } catch {}
     const prevUnread = get().unreadCounts?.[chatId];
     const prevRooms = get().rooms;
     const prevFriends = useFriendStore.getState()?.friends;
@@ -1337,10 +1340,20 @@ export const useChatStore = create((set, get) => ({
             new RegExp(`@${myUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(
               typeof body === "string" ? body : ""
             );
+          const chatTitle = selectedChat.type === "room" ? selectedChat.name : senderName;
           notificationManager.sendNotification({
             title: mentioned ? `${senderName} mentioned you in ${selectedChat.name}` : title,
+            chatTitle,
             body,
             icon: processedMessage.senderId?.profilePic || "/favicon.png",
+            tag: chatId,
+            data: {
+              type: "message",
+              chatType: selectedChat.type,
+              chatId: (selectedChat._id || selectedChat.id || chatId)?.toString(),
+              messageId: processedMessage._id,
+              senderName,
+            },
           });
           window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         } else {
@@ -1367,8 +1380,13 @@ export const useChatStore = create((set, get) => ({
             useAuthStore.getState().authUser?.chatPreferences?.[chatId]?.tone
           );
           const senderName = processedMessage.senderId?.username || "Pulse User";
-          const title = newMessage.roomId ? "New Group Message" : senderName;
-          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? imageSnippet(processedMessage) : processedMessage.file ? `📎️ ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
+          const room = newMessage.roomId
+            ? (get().rooms || []).find((r) => (r._id || r.id)?.toString() === newMessage.roomId?.toString())
+            : null;
+          const roomName = room?.name || "Group Chat";
+          const chatTitle = newMessage.roomId ? roomName : senderName;
+          const title = newMessage.roomId ? `${roomName} • ${senderName}` : senderName;
+          const body = processedMessage.decryptedText || processedMessage.text || (processedMessage.image ? imageSnippet(processedMessage) : processedMessage.file ? `📎 ${processedMessage.file.name}` : processedMessage.audio ? "🎤 Voice Note" : "New message");
           const myUsername = useAuthStore.getState().authUser?.username || "";
           const mentioned =
             !!newMessage.roomId &&
@@ -1377,9 +1395,31 @@ export const useChatStore = create((set, get) => ({
               typeof body === "string" ? body : ""
             );
           notificationManager.sendNotification({
-            title: mentioned ? `${senderName} mentioned you` : title,
+            title: mentioned ? `${senderName} mentioned you in ${roomName}` : title,
+            chatTitle,
             body,
             icon: processedMessage.senderId?.profilePic || "/favicon.png",
+            tag: chatId,
+            force: true,
+            data: {
+              type: "message",
+              chatType: newMessage.roomId ? "room" : "user",
+              chatId,
+              messageId: processedMessage._id,
+              senderName,
+            },
+            onClick: () => {
+              window.dispatchEvent(
+                new CustomEvent("pulse:open-chat", {
+                  detail: {
+                    type: "message",
+                    chatType: newMessage.roomId ? "room" : "user",
+                    chatId,
+                    messageId: processedMessage._id,
+                  },
+                })
+              );
+            },
           });
         }
       }
@@ -1505,6 +1545,7 @@ export const useChatStore = create((set, get) => ({
           title: "⏰ Message reminder",
           body: String(preview).slice(0, 120),
           icon: "/favicon.png",
+          force: true,
         });
         window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
       }
@@ -2247,6 +2288,9 @@ export const useChatStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     const unread = { ...get().unreadCounts };
     if (chat?.id) unread[chat.id] = 0;
+    if (chat?.id || chat?._id) {
+      notificationManager.clearNotification(chat.id || chat._id);
+    }
 
     if (socket) {
       const prevRoom = current?.type === "room" ? current?.id?.toString() : null;

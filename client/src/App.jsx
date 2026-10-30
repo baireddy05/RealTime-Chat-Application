@@ -1,9 +1,15 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
-import { useEffect } from "react";
 import { Loader } from "lucide-react";
 import { lazyWithRetry } from "./lib/lazyWithRetry";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { SplashScreen } from "@capacitor/splash-screen";
+import { App as CapApp } from "@capacitor/app";
+import { notificationManager } from "./lib/notification";
+import { syncNativeBackgroundService } from "./lib/backgroundSync";
+import { ensurePushTransports } from "./lib/push";
 
 // Lazy load pages to drastically reduce the initial JS bundle size
 const HomePage = lazyWithRetry(() => import("./pages/HomePage"));
@@ -16,7 +22,42 @@ function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: "#09090b" }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      SplashScreen.hide().catch(() => {});
+      notificationManager.initNative().then(() => {
+        notificationManager.requestPermission().catch(() => {});
+      }).catch(() => {});
+
+      const sub = CapApp.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) {
+          useAuthStore.getState().connectSocket();
+        }
+      });
+      return () => {
+        sub.then((h) => h.remove()).catch(() => {});
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser && Capacitor.isNativePlatform()) {
+      notificationManager.requestPermission().catch(() => {});
+      ensurePushTransports().catch(() => {});
+      syncNativeBackgroundService(authUser._id || authUser.id).catch(() => {});
+    }
+  }, [authUser]);
+
+  useEffect(() => {
     checkAuth();
+
+    const handleServerChanged = () => {
+      checkAuth();
+    };
+    window.addEventListener("pulse:server-changed", handleServerChanged);
+    return () => window.removeEventListener("pulse:server-changed", handleServerChanged);
   }, [checkAuth]);
 
   if (isCheckingAuth && !authUser)

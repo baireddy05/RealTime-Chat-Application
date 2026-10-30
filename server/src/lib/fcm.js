@@ -20,21 +20,34 @@ const getAdmin = async () => {
     return null;
   }
   try {
-    const { default: adminLib } = await import("firebase-admin");
+    const { initializeApp, cert, getApps } = await import("firebase-admin/app");
+    const { getMessaging } = await import("firebase-admin/messaging");
     let serviceAccount = null;
     const trimmed = cred.trim();
     if (trimmed.startsWith("{")) {
       serviceAccount = JSON.parse(trimmed);
+    } else if (trimmed.startsWith("ey")) {
+      // Base64-encoded JSON (safe for multi-line env vars on Render/Heroku)
+      serviceAccount = JSON.parse(Buffer.from(trimmed, "base64").toString("utf8"));
     } else {
       const fs = await import("fs");
-      serviceAccount = JSON.parse(fs.readFileSync(trimmed, "utf8"));
+      const path = await import("path");
+      let resolved = path.isAbsolute(trimmed) ? trimmed : path.resolve(process.cwd(), trimmed);
+      if (!fs.existsSync(resolved)) {
+        const serverRelative = path.resolve(process.cwd(), "server", trimmed);
+        if (fs.existsSync(serverRelative)) {
+          resolved = serverRelative;
+        }
+      }
+      serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf8"));
     }
     // Private keys pasted into .env often carry literal \n sequences
     if (serviceAccount.private_key && serviceAccount.private_key.includes("\\n")) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
     }
-    adminLib.initializeApp({ credential: adminLib.credential.cert(serviceAccount) });
-    admin = adminLib;
+    const apps = getApps();
+    const app = apps.length > 0 ? apps[0] : initializeApp({ credential: cert(serviceAccount) });
+    admin = { messaging: () => getMessaging(app) };
     console.log("[FCM] firebase-admin initialized — native push enabled");
     return admin;
   } catch (err) {
@@ -61,17 +74,41 @@ export const sendFcm = async (userId, { title, body, data = {} }) => {
   if (tokens.length === 0) return { attempted: 0, delivered: 0, pruned: 0 };
 
   const stringData = Object.fromEntries(
-    Object.entries({ ...data, title: title || "", body: body || "" }).map(([k, v]) => [k, String(v)])
+    Object.entries({ ...data, title: title || "Pulse Messenger", body: body || "New activity" }).map(([k, v]) => [
+      k,
+      String(v),
+    ])
   );
+  // Both notification and data payloads:
+  // 1. Google Play Services displays system notification even when app is force-stopped by MIUI/HyperOS
+  // 2. PulseFirebaseMessagingService updates the exact same notification (by tag) with InboxStyle stacked lines
+  const tag = data?.chatId ? `chat_${data.chatId}` : undefined;
   const message = {
     tokens: tokens.map((t) => t.token),
-    notification: { title: title || "Pulse Messenger", body: body || "New activity" },
-    data: { ...stringData, click_action: "FLUTTER_NOTIFICATION_CLICK" },
-    android: { priority: "high", notification: { channelId: "pulse_messages", sound: "default" } },
+    notification: {
+      title: title || "Pulse Messenger",
+      body: body || "New activity",
+    },
+    data: stringData,
+    android: {
+      priority: "high",
+      notification: {
+        channelId: "pulse_messages_v2",
+        sound: "default",
+        defaultSound: true,
+        defaultVibrateTimings: true,
+        icon: "ic_stat_pulse",
+        color: "#00E5FF",
+        tag,
+      },
+    },
   };
 
   try {
     const res = await sdk.messaging().sendEachForMulticast(message);
+    console.log(
+      `[FCM] Dispatched to ${tokens.length} devices for user ${userId}: ${res.successCount} delivered, ${res.failureCount} failed`
+    );
     const dead = [];
     res.responses.forEach((r, i) => {
       if (!r.success) {

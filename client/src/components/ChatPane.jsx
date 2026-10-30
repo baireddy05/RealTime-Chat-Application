@@ -723,7 +723,8 @@ const ChatPane = ({ onBack }) => {
       setHasNotificationPermission(true);
       notificationManager.sendNotification({
         title: "Pulse Notifications Active",
-        body: "You will receive real-time desktop alerts when backgrounded.",
+        body: "You will receive real-time alerts for new messages.",
+        force: true,
       });
     } else {
       const res = await notificationManager.requestPermission();
@@ -733,7 +734,8 @@ const ChatPane = ({ onBack }) => {
         soundManager.playAlertSound();
         notificationManager.sendNotification({
           title: "Pulse Notifications Enabled! 🎉",
-          body: "You will now receive desktop notifications for new messages.",
+          body: "You will now receive notifications for new messages.",
+          force: true,
         });
       }
     }

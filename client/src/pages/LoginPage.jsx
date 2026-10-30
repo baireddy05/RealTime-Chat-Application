@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
 import PulseLogo from "../components/PulseLogo";
+import ServerConfigModal from "../components/ServerConfigModal";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Loader,
@@ -14,12 +15,14 @@ import {
   Moon,
   Activity,
   ArrowLeft,
+  Server,
 } from "lucide-react";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
   const { login, isLoggingIn } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
@@ -58,14 +61,20 @@ const LoginPage = () => {
     try {
       await login({ email: formData.email.trim(), password: formData.password });
     } catch (err) {
-      setErrorMessage(err?.response?.data?.message || err?.message || "Invalid email/username or password");
+      if (err?.code === "ECONNABORTED" || err?.message?.includes("timeout")) {
+        setErrorMessage("Connection timed out. The server may be waking up - please try again in a few moments, or check server connection.");
+      } else if (!err?.response) {
+        setErrorMessage("Cannot connect to server. Check your network or tap the server icon at the top to change the endpoint.");
+      } else {
+        setErrorMessage(err?.response?.data?.message || err?.message || "Invalid email/username or password");
+      }
     }
   };
 
   return (
     <div className="flex h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-hidden select-none font-sans relative">
       {/* ── Top Header Navigation Bar (Back to Welcome on Both Mobile & Laptop, and Theme Toggle) ── */}
-      <div className="absolute top-4 left-4 right-4 sm:top-5 sm:left-6 sm:right-6 flex items-center justify-between z-50 pointer-events-none">
+      <div className="absolute top-[max(env(safe-area-inset-top,0px),1rem)] left-4 right-4 sm:top-5 sm:left-6 sm:right-6 flex items-center justify-between z-50 pointer-events-none">
         <div className="pointer-events-auto">
           <button
             onClick={() => navigate("/welcome")}
@@ -78,7 +87,15 @@ const LoginPage = () => {
           </button>
         </div>
 
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-2">
+          <button
+            onClick={() => setIsServerModalOpen(true)}
+            className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
+            title="Configure Server Endpoint"
+            type="button"
+          >
+            <Server size={18} className="text-cyan-500" />
+          </button>
           <button
             onClick={toggleTheme}
             className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
@@ -90,7 +107,7 @@ const LoginPage = () => {
         </div>
       </div>
 
-      {/* ── Desktop Left Panel: Interactive Pulse Experience ── */}
+      {/* â”€â”€ Desktop Left Panel: Interactive Pulse Experience â”€â”€ */}
       <div
         ref={leftPanelRef}
         onMouseMove={handleMouseMove}
@@ -168,7 +185,7 @@ const LoginPage = () => {
         </div>
       </div>
 
-      {/* ── Right / Form Panel (Responsive across Mobile and Laptop) ── */}
+      {/* â”€â”€ Right / Form Panel (Responsive across Mobile and Laptop) â”€â”€ */}
       <div className="w-full lg:w-[45%] h-full flex flex-col z-20 glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] bg-[rgb(var(--bg-app-rgb))]">
         {/* Scrollable Form Container */}
         <div className="flex-1 overflow-y-auto flex flex-col justify-center px-5 sm:px-10 md:px-14 lg:px-20 py-16 sm:py-12">
@@ -232,7 +249,7 @@ const LoginPage = () => {
                   <input
                     type={showPassword ? "text" : "password"}
                     className="w-full pl-11 pr-11 py-3.5 rounded-2xl glass-input text-theme-main placeholder:text-theme-muted/50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent-primary/20 transition-all border border-black/10 dark:border-white/10"
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     autoComplete="current-password"
@@ -275,6 +292,10 @@ const LoginPage = () => {
           </div>
         </div>
       </div>
+      <ServerConfigModal
+        isOpen={isServerModalOpen}
+        onClose={() => setIsServerModalOpen(false)}
+      />
     </div>
   );
 };

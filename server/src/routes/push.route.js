@@ -6,11 +6,13 @@ import {
   unsubscribePush,
   registerDeviceToken,
   unregisterDeviceToken,
+  streamNotifications,
 } from "../controllers/push.controller.js";
 
 const router = express.Router();
 
 router.get("/config", getPushConfig);
+router.get("/stream", protectRoute, streamNotifications);
 router.post("/subscribe", protectRoute, subscribePush);
 router.post("/unsubscribe", protectRoute, unsubscribePush);
 router.post("/device-token", protectRoute, registerDeviceToken);

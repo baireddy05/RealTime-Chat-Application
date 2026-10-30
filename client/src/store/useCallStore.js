@@ -196,6 +196,15 @@ export const useCallStore = create((set, get) => ({
       notificationManager.sendNotification({
         title: `Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
         body: `${callerInfo?.name || callerInfo?.username || "Someone"} is calling you...`,
+        channelId: "pulse_calls_v2",
+        tag: `call_${from}`,
+        force: true,
+        data: {
+          type: "call",
+          callType,
+          callerId: from,
+          callerName: callerInfo?.name || callerInfo?.username || "Someone",
+        },
         onClick: () => window.focus(),
       });
 
@@ -770,6 +779,8 @@ export const useCallStore = create((set, get) => ({
     pendingIceCandidates = [];
     try {
       soundManager.stopRinging?.();
+      const pId = get().peerUser?._id;
+      if (pId) notificationManager.clearNotification(`call_${pId}`);
     } catch {}
 
     const { localStream, screenStream, remoteStream, peerConnection } = get();

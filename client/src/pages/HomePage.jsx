@@ -399,7 +399,7 @@ const HomePage = () => {
   return (
     <>
       <div
-        className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200 safe-top"
+        className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 md:p-3 gap-0 md:gap-3 bg-[rgb(var(--bg-app-rgb))] md:bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200 md:safe-top"
         style={{
           "--sidebar-width": `${sidebarWidth}px`,
         }}
@@ -600,7 +600,7 @@ const HomePage = () => {
       {/* 2. Zone 2: Conversation Sidebar */}
       <div
         ref={sidebarContainerRef}
-        className={`w-full md:w-[var(--sidebar-width)] h-full z-30 shrink-0 flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass overflow-hidden ${
+        className={`w-full md:w-[var(--sidebar-width)] h-full z-30 shrink-0 flex flex-col bg-[rgb(var(--bg-app-rgb))] md:glass-panel rounded-none md:rounded-3xl border-0 md:border md:border-[var(--glass-border)] md:border-t-[var(--glass-border-top)] shadow-none md:shadow-glass overflow-hidden ${
           isResizing ? "transition-none select-none pointer-events-none" : "transition-[width] duration-75 ease-out"
         } ${selectedChat ? "hidden md:flex" : "flex"}`}
       >
@@ -648,7 +648,7 @@ const HomePage = () => {
 
       {/* 3. Zone 3: Master Active Chat Workstation or Command Center */}
       <main
-        className={`flex-1 min-w-0 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-all duration-200 ${
+        className={`flex-1 min-w-0 h-full z-20 overflow-hidden flex flex-col bg-[rgb(var(--bg-app-rgb))] md:glass-panel rounded-none md:rounded-3xl border-0 md:border md:border-[var(--glass-border)] md:border-t-[var(--glass-border-top)] shadow-none md:shadow-glass transition-all duration-200 ${
           !selectedChat ? "hidden md:flex" : "flex"
         }`}
       >

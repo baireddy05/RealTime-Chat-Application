@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
 
 /**
  * Mobile & Browser Back Navigation Manager for Pulse Messenger
@@ -25,6 +27,30 @@ class BackNavigationManager {
     if (this.isListening) return;
     this.isListening = true;
     window.addEventListener("popstate", this.handlePopState);
+
+    // Native Android hardware back button handler via Capacitor
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener("backButton", () => {
+        if (this.stack.length > 0) {
+          const top = this.stack.pop();
+          try {
+            if (typeof top?.onBack === "function") {
+              top.onBack();
+            }
+          } catch (err) {
+            console.error("[PulseBack] Native back error:", err);
+          }
+        } else {
+          const now = Date.now();
+          if (now - this.lastExitPromptTime < 2000) {
+            CapApp.exitApp();
+          } else {
+            this.lastExitPromptTime = now;
+            this.showExitToast();
+          }
+        }
+      });
+    }
   }
 
   ensureRootGuard() {
@@ -40,6 +66,7 @@ class BackNavigationManager {
   isMobileDevice() {
     if (typeof window === "undefined") return false;
     return (
+      Capacitor.isNativePlatform() ||
       window.innerWidth < 768 ||
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     );

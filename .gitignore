@@ -8,3 +8,7 @@ build/
 client/dist/
 server/node_modules/
 client/node_modules/
+*firebase*.json
+*service-account*.json
+google-services.json
+*.apk

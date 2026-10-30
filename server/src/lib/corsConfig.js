@@ -22,10 +22,17 @@ export const isOriginAllowed = (origin) => {
     // Ignore invalid URL parse
   }
 
-  // Allow local development origins
+  // Allow local development origins and mobile app origins (Capacitor / Android emulator / local LAN)
   if (
     normalized.startsWith("http://localhost:") ||
-    normalized.startsWith("http://127.0.0.1:")
+    normalized.startsWith("http://127.0.0.1:") ||
+    normalized === "https://localhost" ||
+    normalized === "http://localhost" ||
+    normalized === "capacitor://localhost" ||
+    normalized.startsWith("http://10.0.2.2:") ||
+    normalized.startsWith("http://192.168.") ||
+    normalized.startsWith("http://10.") ||
+    normalized.startsWith("http://172.")
   ) {
     return true;
   }

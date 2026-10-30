@@ -14,6 +14,23 @@ import { isStickerUrl, imageSnippet } from "../lib/attachments";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
 
+const AVATAR_GRADIENTS = [
+  "from-emerald-600 to-teal-500",
+  "from-blue-600 to-cyan-500",
+  "from-violet-600 to-purple-500",
+  "from-rose-600 to-pink-500",
+  "from-amber-600 to-orange-500",
+  "from-indigo-600 to-blue-500",
+  "from-teal-600 to-emerald-500",
+  "from-fuchsia-600 to-rose-500",
+];
+
+const getAvatarGradient = (str = "") => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+};
+
 const ChatLabelDots = memo(({ chatId }) => {
   const labels = useChatStore((s) => s.labels);
   const chatLabels = useChatStore((s) => s.chatLabels);
@@ -208,6 +225,7 @@ const Sidebar = ({
   const [savingToneId, setSavingToneId] = useState(null);
   const [chatMenuAnchor, setChatMenuAnchor] = useState(null); // { top, bottom, left, right }
   const [showChannelsModal, setShowChannelsModal] = useState(false);
+  const [showFabMenu, setShowFabMenu] = useState(false);
 
   // ---- Primary tabs shared with the desktop activity rail ----
   // Chats / Updates / Groups / Calls live on a finger-following track.
@@ -869,10 +887,10 @@ const Sidebar = ({
         onTouchMove={cancelCardLongPress}
         onTouchEnd={cancelCardLongPress}
         onTouchCancel={cancelCardLongPress}
-        className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+        className={`group relative flex items-center gap-3.5 px-4 py-3.5 md:p-2.5 md:rounded-2xl cursor-pointer transition-colors duration-150 border-b border-black/[0.04] dark:border-white/[0.04] md:border-transparent ${
           isSelected
-            ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
-            : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
+            ? "bg-zinc-900/90 text-white dark:bg-white/10 dark:text-white md:shadow-lg font-semibold"
+            : "hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/[0.08]"
         }`}
       >
         <button
@@ -887,53 +905,55 @@ const Sidebar = ({
         >
           <span className="material-symbols-outlined text-lg">more_vert</span>
         </button>
-        <div
-          className={`relative shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-150 ${
-            isSelected
-              ? "bg-white text-zinc-900 dark:bg-[#0d0c11] dark:text-white shadow-md font-bold scale-105"
-              : "bg-black/5 border border-black/10 text-zinc-600 group-hover:text-zinc-900 group-hover:scale-105 dark:bg-white/5 dark:border-white/10 dark:text-zinc-400 dark:group-hover:text-white"
-          }`}
-        >
-          <span className="material-symbols-outlined text-xl">{room.isChannel ? "campaign" : "groups"}</span>
+        <div className="relative shrink-0 w-12 h-12">
+          {room.avatar || room.profilePic ? (
+            <img
+              src={room.avatar || room.profilePic}
+              alt={room.name}
+              className="w-full h-full rounded-2xl object-cover border border-black/10 dark:border-white/10"
+            />
+          ) : (
+            <div className={`w-full h-full rounded-2xl bg-gradient-to-tr ${room.isChannel ? "from-purple-600 to-indigo-600" : "from-emerald-600 to-cyan-600"} flex items-center justify-center text-white shadow-sm`}>
+              <span className="material-symbols-outlined text-2xl">{room.isChannel ? "campaign" : "groups"}</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div className="flex items-center gap-1 min-w-0">
-              <span
-                className={`text-xs font-semibold truncate ${
-                  isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
-                }`}
-              >
-                {(room.name || "Group").replace(/^#/, "")}
-              </span>
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <span
+              className={`text-[15px] font-semibold truncate flex items-center gap-1.5 ${
+                isSelected ? "text-white dark:text-white font-bold" : "text-zinc-900 dark:text-zinc-100"
+              }`}
+            >
+              {(room.name || "Group").replace(/^#/, "")}
               <ChatLabelDots chatId={roomId} />
-            </div>
+            </span>
+            <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 shrink-0">
+              {timeStr || "Active"}
+            </span>
+          </div>
 
-            <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className={`flex items-center gap-1 text-[13px] truncate ${isSelected ? "text-zinc-300 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-400"}`}>
               {isTyping ? (
-                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold animate-fadeIn min-w-0">
-                  <span className="truncate">{typers.join(", ")} {typers.length === 1 ? "is" : "are"} typing</span>
-                  <span className="inline-flex items-center gap-0.5 shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-1" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-2" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
-                  </span>
+                <div className="flex items-center gap-1.5 text-emerald-500 font-medium animate-fadeIn min-w-0">
+                  <span className="truncate">{typers.join(", ")} typing...</span>
                 </div>
               ) : draftText ? (
                 <div className="flex items-center gap-1 min-w-0 truncate">
                   <span className="text-red-500 font-bold shrink-0">[Draft]</span>
-                  <span className="truncate text-zinc-900 dark:text-white font-medium">{draftText}</span>
+                  <span className="truncate text-zinc-900 dark:text-zinc-200">{draftText}</span>
                 </div>
               ) : previewText ? (
                 <>
                   {isOutgoing && (
-                    <span className={`material-symbols-outlined text-[13px] shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-400"}`}>
+                    <span className="material-symbols-outlined text-[14px] shrink-0 text-zinc-400">
                       done
                     </span>
                   )}
                   {senderUsername && (
-                    <span className={`font-medium shrink-0 ${isSelected ? "text-white dark:text-black" : "text-zinc-700 dark:text-zinc-300"}`}>
+                    <span className="font-medium shrink-0 text-zinc-700 dark:text-zinc-300">
                       {senderUsername}:
                     </span>
                   )}
@@ -943,24 +963,17 @@ const Sidebar = ({
                 <span className="truncate opacity-75">{room.description || (room.isChannel ? "Channel" : "Group chat")}</span>
               )}
             </div>
-          </div>
 
-          <div className="shrink-0 flex flex-col items-end justify-center self-stretch gap-1 text-right">
-            <span className={`text-[10px] font-mono leading-none flex items-center gap-1 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+            <div className="flex items-center gap-1.5 shrink-0">
               {(authUser?.pinnedChats || []).includes(roomId) && (
-                <span className="material-symbols-outlined text-[11px]">push_pin</span>
+                <span className="material-symbols-outlined text-[13px] text-zinc-400 dark:text-zinc-500">push_pin</span>
               )}
-              {timeStr || "Active"}
-            </span>
-            {unread > 0 && (
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm animate-pulse ${
-                  isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-                }`}
-              >
-                {unread}
-              </span>
-            )}
+              {unread > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                  {unread}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1013,10 +1026,10 @@ const Sidebar = ({
         onTouchMove={cancelCardLongPress}
         onTouchEnd={cancelCardLongPress}
         onTouchCancel={cancelCardLongPress}
-        className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+        className={`group relative flex items-center gap-3.5 px-4 py-3.5 md:p-2.5 md:rounded-2xl cursor-pointer transition-colors duration-150 border-b border-black/[0.04] dark:border-white/[0.04] md:border-transparent ${
           isSelected
-            ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
-            : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
+            ? "bg-zinc-900/90 text-white dark:bg-white/10 dark:text-white md:shadow-lg font-semibold"
+            : "hover:bg-black/5 active:bg-black/10 dark:hover:bg-white/5 dark:active:bg-white/[0.08]"
         }`}
       >
         <button
@@ -1031,66 +1044,66 @@ const Sidebar = ({
         >
           <span className="material-symbols-outlined text-lg">more_vert</span>
         </button>
-        <div className="relative shrink-0 w-10 h-10">
-          <img
-            className={`w-full h-full rounded-full object-cover bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 ${
-              unviewedStoryUsers.has(friendId) ? "ring-2 ring-emerald-500 ring-offset-1 ring-offset-transparent" : ""
-            }`}
-            alt={isSelfChat ? "Saved Messages" : friend.username}
-            src={
-              isSelfChat
-                ? friend.profilePic || `https://ui-avatars.com/api/?name=Saved&background=3b82f6&color=ffffff`
-                : friend.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username)}&background=27272a&color=ffffff`
-            }
-          />
+        <div className="relative shrink-0 w-12 h-12">
+          {isSelfChat ? (
+            <div className="w-full h-full rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-sm">
+              <span className="material-symbols-outlined text-2xl">bookmark</span>
+            </div>
+          ) : friend.profilePic ? (
+            <img
+              className={`w-full h-full rounded-full object-cover border border-black/10 dark:border-white/10 ${
+                unviewedStoryUsers.has(friendId) ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-transparent" : ""
+              }`}
+              alt={friend.username}
+              src={friend.profilePic}
+            />
+          ) : (
+            <div className={`w-full h-full rounded-full bg-gradient-to-tr ${getAvatarGradient(friend.username)} flex items-center justify-center text-white font-bold text-base shadow-sm select-none`}>
+              {(friend.username || "U").slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <span
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 ${
+            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-[#09090b] z-10 ${
               isOnline
-                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+                ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"
                 : "bg-zinc-400 dark:bg-zinc-600"
             }`}
           />
         </div>
 
-        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div className="flex items-center gap-1 min-w-0">
-              <span
-                className={`text-xs font-semibold truncate ${
-                  isSelected ? "text-white dark:text-[#0d0c11] font-bold" : "text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white"
-                }`}
-              >
-                {isSelfChat ? (
-                  <div className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">bookmark</span>Saved Messages (You)</div>
-                ) : (
-                  friend.username
-                )}
-              </span>
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <span
+              className={`text-[15px] font-semibold truncate flex items-center gap-1.5 ${
+                isSelected ? "text-white dark:text-white font-bold" : "text-zinc-900 dark:text-zinc-100"
+              }`}
+            >
+              {isSelfChat ? "Saved Messages (You)" : friend.username}
               <ChatLabelDots chatId={friendId} />
-            </div>
+            </span>
+            <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 shrink-0">
+              {timeStr || (isOnline ? "Online" : "")}
+            </span>
+          </div>
 
-            <div className={`flex items-center gap-1 text-[11px] truncate mt-0.5 ${isSelected ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className={`flex items-center gap-1 text-[13px] truncate ${isSelected ? "text-zinc-300 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-400"}`}>
               {isTyping ? (
-                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold animate-fadeIn min-w-0">
-                  <span>typing</span>
-                  <span className="inline-flex items-center gap-0.5 shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-1" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-2" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-typing-dot-3" />
-                  </span>
+                <div className="flex items-center gap-1.5 text-emerald-500 font-medium animate-fadeIn min-w-0">
+                  <span>typing...</span>
                 </div>
               ) : draftText ? (
                 <div className="flex items-center gap-1 min-w-0 truncate">
                   <span className="text-red-500 font-bold shrink-0">[Draft]</span>
-                  <span className="truncate text-zinc-900 dark:text-white font-medium">{draftText}</span>
+                  <span className="truncate text-zinc-900 dark:text-zinc-200">{draftText}</span>
                 </div>
               ) : previewText ? (
                 <>
                   {isOutgoing && (
                     <MessageTicks
                       status={isRead ? "read" : isDelivered ? "delivered" : "sent"}
-                      size={13}
-                      className={isSelected ? "text-white dark:text-black" : "text-zinc-400"}
+                      size={14}
+                      className={isRead ? "text-cyan-400" : "text-zinc-400"}
                     />
                   )}
                   <span className="truncate">{previewText}</span>
@@ -1099,24 +1112,17 @@ const Sidebar = ({
                 <span className="truncate opacity-75">{isOnline ? "Online" : "Offline"}</span>
               )}
             </div>
-          </div>
 
-          <div className="shrink-0 flex flex-col items-end justify-center self-stretch gap-1 text-right">
-            <span className={`text-[10px] font-mono leading-none flex items-center gap-1 ${isSelected ? "text-zinc-300 dark:text-zinc-600 font-medium" : "text-zinc-400 dark:text-zinc-500"}`}>
+            <div className="flex items-center gap-1.5 shrink-0">
               {(authUser?.pinnedChats || []).includes(friendId) && (
-                <span className="material-symbols-outlined text-[11px]">push_pin</span>
+                <span className="material-symbols-outlined text-[13px] text-zinc-400 dark:text-zinc-500">push_pin</span>
               )}
-              {timeStr || (isOnline ? "Online" : "")}
-            </span>
-            {unread > 0 && (
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm animate-pulse ${
-                  isSelected ? "bg-white text-zinc-900 dark:bg-black dark:text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-                }`}
-              >
-                {unread}
-              </span>
-            )}
+              {unread > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                  {unread}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1334,84 +1340,63 @@ const Sidebar = ({
   return (
     <section
       aria-label="Chats List"
-      className="h-full flex flex-col p-3 text-on-surface select-none overflow-hidden transition-colors duration-200 bg-transparent"
+      className="h-full flex flex-col p-0 md:p-3 text-on-surface select-none overflow-hidden transition-colors duration-200 bg-[rgb(var(--bg-app-rgb))] md:bg-transparent relative"
     >
-      {/* 1. Sleek Top Header Bar with Actions */}
-      <div className="flex flex-col gap-2 pb-2">
-        <div className="flex items-center justify-between px-1 pt-1">
-          <div className="flex items-center gap-2.5">
+      {/* 1. Sleek Native Android Top App Bar */}
+      <div className="flex flex-col gap-2 pb-2 px-4 md:px-0 pt-3 md:pt-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             {onOpenProfile && (
               <button
                 type="button"
                 onClick={onOpenProfile}
-                className="md:hidden relative shrink-0 w-8 h-8 active:scale-95 transition-transform cursor-pointer"
+                className="md:hidden relative shrink-0 w-10 h-10 active:scale-95 transition-transform cursor-pointer"
                 title="Open Profile & Status"
               >
-                <img
-                  src={
-                    authUser?.profilePic ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=27272a&color=ffffff&bold=true`
-                  }
-                  alt={authUser?.username || "User"}
-                  className="w-full h-full rounded-full object-cover border border-black/10 dark:border-white/15"
-                />
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#121117] z-10" />
+                {authUser?.profilePic ? (
+                  <img
+                    src={authUser.profilePic}
+                    alt={authUser?.username || "User"}
+                    className="w-full h-full rounded-full object-cover border border-black/10 dark:border-white/15 shadow-sm"
+                  />
+                ) : (
+                  <div className={`w-full h-full rounded-full bg-gradient-to-tr ${getAvatarGradient(authUser?.username || "You")} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
+                    {(authUser?.username || "U").slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#09090b] z-10" />
               </button>
             )}
             <div className="flex items-center cursor-pointer" onClick={() => setSelectedChat(null)}>
-              <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl leading-tight">
+              <h1 className="font-bold tracking-tight text-zinc-900 dark:text-white text-xl md:text-2xl leading-tight">
                 {mobileTab === "updates" ? "Updates" : mobileTab === "groups" ? "Groups" : mobileTab === "calls" ? "Calls" : "Chats"}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* 24-Hour Status Stories Button (Mobile Only) */}
-            {onOpenStatus && (
-              <button
-                onClick={onOpenStatus}
-                className="md:hidden p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
-                title="Status Stories"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xl">motion_photos_on</span>
-              </button>
-            )}
-
-            {/* New Group Button (Mobile Only) */}
+          <div className="flex items-center gap-0.5">
+            {/* Quick Search Button (Mobile Only) */}
             <button
-              onClick={handleOpenGroupModal}
-              className="md:hidden p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
-              title="New Group"
+              onClick={() => {
+                if (mobileTab !== "chats") setMobileTab("chats");
+                setTimeout(() => searchInputRef.current?.focus(), 80);
+              }}
+              className="md:hidden p-2 rounded-full text-zinc-500 hover:text-zinc-900 active:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:active:bg-white/10 transition-colors cursor-pointer"
+              title="Search"
               type="button"
             >
-              <span className="material-symbols-outlined text-xl">group_add</span>
-            </button>
-
-            {/* Add Contact Button (Mobile Only) */}
-            <button
-              onClick={onOpenAddFriend}
-              className="md:hidden relative p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
-              title="Add Contact"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-xl">person_add</span>
-              {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold shadow-md animate-pulse">
-                  {pendingCount}
-                </span>
-              )}
+              <span className="material-symbols-outlined text-[22px]">search</span>
             </button>
 
             {/* Options Dropdown Menu */}
             <div className="relative" ref={optionsDropdownRef}>
               <button
                 onClick={() => setShowOptionsDropdown(!showOptionsDropdown)}
-                className="p-2 md:p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
+                className="p-2 md:p-1.5 rounded-full text-zinc-500 hover:text-zinc-900 active:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:active:bg-white/10 transition-colors cursor-pointer"
                 title="More options"
                 type="button"
               >
-                <span className="material-symbols-outlined text-xl md:text-lg">more_vert</span>
+                <span className="material-symbols-outlined text-[22px] md:text-lg">more_vert</span>
               </button>
 
               {showOptionsDropdown && (
@@ -1559,114 +1544,106 @@ const Sidebar = ({
         </div>
 
         {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct — Chats tab only on mobile */}
-        <div className={`relative select-none ${mobileTab === "chats" ? "" : "hidden"}`}>
-          <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1">
+        <div className={`relative select-none px-4 md:px-0 ${mobileTab === "chats" ? "" : "hidden"}`}>
+          <div ref={tabsRef} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1.5 pb-1">
             <button
               onClick={() => setActiveFilter("all")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-              activeFilter === "all"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
-            }`}
-            type="button"
-          >
-            <span>All</span>
-            <span className="text-[10px] opacity-75 font-mono">({allCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter("unread")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-              activeFilter === "unread"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
-            }`}
-            type="button"
-          >
-            <span>Unread</span>
-            {totalUnreadCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                activeFilter === "unread"
-                  ? "bg-white text-zinc-900 dark:bg-black dark:text-white"
-                  : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-              }`}>
-                {totalUnreadCount}
-              </span>
-            )}
-          </button>
-
-          {pendingCount > 0 && (
-            <button
-              onClick={() => setActiveFilter("requests")}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-                activeFilter === "requests"
-                  ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                  : "text-zinc-900 bg-black/5 border border-black/10 hover:bg-black/10 dark:text-white dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 font-semibold"
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                activeFilter === "all"
+                  ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
               }`}
               type="button"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-white animate-pulse" />
-              <span>Requests</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                activeFilter === "requests"
-                  ? "bg-white text-zinc-900 dark:bg-black dark:text-white"
-                  : "bg-zinc-900 text-white dark:bg-white dark:text-black"
-              }`}>
-                {pendingCount}
-              </span>
+              <span>All</span>
+              <span className="text-[10px] opacity-75 font-mono">({allCount})</span>
             </button>
-          )}
 
-          <button
-            onClick={() => setActiveFilter("groups")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-              activeFilter === "groups"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
-            }`}
-            type="button"
-          >
-            <span>Groups</span>
-            <span className="text-[10px] opacity-75 font-mono">({roomsCount})</span>
-          </button>
+            <button
+              onClick={() => setActiveFilter("unread")}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                activeFilter === "unread"
+                  ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
+              }`}
+              type="button"
+            >
+              <span>Unread</span>
+              {totalUnreadCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500 text-white">
+                  {totalUnreadCount}
+                </span>
+              )}
+            </button>
 
-          <button
-            onClick={() => setActiveFilter("channels")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-              activeFilter === "channels"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
-            }`}
-            type="button"
-          >
-            <span>Channels</span>
-            <span className="text-[10px] opacity-75 font-mono">({channelsCount})</span>
-          </button>
+            {pendingCount > 0 && (
+              <button
+                onClick={() => setActiveFilter("requests")}
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                  activeFilter === "requests"
+                    ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                    : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
+                }`}
+                type="button"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Requests</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500 text-white">
+                  {pendingCount}
+                </span>
+              </button>
+            )}
 
-          <button
-            onClick={() => setActiveFilter("direct")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-              activeFilter === "direct"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
-            }`}
-            type="button"
-          >
-            <span>Direct</span>
-            <span className="text-[10px] opacity-75 font-mono">({directCount})</span>
-          </button>
+            <button
+              onClick={() => setActiveFilter("groups")}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                activeFilter === "groups"
+                  ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
+              }`}
+              type="button"
+            >
+              <span>Groups</span>
+              <span className="text-[10px] opacity-75 font-mono">({roomsCount})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveFilter("archived")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
-              activeFilter === "archived"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-md font-bold"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5"
-            }`}
-            type="button"
-          >
-            <span>Archived</span>
-          </button>
+            <button
+              onClick={() => setActiveFilter("channels")}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                activeFilter === "channels"
+                  ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
+              }`}
+              type="button"
+            >
+              <span>Channels</span>
+              <span className="text-[10px] opacity-75 font-mono">({channelsCount})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveFilter("direct")}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                activeFilter === "direct"
+                  ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
+              }`}
+              type="button"
+            >
+              <span>Direct</span>
+              <span className="text-[10px] opacity-75 font-mono">({directCount})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveFilter("archived")}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all shrink-0 border ${
+                activeFilter === "archived"
+                  ? "bg-white/15 text-zinc-900 dark:text-white border-black/20 dark:border-white/25 font-semibold shadow-sm"
+                  : "bg-black/[0.03] dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/[0.05] hover:text-white"
+              }`}
+              type="button"
+            >
+              <span>Archived</span>
+            </button>
           </div>
           {!tabsAtStart && (
             <>
@@ -2038,25 +2015,6 @@ const Sidebar = ({
       )}
 
       {/* 4. Conversation List - desktop single pane, true swipeable pager on mobile */}
-      {/* Mobile pager position dots (tap to jump) */}
-      <div className="md:hidden flex items-center justify-center gap-1.5 pt-1 pb-0.5">
-        {MOBILE_TABS.map((t, i) => (
-          <button
-            key={t}
-            type="button"
-            aria-label={`Go to ${t}`}
-            onClick={() => {
-              if (i !== mobileTabIndex) {
-                setSearchQuery("");
-                setMobileTab(t);
-              }
-            }}
-            className={`h-1 rounded-full transition-all duration-300 ${
-              mobileTab === t ? "w-5 bg-zinc-900 dark:bg-white" : "w-1 bg-zinc-300 dark:bg-zinc-700"
-            }`}
-          />
-        ))}
-      </div>
       <div
         ref={pagerViewportRef}
         onTouchStart={handlePagerTouchStart}
@@ -2445,14 +2403,71 @@ const Sidebar = ({
         </>,
         document.body
       )}
-      {/* 5. Mobile bottom navigation (WhatsApp-style swipeable primary tabs).
-          Rendered inside the sidebar column so it never overlaps content;
-          hidden on desktop where the activity rail serves this role.
-          Tapping switches the inline page — swiping the list above does the same. */}
+      {/* 5. Native Android Floating Action Button (FAB) */}
+      <div className="md:hidden fixed right-5 bottom-[70px] z-40">
+        {showFabMenu && (
+          <div className="absolute right-0 bottom-16 mb-2 flex flex-col gap-2.5 items-end select-none z-50 animate-fadeIn">
+            <button
+              type="button"
+              onClick={() => {
+                setShowFabMenu(false);
+                onOpenAddFriend?.();
+              }}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-zinc-900/95 dark:bg-[#1a1922] text-white border border-white/10 shadow-xl text-xs font-semibold backdrop-blur-xl active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <span>New Direct Chat</span>
+              <span className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                <span className="material-symbols-outlined text-[16px]">person_add</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowFabMenu(false);
+                handleOpenGroupModal();
+              }}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-zinc-900/95 dark:bg-[#1a1922] text-white border border-white/10 shadow-xl text-xs font-semibold backdrop-blur-xl active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <span>New Group</span>
+              <span className="w-7 h-7 rounded-full bg-cyan-500 text-white flex items-center justify-center">
+                <span className="material-symbols-outlined text-[16px]">group_add</span>
+              </span>
+            </button>
+            {onOpenStatus && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFabMenu(false);
+                  onOpenStatus();
+                }}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-zinc-900/95 dark:bg-[#1a1922] text-white border border-white/10 shadow-xl text-xs font-semibold backdrop-blur-xl active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              >
+                <span>Add Story</span>
+                <span className="w-7 h-7 rounded-full bg-purple-500 text-white flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[16px]">motion_photos_on</span>
+                </span>
+              </button>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setShowFabMenu((prev) => !prev)}
+          className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+          title="New Chat"
+        >
+          <span className="material-symbols-outlined text-2xl transition-transform duration-200">
+            {showFabMenu ? "close" : "edit_square"}
+          </span>
+        </button>
+      </div>
+
+      {/* 6. Native Android Material 3 Bottom Navigation Bar */}
       <nav
         aria-label="Primary"
-        className="md:hidden shrink-0 -mx-3 -mb-3 mt-2 border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 10px)" }}
+        className="md:hidden shrink-0 w-full border-t border-black/10 dark:border-white/10 bg-[#09090b] backdrop-blur-2xl px-2 pt-2 grid grid-cols-4 z-30"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)" }}
       >
         <button
           type="button"
@@ -2462,69 +2477,69 @@ const Sidebar = ({
             setSearchQuery("");
             setMobileTab("chats");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
-            mobileTab === "chats" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          className={`flex flex-col items-center gap-1 py-1 active:scale-95 transition-all ${
+            mobileTab === "chats" ? "text-emerald-400 font-semibold" : "text-zinc-400 hover:text-zinc-200"
           }`}
         >
-          <span className={`relative flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
-            mobileTab === "chats" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          <span className={`relative flex items-center justify-center px-4 py-1 rounded-full transition-all ${
+            mobileTab === "chats" ? "bg-emerald-500/15" : ""
           }`}>
-            <span className="material-symbols-outlined text-[20px]">chat</span>
+            <span className="material-symbols-outlined text-[22px]">chat</span>
             {totalUnreadCount > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold flex items-center justify-center shadow">
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white font-mono text-[9px] font-bold flex items-center justify-center shadow">
                 {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
               </span>
             )}
           </span>
-          <span className={`text-[10px] ${mobileTab === "chats" ? "font-semibold" : "font-medium"}`}>Chats</span>
+          <span className="text-[11px] tracking-tight">Chats</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setSearchQuery(""); setMobileTab("updates"); }}
-          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
-            mobileTab === "updates" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          className={`flex flex-col items-center gap-1 py-1 active:scale-95 transition-all ${
+            mobileTab === "updates" ? "text-emerald-400 font-semibold" : "text-zinc-400 hover:text-zinc-200"
           }`}
         >
-          <span className={`relative flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
-            mobileTab === "updates" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          <span className={`relative flex items-center justify-center px-4 py-1 rounded-full transition-all ${
+            mobileTab === "updates" ? "bg-emerald-500/15" : ""
           }`}>
-            <span className="material-symbols-outlined text-[20px]">motion_photos_on</span>
+            <span className="material-symbols-outlined text-[22px]">motion_photos_on</span>
             {unviewedStoryUsers.size > 0 && (
-              <span className="absolute top-0.5 right-2.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-black" />
+              <span className="absolute top-0 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#09090b]" />
             )}
           </span>
-          <span className={`text-[10px] ${mobileTab === "updates" ? "font-semibold" : "font-medium"}`}>Updates</span>
+          <span className="text-[11px] tracking-tight">Updates</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setSearchQuery(""); setMobileTab("groups"); }}
-          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
-            mobileTab === "groups" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          className={`flex flex-col items-center gap-1 py-1 active:scale-95 transition-all ${
+            mobileTab === "groups" ? "text-emerald-400 font-semibold" : "text-zinc-400 hover:text-zinc-200"
           }`}
         >
-          <span className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
-            mobileTab === "groups" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          <span className={`flex items-center justify-center px-4 py-1 rounded-full transition-all ${
+            mobileTab === "groups" ? "bg-emerald-500/15" : ""
           }`}>
-            <span className="material-symbols-outlined text-[20px]">groups</span>
+            <span className="material-symbols-outlined text-[22px]">groups</span>
           </span>
-          <span className={`text-[10px] ${mobileTab === "groups" ? "font-semibold" : "font-medium"}`}>Groups</span>
+          <span className="text-[11px] tracking-tight">Groups</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setSearchQuery(""); setMobileTab("calls"); }}
-          className={`flex flex-col items-center gap-0.5 py-1 active:scale-95 transition-transform ${
-            mobileTab === "calls" ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+          className={`flex flex-col items-center gap-1 py-1 active:scale-95 transition-all ${
+            mobileTab === "calls" ? "text-emerald-400 font-semibold" : "text-zinc-400 hover:text-zinc-200"
           }`}
         >
-          <span className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
-            mobileTab === "calls" ? "bg-zinc-900/[0.07] dark:bg-white/10" : ""
+          <span className={`flex items-center justify-center px-4 py-1 rounded-full transition-all ${
+            mobileTab === "calls" ? "bg-emerald-500/15" : ""
           }`}>
-            <span className="material-symbols-outlined text-[20px]">call_log</span>
+            <span className="material-symbols-outlined text-[22px]">call</span>
           </span>
-          <span className={`text-[10px] ${mobileTab === "calls" ? "font-semibold" : "font-medium"}`}>Calls</span>
+          <span className="text-[11px] tracking-tight">Calls</span>
         </button>
       </nav>
     </section>

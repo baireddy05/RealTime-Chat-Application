@@ -1,6 +1,7 @@
 import { getUserSocketIds } from "./socket.js";
 import { sendWebPush } from "./push.js";
 import { sendFcm } from "./fcm.js";
+import { sendSsePush } from "../controllers/push.controller.js";
 
 // Build a privacy-safe push preview from server-visible fields only.
 // Encrypted bodies are opaque here by design — never include ciphertext.
@@ -40,6 +41,12 @@ export const notifyUser = async (userId, { title, body, data = {} }) => {
     badge: "/favicon.png",
     data,
   };
+  // Send instantly to native Android Background Service via SSE stream
+  try {
+    sendSsePush(userId, payload);
+  } catch (err) {
+    console.error("[Notify] SSE push failed:", err.message);
+  }
   const [web, fcm] = await Promise.all([
     sendWebPush(userId, payload).catch((err) => {
       console.error("[Notify] web push failed:", err.message);
@@ -66,27 +73,37 @@ export const notifyNewMessage = async ({ message, senderName, room = null, recei
       const targets = (room.members || [])
         .map((m) => m?._id?.toString?.() || m?.toString?.() || m)
         .filter((id) => typeof id === "string" && id && id !== senderIdStr);
+      console.log(`[Notify] Sending group push notification to ${targets.length} members for room ${room._id}`);
       await Promise.all(
-        targets
-          .filter((id) => id !== senderIdStr && !hasLiveSocket(id))
-          .map((id) =>
-            notifyUser(id, {
-              title,
-              body,
-              data: { type: "message", chatType: "room", chatId: room._id?.toString?.() || room._id, messageId: msgId },
-            })
-          )
+        targets.map((id) =>
+          notifyUser(id, {
+            title,
+            body,
+            data: {
+              type: "message",
+              chatType: "room",
+              chatId: room._id?.toString?.() || room._id,
+              messageId: msgId,
+              senderName: senderName || "Someone",
+            },
+          })
+        )
       );
     } else if (receiverId) {
       const rid = receiverId?._id?.toString?.() || receiverId?.toString?.() || receiverId;
       const dmPeer = message?.senderId?._id?.toString?.() || message?.senderId?.toString?.() || message?.senderId;
-      if (!hasLiveSocket(rid)) {
-        await notifyUser(rid, {
-          title: senderName || "New message",
-          body,
-          data: { type: "message", chatType: "user", chatId: dmPeer, messageId: msgId },
-        });
-      }
+      console.log(`[Notify] Sending DM push notification to receiver ${rid} from ${senderName}`);
+      await notifyUser(rid, {
+        title: senderName || "New message",
+        body,
+        data: {
+          type: "message",
+          chatType: "user",
+          chatId: dmPeer,
+          messageId: msgId,
+          senderName: senderName || "New message",
+        },
+      });
     }
   } catch (err) {
     console.error("[Notify] notifyNewMessage failed:", err.message);
@@ -96,7 +113,6 @@ export const notifyNewMessage = async ({ message, senderName, room = null, recei
 export const notifyIncomingCall = async ({ callerId, callerName, receiverId, callType = "video" }) => {
   try {
     const rid = receiverId?.toString?.() || receiverId;
-    if (hasLiveSocket(rid)) return; // in-app ringing handles it
     const label = callType === "audio" ? "Voice" : "Video";
     await notifyUser(rid, {
       title: `Incoming ${label} call`,
