@@ -28,7 +28,7 @@ import java.util.Map;
 
 public class PulseFirebaseMessagingService extends FirebaseMessagingService {
     private static final String TAG = "PulseFCMService";
-    public static final String CHANNEL_MESSAGE_ID = "pulse_v4_messages";
+    public static final String CHANNEL_MESSAGE_ID = "pulse_v5_messages";
     public static final String CHANNEL_CALL_ID = "pulse_calls_v2";
     private static final String PREF_STACKS = "pulse_msg_stacks";
 
@@ -37,7 +37,7 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
                 // High importance message channels with sound, vibration, lights
-                String[] messageChannels = new String[]{CHANNEL_MESSAGE_ID, "pulse_messages_v2", "pulse_messages", "default"};
+                String[] messageChannels = new String[]{CHANNEL_MESSAGE_ID, "pulse_v4_messages", "pulse_messages_v2", "pulse_messages", "default"};
                 Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                 AudioAttributes audioAttributes = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -56,6 +56,7 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                         ch.setShowBadge(true);
                         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
                         ch.setSound(defaultSoundUri, audioAttributes);
+                        ch.setBypassDnd(true);
                         nm.createNotificationChannel(ch);
                     }
                 }

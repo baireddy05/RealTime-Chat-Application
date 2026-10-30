@@ -99,13 +99,12 @@ export const sendFcm = async (userId, { title, body, data = {} }) => {
     android: {
       priority: "high",
       notification: {
-        channelId: "pulse_v4_messages",
+        channelId: "pulse_v5_messages",
         sound: "default",
         defaultSound: true,
         defaultVibrateTimings: true,
         priority: "max",
         visibility: "public",
-        icon: "ic_stat_pulse",
         color: "#00E5FF",
       },
     },

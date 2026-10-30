@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
+        android:name=".PulseApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -51,6 +52,7 @@
         <!-- Native Firebase Cloud Messaging Service (WhatsApp-style stacked notifications) -->
         <service
             android:name=".PulseFirebaseMessagingService"
+            android:directBootAware="true"
             android:exported="false">
             <intent-filter android:priority="1000">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
@@ -59,7 +61,7 @@
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="pulse_v4_messages" />
+            android:value="pulse_v5_messages" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_pulse" />
