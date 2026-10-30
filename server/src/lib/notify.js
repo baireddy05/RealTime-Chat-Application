@@ -2,22 +2,66 @@ import { getUserSocketIds } from "./socket.js";
 import { sendWebPush } from "./push.js";
 import { sendFcm } from "./fcm.js";
 import { sendSsePush } from "../controllers/push.controller.js";
+import crypto from "crypto";
 
-// Build a privacy-safe push preview from server-visible fields only.
-// Encrypted bodies are opaque here by design — never include ciphertext.
-export const previewForMessage = (msg) => {
+// Decrypt E2EE message text for push notification preview
+const decryptMessageText = (ciphertextStr, { senderId, receiverId, roomId }) => {
+  if (!ciphertextStr || typeof ciphertextStr !== "string" || !ciphertextStr.startsWith("[e2ee]:")) {
+    return ciphertextStr;
+  }
+  try {
+    let keyString = "pulse-default-secure-vault-key";
+    if (roomId) {
+      keyString = `pulse-room-key-${String(roomId)}`;
+    } else if (senderId && receiverId) {
+      const ids = [String(senderId), String(receiverId)].sort();
+      keyString = `pulse-dm-key-${ids[0]}-${ids[1]}`;
+    }
+    const keyHash = crypto.createHash("sha256").update(keyString).digest();
+
+    const raw = ciphertextStr.slice(7);
+    const [ivHex, cipherHex] = raw.split(":");
+    if (!ivHex || !cipherHex) return null;
+
+    const iv = Buffer.from(ivHex, "hex");
+    const ciphertextWithTag = Buffer.from(cipherHex, "hex");
+    if (ciphertextWithTag.length < 16) return null;
+
+    const ciphertext = ciphertextWithTag.subarray(0, ciphertextWithTag.length - 16);
+    const authTag = ciphertextWithTag.subarray(ciphertextWithTag.length - 16);
+
+    const decipher = crypto.createDecipheriv("aes-256-gcm", keyHash, iv);
+    decipher.setAuthTag(authTag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+  } catch (err) {
+    return null;
+  }
+};
+
+// Build push preview from message fields, resolving E2EE ciphertext to clear text for notifications
+export const previewForMessage = (msg, context = {}) => {
   if (!msg) return "New message";
-  if (!msg.isEncrypted && typeof msg.text === "string" && msg.text.trim()) {
-    const t = msg.text.trim();
+
+  let plainText = msg.text;
+  if (msg.isEncrypted || (typeof msg.text === "string" && msg.text.startsWith("[e2ee]:"))) {
+    const senderId = msg.senderId?._id?.toString?.() || msg.senderId?.toString?.();
+    const receiverId = context.receiverId?.toString?.() || msg.receiverId?._id?.toString?.() || msg.receiverId?.toString?.();
+    const roomId = context.room?._id?.toString?.() || msg.roomId?.toString?.();
+    const decrypted = decryptMessageText(msg.text, { senderId, receiverId, roomId });
+    if (decrypted) plainText = decrypted;
+  }
+
+  if (typeof plainText === "string" && plainText.trim() && !plainText.startsWith("[e2ee]:")) {
+    const t = plainText.trim();
     return t.length > 120 ? `${t.slice(0, 120)}…` : t;
   }
   if (msg.image) return "📷 Photo";
   if (msg.videoNote) return "🎬 Video message";
   if (msg.audio) return "🎤 Voice message";
-  if (msg.file) return `📎 ${msg.file?.name || "File"}`;
-  if (msg.contact) return "👤 Shared contact";
-  if (msg.poll) return "📊 New poll";
-  if (msg.location) return msg.location.name ? `📍 ${msg.location.name}` : "📍 Shared location";
+  if (msg.file && (msg.file.url || msg.file.name)) return `📎 ${msg.file.name || "File"}`;
+  if (msg.contact && (msg.contact.fullName || msg.contact.username || msg.contact.phone)) return "👤 Shared contact";
+  if (msg.poll && msg.poll.question) return "📊 New poll";
+  if (msg.location && (msg.location.lat != null || msg.location.name)) return msg.location.name ? `📍 ${msg.location.name}` : "📍 Shared location";
   if (msg.isSticker) return "⭐ Sticker";
   return "New message";
 };
@@ -64,7 +108,7 @@ export const notifyUser = async (userId, { title, body, data = {} }) => {
 // `room` is { _id, name, members } for group messages, null for DMs.
 export const notifyNewMessage = async ({ message, senderName, room = null, receiverId = null }) => {
   try {
-    const body = previewForMessage(message);
+    const body = previewForMessage(message, { room, receiverId });
     const msgId = message?._id?.toString?.() || message?._id;
     if (room) {
       const title = `${room.name || "Group"} • ${senderName || "Someone"}`;
