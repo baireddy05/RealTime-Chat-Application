@@ -9,6 +9,7 @@ export const getPushConfig = async (req, res) => {
       vapidPublicKey: getVapidPublicKey(),
       webPush: isPushConfigured(),
       fcm: isFcmConfigured(),
+      commit: process.env.RENDER_GIT_COMMIT || "local",
     });
   } catch (error) {
     console.error("Error in getPushConfig:", error.message);
