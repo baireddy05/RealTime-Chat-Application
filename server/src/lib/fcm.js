@@ -2,18 +2,20 @@ import DeviceToken from "../models/DeviceToken.model.js";
 
 let admin = null;
 let initAttempted = false;
+let initError = null;
 
 // Lazily initializes firebase-admin from FIREBASE_SERVICE_ACCOUNT, which may
 // be either a JSON string or a path to the service-account JSON file.
 // Returns null (and stays silent afterwards) when unconfigured so the rest
 // of the app keeps working on Web Push alone.
-const getAdmin = async () => {
+export const getAdmin = async () => {
   if (admin) return admin;
-  if (initAttempted) return null;
+  if (initAttempted) return admin;
   initAttempted = true;
 
   const cred = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!cred) {
+    initError = "FIREBASE_SERVICE_ACCOUNT not set";
     console.warn(
       "[FCM] FIREBASE_SERVICE_ACCOUNT not set — native push disabled. Web Push still works for browsers/PWA."
     );
@@ -39,6 +41,9 @@ const getAdmin = async () => {
           resolved = serverRelative;
         }
       }
+      if (!fs.existsSync(resolved)) {
+        throw new Error(`Service account file not found at ${resolved}`);
+      }
       serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf8"));
     }
     // Private keys pasted into .env often carry literal \n sequences
@@ -51,9 +56,19 @@ const getAdmin = async () => {
     console.log("[FCM] firebase-admin initialized — native push enabled");
     return admin;
   } catch (err) {
+    initError = err.message;
     console.error("[FCM] Initialization failed, native push disabled:", err.message);
     return null;
   }
+};
+
+export const getFcmStatus = async () => {
+  const sdk = await getAdmin();
+  return {
+    configured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT),
+    active: Boolean(sdk),
+    error: initError,
+  };
 };
 
 export const isFcmConfigured = () => Boolean(process.env.FIREBASE_SERVICE_ACCOUNT);

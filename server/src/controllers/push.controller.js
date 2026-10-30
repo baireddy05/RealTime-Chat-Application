@@ -1,14 +1,17 @@
 import PushSubscription from "../models/PushSubscription.model.js";
 import DeviceToken from "../models/DeviceToken.model.js";
 import { getVapidPublicKey, isPushConfigured } from "../lib/push.js";
-import { isFcmConfigured } from "../lib/fcm.js";
+import { isFcmConfigured, getFcmStatus } from "../lib/fcm.js";
 
 export const getPushConfig = async (req, res) => {
   try {
+    const fcmStatus = await getFcmStatus();
     res.status(200).json({
       vapidPublicKey: getVapidPublicKey(),
       webPush: isPushConfigured(),
       fcm: isFcmConfigured(),
+      fcmActive: fcmStatus.active,
+      fcmError: fcmStatus.error,
       commit: process.env.RENDER_GIT_COMMIT || "local",
     });
   } catch (error) {
