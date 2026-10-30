@@ -10,5 +10,6 @@ server/node_modules/
 client/node_modules/
 *firebase*.json
 *service-account*.json
+*firebase*.txt
 google-services.json
 *.apk
