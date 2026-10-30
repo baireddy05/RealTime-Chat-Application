@@ -91,9 +91,23 @@ export const sendFcm = async (userId, { title, body, data = {} }) => {
   // to dynamically stack all unread messages per chat into an InboxStyle notification.
   const message = {
     tokens: tokens.map((t) => t.token),
+    notification: {
+      title: title || "Pulse Messenger",
+      body: body || "New activity",
+    },
     data: stringData,
     android: {
       priority: "high",
+      notification: {
+        channelId: "pulse_v4_messages",
+        sound: "default",
+        defaultSound: true,
+        defaultVibrateTimings: true,
+        priority: "max",
+        visibility: "public",
+        icon: "ic_stat_pulse",
+        color: "#00E5FF",
+      },
     },
   };
 
