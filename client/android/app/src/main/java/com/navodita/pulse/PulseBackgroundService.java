@@ -43,9 +43,18 @@ public class PulseBackgroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startKeepAliveForeground();
-        startWorker();
-        return START_STICKY;
+        try {
+            stopForeground(true);
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.cancel(9999);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    nm.deleteNotificationChannel(CHANNEL_SERVICE_ID);
+                }
+            }
+        } catch (Exception ignored) {}
+        stopSelf();
+        return START_NOT_STICKY;
     }
 
     private void createChannels() {

@@ -19,30 +19,18 @@ public class PulseNativePlugin extends Plugin {
 
     @PluginMethod
     public void configureSync(PluginCall call) {
-        String serverUrl = call.getString("serverUrl", "");
-        String token = call.getString("token", "");
-        String userId = call.getString("userId", "");
-
         Context ctx = getContext();
-        SharedPreferences prefs = ctx.getSharedPreferences("pulse_prefs", Context.MODE_PRIVATE);
-        prefs.edit()
-            .putString("server_url", serverUrl)
-            .putString("token", token)
-            .putString("user_id", userId)
-            .apply();
-
         try {
             Intent serviceIntent = new Intent(ctx, PulseBackgroundService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ContextCompat.startForegroundService(ctx, serviceIntent);
-            } else {
-                ctx.startService(serviceIntent);
+            ctx.stopService(serviceIntent);
+            android.app.NotificationManager nm = (android.app.NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.cancel(9999);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    nm.deleteNotificationChannel(PulseBackgroundService.CHANNEL_SERVICE_ID);
+                }
             }
-        } catch (Exception e) {
-            call.reject("Failed to start background service: " + e.getMessage());
-            return;
-        }
-
+        } catch (Exception ignored) {}
         call.resolve();
     }
 

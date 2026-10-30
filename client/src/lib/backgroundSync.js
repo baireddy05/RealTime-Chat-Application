@@ -6,18 +6,12 @@ export const PulseBackground = Capacitor.isNativePlatform()
   : null;
 
 export async function syncNativeBackgroundService(userId) {
-  if (!Capacitor.isNativePlatform() || !PulseBackground) return;
-  try {
-    const token = localStorage.getItem("pulse-token") || "";
-    const serverUrl = getApiBaseUrl();
-    await PulseBackground.configureSync({
-      serverUrl,
-      token,
-      userId: userId ? String(userId) : "",
-    });
-    console.log("[Pulse Background Sync] Native background service configured and running.");
-  } catch (e) {
-    console.warn("[Pulse Background Sync] configureSync error:", e);
+  // Pure native FCM high-priority data messages deliver notifications 100% reliably.
+  // We explicitly disable the persistent foreground service so "Connected in background" notification is removed.
+  if (Capacitor.isNativePlatform() && PulseBackground) {
+    try {
+      await PulseBackground.stopSync();
+    } catch {}
   }
 }
 

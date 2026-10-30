@@ -25,6 +25,18 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
+        // Cancel and delete any legacy foreground keepalive notification (ID 9999)
+        try {
+            android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.cancel(9999);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    nm.deleteNotificationChannel("pulse_bg_keepalive");
+                }
+            }
+            stopService(new android.content.Intent(this, PulseBackgroundService.class));
+        } catch (Exception ignored) {}
+
         // Request exemption from battery optimization so background FCM wakeups arrive when app is closed
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             try {
