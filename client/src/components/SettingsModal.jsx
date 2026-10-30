@@ -22,6 +22,8 @@ import {
 import { useChatStore } from "../store/useChatStore";
 import { ensurePushTransports } from "../lib/push";
 import { hasChatPin, setChatPin, clearChatPin, verifyChatPin, getLockedChats } from "../lib/chatLock";
+import { Capacitor } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
 
 // Chat Lock PIN management (device-local, Privacy tab)
 const ChatLockSettings = () => {
@@ -211,6 +213,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [pushStatus, setPushStatus] = useState(null); // null | "on" | "off" | "unsupported" | "unconfigured"
 
   const refreshPushStatus = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await PushNotifications.checkPermissions();
+        const granted = perm.receive === "granted";
+        setNotificationsAllowed(granted);
+        setPushStatus(granted ? "on" : "off");
+      } catch {
+        setNotificationsAllowed(true);
+        setPushStatus("on");
+      }
+      return;
+    }
+
     try {
       const { axiosInstance } = await import("../lib/axios");
       const { data } = await axiosInstance.get("/push/config");
@@ -236,7 +251,26 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleRequestNotification = async () => {    if (typeof Notification !== "undefined") {
+  const handleRequestNotification = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive !== "granted") {
+          perm = await PushNotifications.requestPermissions();
+        }
+        const granted = perm.receive === "granted";
+        setNotificationsAllowed(granted);
+        setPushStatus(granted ? "on" : "off");
+        if (granted) {
+          await ensurePushTransports().catch(() => {});
+        }
+      } catch (err) {
+        console.warn("[FCM] Permission request error:", err);
+      }
+      return;
+    }
+
+    if (typeof Notification !== "undefined") {
       const perm = await Notification.requestPermission();
       setNotificationsAllowed(perm === "granted");
       if (perm === "granted") {
@@ -247,6 +281,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
   };
 
   const handleEnablePush = async () => {
+    if (Capacitor.isNativePlatform()) {
+      await handleRequestNotification();
+      return;
+    }
+
     if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
       const perm = await Notification.requestPermission();
       setNotificationsAllowed(perm === "granted");
@@ -643,27 +682,29 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 </button>
               </div>
 
-              {/* Desktop Notifications */}
+              {/* Desktop / Device Notifications */}
               <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                     <Bell size={15} />
-                    <span>Browser Desktop Notifications</span>
+                    <span>{Capacitor.isNativePlatform() ? "Device Notifications" : "Browser Desktop Notifications"}</span>
                   </div>
                   <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                    Receive background notifications when new direct messages or mentions arrive.
+                    {Capacitor.isNativePlatform()
+                      ? "Receive heads-up banners and alerts when new messages arrive."
+                      : "Receive background notifications when new direct messages or mentions arrive."}
                   </p>
                 </div>
 
                 {!notificationsAllowed ? (
                   <button
                     onClick={handleRequestNotification}
-                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm shrink-0"
                   >
                     Enable
                   </button>
                 ) : (
-                  <span className="text-xs font-semibold text-emerald-500">Allowed</span>
+                  <span className="text-xs font-semibold text-emerald-500 shrink-0">Allowed</span>
                 )}
               </div>
 
@@ -672,17 +713,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                     <Bell size={15} />
-                    <span>Background Push Notifications</span>
+                    <span>{Capacitor.isNativePlatform() ? "Native Push Alerts (FCM)" : "Background Push Notifications"}</span>
                   </div>
                   <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                    Get message and call alerts even when the browser tab is closed.
+                    {Capacitor.isNativePlatform()
+                      ? "Instant background delivery even when the app is completely closed."
+                      : "Get message and call alerts even when the browser tab is closed."}
                   </p>
-                  {pushStatus === "unconfigured" && (
+                  {!Capacitor.isNativePlatform() && pushStatus === "unconfigured" && (
                     <p className="text-[11px] text-amber-500">
                       Server push is not configured yet (missing VAPID keys).
                     </p>
                   )}
-                  {pushStatus === "unsupported" && (
+                  {!Capacitor.isNativePlatform() && pushStatus === "unsupported" && (
                     <p className="text-[11px] text-amber-500">
                       This browser does not support background push.
                     </p>
