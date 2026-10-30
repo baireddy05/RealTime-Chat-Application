@@ -18,16 +18,10 @@ import {
   EyeOff,
   PanelLeft,
   PanelRight,
-  Server,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { ensurePushTransports } from "../lib/push";
-import { notificationManager } from "../lib/notification";
-import { Capacitor } from "@capacitor/core";
-import { openAutostartSettings, requestIgnoreBatteryOptimization } from "../lib/backgroundSync";
 import { hasChatPin, setChatPin, clearChatPin, verifyChatPin, getLockedChats } from "../lib/chatLock";
-import ServerConfigModal from "./ServerConfigModal";
-import { getApiBaseUrl } from "../lib/apiConfig";
 
 // Chat Lock PIN management (device-local, Privacy tab)
 const ChatLockSettings = () => {
@@ -70,7 +64,7 @@ const ChatLockSettings = () => {
     setPinSet(true);
     reset();
     setSaving(false);
-    setDone(pinSet ? "PIN changed." : "PIN set. Lock chats from any chat's â‹® menu.");
+    setDone(pinSet ? "PIN changed." : "PIN set. Lock chats from any chat's ⋮ menu.");
   };
 
   const handleRemove = async () => {
@@ -78,7 +72,7 @@ const ChatLockSettings = () => {
     clearChatPin();
     setPinSet(false);
     reset();
-    setDone("PIN removed â€” locked chats are now open.");
+    setDone("PIN removed — locked chats are now open.");
   };
 
   const pinInput = (value, onChange, placeholder) => (
@@ -116,13 +110,13 @@ const ChatLockSettings = () => {
       </p>
       {pinSet && (
         <div className="flex items-center gap-2">
-          {pinInput(current, setCurrent, "â€¢â€¢â€¢â€¢")}
+          {pinInput(current, setCurrent, "••••")}
           <span className="text-[10px] text-zinc-500 shrink-0">Current PIN</span>
         </div>
       )}
       <div className="flex items-center gap-2">
-        {pinInput(next, setNext, "â€¢â€¢â€¢â€¢")}
-        {pinInput(confirm, setConfirm, "â€¢â€¢â€¢â€¢")}
+        {pinInput(next, setNext, "••••")}
+        {pinInput(confirm, setConfirm, "••••")}
         <span className="text-[10px] text-zinc-500 shrink-0">{pinSet ? "New PIN" : "New 4-digit PIN"}</span>
       </div>
       {error && <p className="text-[11px] text-red-500">{error}</p>}
@@ -134,7 +128,7 @@ const ChatLockSettings = () => {
           disabled={saving}
           className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-all"
         >
-          {saving ? "Savingâ€¦" : pinSet ? "Change PIN" : "Set PIN"}
+          {saving ? "Saving…" : pinSet ? "Change PIN" : "Set PIN"}
         </button>
         {pinSet && (
           <button
@@ -211,18 +205,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [previewVisible, setPreviewVisible] = useState(true);
   const [previewSide, setPreviewSide] = useState("right"); // "left" | "right"
   const [previewMobileOpen, setPreviewMobileOpen] = useState(false);
-  const [notificationsAllowed, setNotificationsAllowed] = useState(() =>
-    notificationManager.hasPermission()
+  const [notificationsAllowed, setNotificationsAllowed] = useState(
+    typeof Notification !== "undefined" && Notification.permission === "granted"
   );
   const [pushStatus, setPushStatus] = useState(null); // null | "on" | "off" | "unsupported" | "unconfigured"
-  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
 
   const refreshPushStatus = async () => {
-    setNotificationsAllowed(notificationManager.hasPermission());
-    if (Capacitor.isNativePlatform()) {
-      setPushStatus("on");
-      return;
-    }
     try {
       const { axiosInstance } = await import("../lib/axios");
       const { data } = await axiosInstance.get("/push/config");
@@ -248,40 +236,24 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleRequestNotification = async () => {
-    const perm = await notificationManager.requestPermission();
-    setNotificationsAllowed(perm === "granted");
-    if (perm === "granted") {
-      await ensurePushTransports().catch(() => {});
-      refreshPushStatus();
+  const handleRequestNotification = async () => {    if (typeof Notification !== "undefined") {
+      const perm = await Notification.requestPermission();
+      setNotificationsAllowed(perm === "granted");
+      if (perm === "granted") {
+        await ensurePushTransports().catch(() => {});
+        refreshPushStatus();
+      }
     }
   };
 
   const handleEnablePush = async () => {
-    if (!notificationManager.hasPermission()) {
-      const perm = await notificationManager.requestPermission();
+    if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+      const perm = await Notification.requestPermission();
       setNotificationsAllowed(perm === "granted");
       if (perm !== "granted") return;
     }
     await ensurePushTransports().catch(() => {});
     refreshPushStatus();
-  };
-
-  const handleSendTestNotification = async () => {
-    try {
-      const ok = await notificationManager.sendNotification({
-        title: "Pulse Notifications Active! 🎉",
-        body: "Native Android notifications and alerts are working properly.",
-        force: true,
-      });
-      if (ok) {
-        alert("Test notification triggered! Check your status bar and screen.");
-      } else {
-        alert("Please grant notification permissions in Phone Settings -> Apps -> Pulse Chat -> Notifications.");
-      }
-    } catch (err) {
-      alert("Error sending notification: " + (err?.message || err));
-    }
   };
 
   const isAppearance = activeTab === "appearance";
@@ -332,10 +304,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
       {/* Backdrop */}
       <div className="fixed inset-0" onClick={onClose} />
 
-      {/* Settings + standalone preview â€” preview docks left / right on desktop */}
+      {/* Settings + standalone preview — preview docks left / right on desktop */}
       <div className={`relative z-10 w-full flex flex-col lg:flex-row items-stretch justify-center gap-4 max-h-[92dvh] sm:max-h-[90vh] ${isAppearance ? "lg:max-w-6xl" : "lg:max-w-xl"}`}>
         {showSidePreview && previewSide === "left" && previewPanel}
-        {/* Main Modal Card â€” bottom sheet on mobile, centered dialog on desktop */}
+        {/* Main Modal Card — bottom sheet on mobile, centered dialog on desktop */}
         <div className="relative w-full lg:flex-1 lg:min-w-0 bg-white dark:bg-[#121118] border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl rounded-b-none sm:rounded-b-3xl lg:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-scaleIn">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
@@ -357,7 +329,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Tab Navigation â€” horizontally scrollable on mobile */}
+        {/* Tab Navigation — horizontally scrollable on mobile */}
         <div className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 pt-3 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] overflow-x-auto no-scrollbar shrink-0">
           <button
             onClick={() => setActiveTab("appearance")}
@@ -398,7 +370,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 select-none">
           {activeTab === "appearance" && (
             <div className="min-w-0 space-y-5 sm:space-y-6">
-              {/* Standalone preview controls â€” the preview itself docks left / right */}
+              {/* Standalone preview controls — the preview itself docks left / right */}
               <div className="flex items-center justify-between gap-2 rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Eye size={14} className="text-zinc-500 dark:text-zinc-400 shrink-0" />
@@ -671,106 +643,63 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 </button>
               </div>
 
-              {/* Desktop / Native Notifications */}
+              {/* Desktop Notifications */}
               <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                     <Bell size={15} />
-                    <span>{Capacitor.isNativePlatform() ? "App Notifications & Alerts" : "Browser Desktop Notifications"}</span>
+                    <span>Browser Desktop Notifications</span>
                   </div>
                   <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                    {Capacitor.isNativePlatform()
-                      ? "Receive heads-up status bar banners, vibration, and ringtone for messages and calls."
-                      : "Receive background notifications when new direct messages or mentions arrive."}
+                    Receive background notifications when new direct messages or mentions arrive.
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                {!notificationsAllowed ? (
                   <button
-                    onClick={handleSendTestNotification}
-                    className="text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-300 active:scale-95 transition-all"
+                    onClick={handleRequestNotification}
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm"
                   >
-                    Test
+                    Enable
                   </button>
-                  {!notificationsAllowed ? (
-                    <button
-                      onClick={handleRequestNotification}
-                      className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm"
-                    >
-                      Enable
-                    </button>
-                  ) : (
-                    <span className="text-xs font-semibold text-emerald-500">Allowed ✓</span>
-                  )}
-                </div>
+                ) : (
+                  <span className="text-xs font-semibold text-emerald-500">Allowed</span>
+                )}
               </div>
 
-              {/* Background Sync for Native Android */}
-              {Capacitor.isNativePlatform() && (
-                <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 space-y-3">
-                  <div className="space-y-0.5">
-                    <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                      <Bell size={15} />
-                      <span>Background Sync (When App is Closed)</span>
-                    </div>
-                    <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                      Pulse includes a background service to receive messages even when removed from recent apps. On Xiaomi / MIUI / HyperOS, enable Autostart and set Battery Saver to "No restrictions".
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => openAutostartSettings()}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-300 active:scale-95 transition-all cursor-pointer"
-                    >
-                      Configure Autostart
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => requestIgnoreBatteryOptimization()}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-300 active:scale-95 transition-all cursor-pointer"
-                    >
-                      Battery: Unrestricted
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Background Push (phone-off / app-closed notifications) */}
-              {!Capacitor.isNativePlatform() && (
-                <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                    <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                      <Bell size={15} />
-                      <span>Background Push Notifications</span>
-                    </div>
-                    <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                      Get message and call alerts even when the browser tab is closed.
-                    </p>
-                    {pushStatus === "unconfigured" && (
-                      <p className="text-[11px] text-amber-500">
-                        Server push is not configured yet (missing VAPID keys).
-                      </p>
-                    )}
-                    {pushStatus === "unsupported" && (
-                      <p className="text-[11px] text-amber-500">
-                        This browser does not support background push.
-                      </p>
-                    )}
+              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                    <Bell size={15} />
+                    <span>Background Push Notifications</span>
                   </div>
-
-                  {pushStatus === "on" ? (
-                    <span className="text-xs font-semibold text-emerald-500 shrink-0">On</span>
-                  ) : (
-                    <button
-                      onClick={handleEnablePush}
-                      className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm shrink-0"
-                    >
-                      Enable
-                    </button>
+                  <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
+                    Get message and call alerts even when the browser tab is closed.
+                  </p>
+                  {pushStatus === "unconfigured" && (
+                    <p className="text-[11px] text-amber-500">
+                      Server push is not configured yet (missing VAPID keys).
+                    </p>
+                  )}
+                  {pushStatus === "unsupported" && (
+                    <p className="text-[11px] text-amber-500">
+                      This browser does not support background push.
+                    </p>
                   )}
                 </div>
-              )}
+
+                {pushStatus === "on" ? (
+                  <span className="text-xs font-semibold text-emerald-500 shrink-0">On</span>
+                ) : (
+                  <button
+                    onClick={handleEnablePush}
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm shrink-0"
+                  >
+                    Enable
+                  </button>
+                )}
+              </div>
 
               {/* End-to-End Encryption Banner */}
               <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] p-4 flex items-center gap-3">
@@ -814,25 +743,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3">
-                <div className="space-y-0.5 min-w-0 flex-1">
-                  <div className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                    <Server size={15} className="text-cyan-500 shrink-0" />
-                    <span>Server Connection Endpoint</span>
-                  </div>
-                  <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                    Active: <code className="font-mono text-[10.5px] bg-black/5 dark:bg-white/5 px-1 py-0.5 rounded">{getApiBaseUrl()}</code>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsServerModalOpen(true)}
-                  className="text-xs font-bold px-3 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all shadow-sm shrink-0"
-                >
-                  Configure
-                </button>
-              </div>
-
               <ChatLockSettings />
             </div>
           )}
@@ -859,7 +769,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-zinc-900 dark:text-white leading-tight">Live preview</p>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Standalone â€” updates as you pick</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Standalone — updates as you pick</p>
               </div>
               <button
                 onClick={() => setPreviewMobileOpen(false)}
@@ -883,10 +793,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
           </div>
         </div>
       )}
-      <ServerConfigModal
-        isOpen={isServerModalOpen}
-        onClose={() => setIsServerModalOpen(false)}
-      />
     </div>
   );
 };

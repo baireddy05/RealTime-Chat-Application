@@ -52,12 +52,6 @@ function App() {
 
   useEffect(() => {
     checkAuth();
-
-    const handleServerChanged = () => {
-      checkAuth();
-    };
-    window.addEventListener("pulse:server-changed", handleServerChanged);
-    return () => window.removeEventListener("pulse:server-changed", handleServerChanged);
   }, [checkAuth]);
 
   if (isCheckingAuth && !authUser)

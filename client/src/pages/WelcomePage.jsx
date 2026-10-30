@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useThemeStore } from "../store/useThemeStore";
 import PulseLogo from "../components/PulseLogo";
-import ServerConfigModal from "../components/ServerConfigModal";
 import {
   Sun,
   Moon,
@@ -10,12 +9,10 @@ import {
   Activity,
   ArrowRight,
   Sparkles,
-  Server,
 } from "lucide-react";
 
 const WelcomePage = () => {
   const { theme, toggleTheme } = useThemeStore();
-  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
 
   // Interactive mouse physics - only on desktop pointer devices
   const [mouseState, setMouseState] = useState({
@@ -54,7 +51,7 @@ const WelcomePage = () => {
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="flex flex-col min-h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-x-hidden overflow-y-auto select-none font-sans relative apple-ambient-bg justify-between pt-[max(env(safe-area-inset-top,0px),1.5rem)] pb-[max(env(safe-area-inset-bottom,0px),1.25rem)] px-5 sm:p-8 md:p-10"
+      className="flex flex-col min-h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-x-hidden overflow-y-auto select-none font-sans relative apple-ambient-bg justify-between p-5 sm:p-8 md:p-10"
       style={{ perspective: isPointerDevice ? "1200px" : "none" }}
     >
       {/* Dynamic Interactive Spotlight following Mouse Pointer on Desktop */}
@@ -84,7 +81,7 @@ const WelcomePage = () => {
         }}
       />
 
-      {/* â”€â”€ Top Header Navigation Bar (Theme Toggle) â”€â”€ */}
+      {/* ── Top Header Navigation Bar (Theme Toggle) ── */}
       <div className="w-full flex items-center justify-between z-20 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center hover:scale-105 transition-transform">
@@ -93,27 +90,17 @@ const WelcomePage = () => {
           <span className="text-lg font-extrabold tracking-tight text-theme-main">Pulse</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsServerModalOpen(true)}
-            className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
-            title="Configure Server Endpoint"
-            type="button"
-          >
-            <Server size={18} className="text-cyan-500" />
-          </button>
-          <button
-            onClick={toggleTheme}
-            className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
-            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            type="button"
-          >
-            {theme === "dark" ? <Sun size={19} className="text-amber-400" /> : <Moon size={19} className="text-accent-primary" />}
-          </button>
-        </div>
+        <button
+          onClick={toggleTheme}
+          className="p-2.5 sm:p-3 rounded-full glass-input hover:bg-[var(--glass-active)] text-theme-muted hover:text-theme-main transition-all active:scale-90 cursor-pointer shadow-sm border border-black/10 dark:border-white/10"
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          type="button"
+        >
+          {theme === "dark" ? <Sun size={19} className="text-amber-400" /> : <Moon size={19} className="text-accent-primary" />}
+        </button>
       </div>
 
-      {/* â”€â”€ Central Hero Section â”€â”€ */}
+      {/* ── Central Hero Section ── */}
       <div
         className="flex-1 flex flex-col items-center justify-center text-center my-auto py-8 sm:py-12 relative z-10 max-w-2xl mx-auto transition-transform duration-200 ease-out"
         style={{
@@ -182,7 +169,7 @@ const WelcomePage = () => {
         </div>
       </div>
 
-      {/* â”€â”€ Footer / Creator Credits â”€â”€ */}
+      {/* ── Footer / Creator Credits ── */}
       <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2 z-20 max-w-6xl mx-auto pt-4 text-[11.5px] text-theme-muted select-none border-t border-black/5 dark:border-white/5">
         <div className="flex items-center gap-1.5">
           <Shield className="w-3.5 h-3.5 text-indigo-400" />
@@ -193,10 +180,6 @@ const WelcomePage = () => {
           <span className="font-semibold text-theme-main">Byreddy Rithwik Reddy</span>
         </div>
       </div>
-      <ServerConfigModal
-        isOpen={isServerModalOpen}
-        onClose={() => setIsServerModalOpen(false)}
-      />
     </div>
   );
 };

@@ -236,7 +236,7 @@ const ForgotPasswordPage = () => {
   return (
     <div className="flex h-[100dvh] w-full bg-[rgb(var(--bg-app-rgb))] overflow-hidden select-none font-sans relative">
       {/* ── Top Header Navigation Bar ── */}
-      <div className="absolute top-[max(env(safe-area-inset-top,0px),1rem)] left-4 right-4 sm:top-5 sm:left-6 sm:right-6 flex items-center justify-between z-50 pointer-events-none">
+      <div className="absolute top-4 left-4 right-4 sm:top-5 sm:left-6 sm:right-6 flex items-center justify-between z-50 pointer-events-none">
         <div className="pointer-events-auto">
           <Link
             to="/login"
@@ -260,7 +260,7 @@ const ForgotPasswordPage = () => {
         </div>
       </div>
 
-      {/* â”€â”€ Desktop Left Panel: Interactive Visual Experience â”€â”€ */}
+      {/* ── Desktop Left Panel: Interactive Visual Experience ── */}
       <div
         ref={leftPanelRef}
         onMouseMove={handleMouseMove}
@@ -330,7 +330,7 @@ const ForgotPasswordPage = () => {
         </div>
       </div>
 
-      {/* â”€â”€ Right Panel: Recovery Steps Form â”€â”€ */}
+      {/* ── Right Panel: Recovery Steps Form ── */}
       <div className="w-full lg:w-[45%] h-full flex flex-col z-20 glass-surface shadow-[-20px_0_40px_rgba(0,0,0,0.05)] border-l border-[var(--glass-border)] bg-[rgb(var(--bg-app-rgb))]">
         <div className="flex-1 overflow-y-auto flex flex-col justify-center px-5 sm:px-10 md:px-14 lg:px-20 py-16 sm:py-12">
           <div className="w-full max-w-[420px] mx-auto animate-slide-up">
@@ -385,7 +385,7 @@ const ForgotPasswordPage = () => {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STEP 1: Enter Email or Username â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ────────── STEP 1: Enter Email or Username ────────── */}
             {step === 1 && (
               <div>
                 <div className="mb-8 text-center lg:text-left">
@@ -447,7 +447,7 @@ const ForgotPasswordPage = () => {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STEP 2: Enter 6-Digit OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ────────── STEP 2: Enter 6-Digit OTP ────────── */}
             {step === 2 && (
               <div>
                 <div className="mb-6 text-center lg:text-left">
@@ -484,7 +484,7 @@ const ForgotPasswordPage = () => {
                     </div>
                   ) : !hasSmtp ? (
                     <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-theme-muted text-xs">
-                      <span>ðŸ’¡ <strong>Local Dev Note:</strong> Check your server terminal window where the OTP code is printed.</span>
+                      <span>💡 <strong>Local Dev Note:</strong> Check your server terminal window where the OTP code is printed.</span>
                     </div>
                   ) : null}
                 </div>
@@ -566,7 +566,7 @@ const ForgotPasswordPage = () => {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STEP 3: Enter New Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ────────── STEP 3: Enter New Password ────────── */}
             {step === 3 && (
               <div>
                 <div className="mb-6 text-center lg:text-left">
@@ -671,7 +671,7 @@ const ForgotPasswordPage = () => {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STEP 4: Success Confirmation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ────────── STEP 4: Success Confirmation ────────── */}
             {step === 4 && (
               <div className="text-center py-4 animate-scale-up">
                 <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/10 border-2 border-emerald-400/40 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.25)]">
