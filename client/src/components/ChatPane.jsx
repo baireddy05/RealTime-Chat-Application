@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -274,6 +275,22 @@ const ChatPane = ({ onBack }) => {
   // fold so chats sometimes opened on older history.
   const initialPinUntilRef = useRef(0);
   const didInitialLockRef = useRef(false);
+
+  const getChatOptionsStyle = () => {
+    const rect = chatOptionsRef.current?.getBoundingClientRect();
+    const menuWidth = 230;
+    const padding = 12;
+    const winWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+    const right = rect ? Math.max(padding, winWidth - rect.right) : padding;
+    const top = rect ? rect.bottom + 6 : 50;
+    return {
+      position: "fixed",
+      top: `${top}px`,
+      right: `${right}px`,
+      width: `${menuWidth}px`,
+      zIndex: 99999,
+    };
+  };
 
   const scrollToBottom = useCallback((behavior = "auto") => {
     const el = scrollerElementRef.current;
@@ -1179,15 +1196,17 @@ const ChatPane = ({ onBack }) => {
             >
               <span className="material-symbols-outlined text-lg">more_vert</span>
             </button>
-            {showChatOptions && (
+            {showChatOptions && typeof document !== "undefined" && createPortal(
                 <>
                   <div
-                    className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]"
+                    className="fixed inset-0 z-[99998] bg-black/40 backdrop-blur-[2px]"
+                    onTouchStart={(e) => { e.stopPropagation(); setShowChatOptions(false); }}
                     onClick={() => setShowChatOptions(false)}
                   />
                   <div
-                    className="absolute right-0 top-10 z-50 bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 rounded-2xl overflow-hidden shadow-2xl py-1.5 w-56 animate-scaleIn smooth-gpu text-[13px]"
-                    style={{ backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
+                    className="rounded-2xl bg-[#0a1812] text-white border border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn smooth-gpu text-[13px] overflow-hidden"
+                    style={{ ...getChatOptionsStyle(), backgroundColor: "var(--glass-heavy-opaque, #0a1812)" }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                   {selectedChat.type === "room" && (
                     <button
@@ -1367,7 +1386,8 @@ const ChatPane = ({ onBack }) => {
                     </>
                   )}
                 </div>
-              </>
+              </>,
+              document.body
             )}
           </div>
         </div>

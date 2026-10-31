@@ -359,6 +359,22 @@ const Sidebar = ({
   useBackHandler(!!openMenuChat, closeChatMenu, "sidebar-chat-menu");
   useBackHandler(showChannelsModal, () => setShowChannelsModal(false), "sidebar-channels");
 
+  const getOptionsDropdownStyle = () => {
+    const rect = optionsDropdownRef.current?.getBoundingClientRect();
+    const menuWidth = 230;
+    const padding = 12;
+    const winWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+    const right = rect ? Math.max(padding, winWidth - rect.right) : padding;
+    const top = rect ? rect.bottom + 6 : 50;
+    return {
+      position: "fixed",
+      top: `${top}px`,
+      right: `${right}px`,
+      width: `${menuWidth}px`,
+      zIndex: 99999,
+    };
+  };
+
   const getChatMenuStyle = () => {
     const menuWidth = 248;
     const menuHeight = 360;
@@ -1417,126 +1433,7 @@ const Sidebar = ({
                 <span className="material-symbols-outlined text-xl md:text-lg">more_vert</span>
               </button>
 
-              {showOptionsDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]"
-                    onClick={() => setShowOptionsDropdown(false)}
-                  />
-                  <div
-                    className="absolute right-0 top-9 z-50 w-56 max-w-[calc(100vw-1rem)] rounded-2xl overflow-hidden bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px]"
-                    style={{ backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
-                  >
-                  {onOpenProfile && (
-                    <button
-                      onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">person</span>
-                      <span>My Profile</span>
-                    </button>
-                  )}
-                  {onOpenStarred && (
-                    <button
-                      onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">star</span>
-                      <span>Starred Messages</span>
-                    </button>
-                  )}
-                  {onOpenAddFriend && (
-                    <button
-                      onClick={() => { onOpenAddFriend(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">person_add</span>
-                      <span>Contacts ({friends?.length || 0})</span>
-                      {pendingCount > 0 && (
-                        <span className="ml-auto px-1.5 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black font-mono text-[9px] font-bold">
-                          {pendingCount}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                  {onOpenSetStatus && (
-                    <button
-                      onClick={() => { onOpenSetStatus(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">sentiment_satisfied</span>
-                      <span>Set Status Mood</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { setShowLabelsManager(true); setShowOptionsDropdown(false); }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-accent-primary">label</span>
-                    <span>Chat Labels</span>
-                  </button>
-                  {!Capacitor.isNativePlatform() && handleInstallPWA && (
-                    <button
-                      onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">install_desktop</span>
-                      <span>Install Pulse PWA</span>
-                    </button>
-                  )}
-                  {onOpenJoinGroup && (
-                    <button
-                      onClick={() => { onOpenJoinGroup(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <Ticket size={16} className="text-accent-primary shrink-0" />
-                      <span>Join Group with Code</span>
-                    </button>
-                  )}
-                  {onOpenBroadcast && (
-                    <button
-                      onClick={() => { onOpenBroadcast(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">campaign</span>
-                      <span>Broadcast Lists</span>
-                    </button>
-                  )}
-                  {onOpenCalls && (
-                    <button
-                      onClick={() => { onOpenCalls(); setShowOptionsDropdown(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">call_log</span>
-                      <span>Call History</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setIsSettingsOpen(true);
-                      setShowOptionsDropdown(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-accent-primary">settings</span>
-                    <span>Settings & Animations</span>
-                  </button>
-
-                  {logout && (
-                    <>
-                      <div className="my-1 border-t border-[var(--glass-border)]" />
-                      <button
-                        onClick={() => { logout(); setShowOptionsDropdown(false); }}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors text-left"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">logout</span>
-                        <span>Sign Out</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </>
-              )}
+              
             </div>
           </div>
         </div>
@@ -2242,6 +2139,130 @@ const Sidebar = ({
       {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
       {showChannelsModal && (
         <ChannelsModal onClose={() => setShowChannelsModal(false)} onOpenChannel={openChannelChat} />
+      )}
+
+      {showOptionsDropdown && typeof document !== "undefined" && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[99998] bg-black/40 backdrop-blur-[2px]"
+            onClick={() => setShowOptionsDropdown(false)}
+            onTouchStart={(e) => { e.stopPropagation(); setShowOptionsDropdown(false); }}
+          />
+          <div
+            style={{ ...getOptionsDropdownStyle(), backgroundColor: "var(--glass-heavy-opaque, #0a1812)" }}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-2xl bg-[#0a1812] text-white border border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px] overflow-hidden"
+          >
+            {onOpenProfile && (
+              <button
+                onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">person</span>
+                <span>My Profile</span>
+              </button>
+            )}
+            {onOpenStarred && (
+              <button
+                onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">star</span>
+                <span>Starred Messages</span>
+              </button>
+            )}
+            {onOpenAddFriend && (
+              <button
+                onClick={() => { onOpenAddFriend(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">person_add</span>
+                <span>Contacts ({friends?.length || 0})</span>
+                {pendingCount > 0 && (
+                  <span className="ml-auto px-1.5 rounded-full bg-emerald-500 text-black font-mono text-[9px] font-bold">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            )}
+            {onOpenSetStatus && (
+              <button
+                onClick={() => { onOpenSetStatus(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">sentiment_satisfied</span>
+                <span>Set Status Mood</span>
+              </button>
+            )}
+            <button
+              onClick={() => { setShowLabelsManager(true); setShowOptionsDropdown(false); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px] text-accent-primary">label</span>
+              <span>Chat Labels</span>
+            </button>
+            {!Capacitor.isNativePlatform() && handleInstallPWA && (
+              <button
+                onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">install_desktop</span>
+                <span>Install Pulse PWA</span>
+              </button>
+            )}
+            {onOpenJoinGroup && (
+              <button
+                onClick={() => { onOpenJoinGroup(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <Ticket size={16} className="text-accent-primary shrink-0" />
+                <span>Join Group with Code</span>
+              </button>
+            )}
+            {onOpenBroadcast && (
+              <button
+                onClick={() => { onOpenBroadcast(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">campaign</span>
+                <span>Broadcast Lists</span>
+              </button>
+            )}
+            {onOpenCalls && (
+              <button
+                onClick={() => { onOpenCalls(); setShowOptionsDropdown(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-accent-primary">call_log</span>
+                <span>Call History</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setIsSettingsOpen(true);
+                setShowOptionsDropdown(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px] text-accent-primary">settings</span>
+              <span>Settings & Animations</span>
+            </button>
+
+            {logout && (
+              <>
+                <div className="my-1 border-t border-white/10" />
+                <button
+                  onClick={() => { logout(); setShowOptionsDropdown(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">logout</span>
+                  <span>Sign Out</span>
+                </button>
+              </>
+            )}
+          </div>
+        </>,
+        document.body
       )}
 
       {/* Per-chat context menu (⋮ / right-click / long-press) */}
