@@ -245,9 +245,12 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
             // Clicking notification launches MainActivity with chat details
             Intent launchIntent = new Intent(this, MainActivity.class);
             launchIntent.setAction(Intent.ACTION_VIEW);
+            launchIntent.setData(Uri.parse("pulse://chat/" + chatType + "/" + chatId));
             launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             launchIntent.putExtra("chatId", chatId);
             launchIntent.putExtra("chatType", chatType);
+            launchIntent.putExtra("senderName", senderName);
+            launchIntent.putExtra("title", notifTitle);
             launchIntent.putExtra("type", "message");
 
             int notifId = Math.abs(chatId.hashCode());
@@ -298,8 +301,10 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
 
             Intent callIntent = new Intent(this, MainActivity.class);
             callIntent.setAction(Intent.ACTION_VIEW);
+            callIntent.setData(Uri.parse("pulse://call/" + callerId));
             callIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             callIntent.putExtra("callerId", callerId);
+            callIntent.putExtra("callerName", callerName);
             callIntent.putExtra("callType", callType);
             callIntent.putExtra("type", "call");
 

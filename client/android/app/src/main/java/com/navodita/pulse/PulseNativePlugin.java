@@ -9,6 +9,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import androidx.core.content.ContextCompat;
 
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -66,6 +67,28 @@ public class PulseNativePlugin extends Plugin {
         } else {
             MainActivity.activeChatId = null;
         }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getPendingChat(PluginCall call) {
+        JSObject ret = new JSObject();
+        if (MainActivity.pendingChatId != null) {
+            ret.put("chatId", MainActivity.pendingChatId);
+            ret.put("chatType", MainActivity.pendingChatType != null ? MainActivity.pendingChatType : "user");
+            ret.put("senderName", MainActivity.pendingSenderName != null ? MainActivity.pendingSenderName : "");
+            MainActivity.pendingChatId = null;
+            MainActivity.pendingChatType = null;
+            MainActivity.pendingSenderName = null;
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void clearPendingChat(PluginCall call) {
+        MainActivity.pendingChatId = null;
+        MainActivity.pendingChatType = null;
+        MainActivity.pendingSenderName = null;
         call.resolve();
     }
 

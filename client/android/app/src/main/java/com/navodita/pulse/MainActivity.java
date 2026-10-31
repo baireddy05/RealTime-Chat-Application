@@ -1,6 +1,7 @@
 package com.navodita.pulse;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -11,6 +12,9 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     public static volatile boolean isAppInForeground = false;
     public static volatile String activeChatId = null;
+    public static volatile String pendingChatId = null;
+    public static volatile String pendingChatType = null;
+    public static volatile String pendingSenderName = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,17 +80,89 @@ public class MainActivity extends BridgeActivity {
         if (intent == null) return;
         String chatId = intent.getStringExtra("chatId");
         String chatType = intent.getStringExtra("chatType");
+        String senderName = intent.getStringExtra("senderName");
+        String type = intent.getStringExtra("type");
+
+        // Inspect Uri data if passed like pulse://chat/user/123 or pulse://call/123
+        Uri data = intent.getData();
+        if (data != null && "pulse".equals(data.getScheme())) {
+            java.util.List<String> segments = data.getPathSegments();
+            String host = data.getHost();
+            if ("chat".equals(host) && segments != null && segments.size() >= 2) {
+                chatType = segments.get(0);
+                chatId = segments.get(1);
+            } else if ("call".equals(host) && segments != null && !segments.isEmpty()) {
+                type = "call";
+                dispatchOpenCallToWebView(segments.get(0), "video");
+                return;
+            }
+        }
+
+        String callerId = intent.getStringExtra("callerId");
+        if ("call".equals(type) || (callerId != null && !callerId.isEmpty())) {
+            String callType = intent.getStringExtra("callType");
+            dispatchOpenCallToWebView(callerId != null ? callerId : "", callType != null ? callType : "video");
+            return;
+        }
+
         if (chatId != null && !chatId.isEmpty() && !"default".equals(chatId)) {
             final String cId = chatId;
             final String cType = chatType != null ? chatType : "user";
+            final String sName = senderName != null ? senderName : "";
+
+            pendingChatId = cId;
+            pendingChatType = cType;
+            pendingSenderName = sName;
             activeChatId = cId;
+
             PulseFirebaseMessagingService.clearStackForChat(this, cId);
-            getBridge().getWebView().postDelayed(() -> {
+            dispatchOpenChatToWebView(cId, cType, sName);
+        }
+    }
+
+    private void dispatchOpenChatToWebView(final String cId, final String cType, final String sName) {
+        final String safeName = sName != null ? sName.replace("'", "\\'") : "";
+        final String js = "(function() {" +
+            "var d = { chatId: '" + cId + "', chatType: '" + cType + "', senderName: '" + safeName + "', type: 'message' };" +
+            "window.__PULSE_PENDING_OPEN_CHAT__ = d;" +
+            "window.dispatchEvent(new CustomEvent('pulse:open-chat', { detail: d }));" +
+            "})();";
+
+        long[] delays = new long[]{150, 400, 800, 1500, 2500, 4000};
+        for (long delay : delays) {
+            runOnUiThread(() -> {
                 try {
-                    String js = "window.dispatchEvent(new CustomEvent('pulse:open-chat', { detail: { chatId: '" + cId + "', chatType: '" + cType + "', type: 'message' } }));";
-                    getBridge().getWebView().evaluateJavascript(js, null);
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        getBridge().getWebView().postDelayed(() -> {
+                            try {
+                                getBridge().getWebView().evaluateJavascript(js, null);
+                            } catch (Exception ignored) {}
+                        }, delay);
+                    }
                 } catch (Exception ignored) {}
-            }, 1200);
+            });
+        }
+    }
+
+    private void dispatchOpenCallToWebView(final String callerId, final String callType) {
+        final String js = "(function() {" +
+            "var d = { callerId: '" + callerId + "', callType: '" + callType + "', type: 'call' };" +
+            "window.dispatchEvent(new CustomEvent('pulse:open-call-from', { detail: d }));" +
+            "})();";
+
+        long[] delays = new long[]{150, 400, 800, 1500, 2500, 4000};
+        for (long delay : delays) {
+            runOnUiThread(() -> {
+                try {
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        getBridge().getWebView().postDelayed(() -> {
+                            try {
+                                getBridge().getWebView().evaluateJavascript(js, null);
+                            } catch (Exception ignored) {}
+                        }, delay);
+                    }
+                } catch (Exception ignored) {}
+            });
         }
     }
 

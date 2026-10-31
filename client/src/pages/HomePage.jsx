@@ -26,6 +26,7 @@ import { useFriendStore } from "../store/useFriendStore";
 import { usePWAInstall } from "../hooks/usePWAInstall";
 import TypingPulseBackground from "../components/TypingPulseBackground";
 import { useBackHandler, backManager } from "../lib/backNavigation";
+import { getPendingNativeChat, clearPendingNativeChat } from "../lib/backgroundSync";
 
 const HomePage = () => {
   // Selective subscriptions so header/rail don't re-render on every message.
@@ -248,40 +249,68 @@ const HomePage = () => {
   // ?callFrom=<userId> opens that user's DM. Runs again as lists load so a
   // cold start from a tap still resolves once data arrives.
   useEffect(() => {
-    const openDeepChat = (type, id) => {
+    const openDeepChat = (type, id, details = {}) => {
+      if (!id) return false;
+      const targetId = String(id);
       const st = useChatStore.getState();
+
+      // Clear any global or native pending queue
+      if (typeof window !== "undefined" && window.__PULSE_PENDING_OPEN_CHAT__) {
+        window.__PULSE_PENDING_OPEN_CHAT__ = null;
+      }
+      clearPendingNativeChat().catch(() => {});
+
+      // Ensure any overlay modals or bottom sheets are closed and correct tab is selected
+      setIsProfileOpen(false);
+      setIsSetStatusOpen(false);
+      setIsStarredDrawerOpen(false);
+      setMobileTab(type === "room" ? "groups" : "chats");
+
       if (type === "room") {
         const allRooms = [...(st.rooms || []), ...(st.channels || [])];
-        const r = allRooms.find((x) => (x._id || x.id)?.toString() === id);
-        if (!r) return false;
+        const r = allRooms.find((x) => (x._id || x.id)?.toString() === targetId);
         setSelectedChat({
-          id: (r._id || r.id).toString(),
-          _id: r._id || r.id,
-          name: r.name,
+          id: targetId,
+          _id: r?._id || targetId,
+          name: r?.name || details?.senderName || details?.name || details?.title || "Group Chat",
           type: "room",
-          description: r.description,
-          members: r.members,
-          createdBy: r.createdBy,
-          admins: r.admins,
-          avatar: r.avatar,
-          profilePic: r.profilePic,
-          isChannel: !!r.isChannel,
+          description: r?.description || "",
+          members: r?.members || [],
+          createdBy: r?.createdBy,
+          admins: r?.admins || [],
+          avatar: r?.avatar,
+          profilePic: r?.profilePic,
+          isChannel: !!(r?.isChannel || details?.isChannel),
         });
         return true;
       }
+
+      // Direct DM chat
       const allUsers = [...(st.users || []), ...(friends || [])];
-      if (authUser && (authUser._id || authUser.id)?.toString() === id) {
-        setSelectedChat({ id, name: "Saved Messages", type: "user", profilePic: authUser.profilePic });
+      if (authUser && (authUser._id || authUser.id)?.toString() === targetId) {
+        setSelectedChat({
+          id: targetId,
+          _id: targetId,
+          name: "Saved Messages",
+          type: "user",
+          profilePic: authUser.profilePic,
+        });
         return true;
       }
-      const u = allUsers.find((x) => (x._id || x.id)?.toString() === id);
-      if (!u) return false;
+
+      const u = allUsers.find((x) => (x._id || x.id)?.toString() === targetId);
       setSelectedChat({
-        id: (u._id || u.id).toString(),
-        name: u.username,
+        id: targetId,
+        _id: u?._id || targetId,
+        name: u?.username || details?.senderName || details?.name || details?.title || "Chat",
         type: "user",
-        profilePic: u.profilePic,
+        profilePic: u?.profilePic || details?.icon || "",
       });
+
+      // If user wasn't in cache yet, refresh users list in background so username and avatar resolve
+      if (!u) {
+        st.getUsers?.().catch(() => {});
+      }
       return true;
     };
 
@@ -306,11 +335,34 @@ const HomePage = () => {
       } catch {}
     };
 
-    consumeParams();
+    // Check cold-start pending notification chats
+    const checkPendingNotification = async () => {
+      if (typeof window !== "undefined" && window.__PULSE_PENDING_OPEN_CHAT__) {
+        const p = window.__PULSE_PENDING_OPEN_CHAT__;
+        window.__PULSE_PENDING_OPEN_CHAT__ = null;
+        if (p?.chatId) {
+          openDeepChat(p.chatType || "user", String(p.chatId), p);
+          return;
+        }
+      }
+
+      try {
+        const nativePending = await getPendingNativeChat();
+        if (nativePending?.chatId) {
+          openDeepChat(nativePending.chatType || "user", String(nativePending.chatId), nativePending);
+          return;
+        }
+      } catch {}
+
+      consumeParams();
+    };
+
+    checkPendingNotification();
+
     const onOpenChat = (e) => {
       const d = e?.detail || {};
-      if (d.chatId) openDeepChat(d.chatType || "user", String(d.chatId));
-      else if (d.callerId) openDeepChat("user", String(d.callerId));
+      if (d.chatId) openDeepChat(d.chatType || "user", String(d.chatId), d);
+      else if (d.callerId) openDeepChat("user", String(d.callerId), d);
     };
     window.addEventListener("pulse:open-chat", onOpenChat);
     window.addEventListener("pulse:open-call-from", onOpenChat);
@@ -318,7 +370,7 @@ const HomePage = () => {
       window.removeEventListener("pulse:open-chat", onOpenChat);
       window.removeEventListener("pulse:open-call-from", onOpenChat);
     };
-  }, [rooms, channels, users, friends, authUser, setSelectedChat]);
+  }, [rooms, channels, users, friends, authUser, setSelectedChat, setMobileTab]);
 
   // Extract status display
   const rawStatus = authUser?.status || "Coding: Available";

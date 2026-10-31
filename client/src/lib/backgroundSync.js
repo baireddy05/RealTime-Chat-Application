@@ -51,3 +51,23 @@ export async function setActiveNativeChat(chatId) {
   }
 }
 
+export async function getPendingNativeChat() {
+  if (!Capacitor.isNativePlatform() || !PulseBackground) return null;
+  try {
+    const res = await PulseBackground.getPendingChat();
+    if (res && res.chatId) {
+      return res;
+    }
+  } catch (e) {
+    console.warn("[Pulse Background Sync] getPendingChat error:", e);
+  }
+  return null;
+}
+
+export async function clearPendingNativeChat() {
+  if (!Capacitor.isNativePlatform() || !PulseBackground) return;
+  try {
+    await PulseBackground.clearPendingChat();
+  } catch {}
+}
+
