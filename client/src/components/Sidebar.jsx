@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { memo, useEffect, useState, useRef, useMemo, useCallback, Suspense } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Ticket } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -6,9 +6,10 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import { useCallStore } from "../store/useCallStore";
-import CreateGroupModal from "./CreateGroupModal";
-import LabelsManagerModal from "./LabelsManagerModal";
-import ChannelsModal from "./ChannelsModal";
+import { lazyWithRetry } from "../lib/lazyWithRetry";
+const CreateGroupModal = lazyWithRetry(() => import("./CreateGroupModal"));
+const LabelsManagerModal = lazyWithRetry(() => import("./LabelsManagerModal"));
+const ChannelsModal = lazyWithRetry(() => import("./ChannelsModal"));
 import MessageTicks from "./MessageTicks";
 import { soundManager, CHAT_TONES } from "../lib/sound";
 import { isChatLocked, isChatLockedAnywhere, setChatLocked, hasChatPin } from "../lib/chatLock";
@@ -739,7 +740,7 @@ const Sidebar = ({
   }, [friends, users, lastMessages, searchQuery]);
 
   // Sort helper by recent message
-  const getChatTimestamp = (item) => {
+  const getChatTimestamp = useCallback((item) => {
     const lastMsg = lastMessages[item._id] || item.lastMessage;
     if (lastMsg?.createdAt) {
       const time = new Date(lastMsg.createdAt).getTime();
@@ -754,26 +755,40 @@ const Sidebar = ({
       if (!isNaN(time) && time > 0) return time;
     }
     return 0;
-  };
+  }, [lastMessages]);
 
-  // Pinned chats float above recent ones (WhatsApp-style), recency kept within each section
-  const pinFirst = (list) => {
-    const pinned = authUser?.pinnedChats || [];
+  // Pinned chats float above recent ones (WhatsApp-style).
+  // O(N) single partition with O(1) set lookup instead of O(N * K) filter passes.
+  const pinFirst = useCallback((list) => {
+    const pinned = authUser?.pinnedChats;
     if (!pinned || pinned.length === 0) return list;
-    const isPinned = (c) => pinned.includes((c._id || c.id)?.toString());
-    return [...list.filter(isPinned), ...list.filter((c) => !isPinned(c))];
-  };
+    const pinnedSet = new Set(pinned.map(String));
+    const pinnedItems = [];
+    const regularItems = [];
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const id = (item._id || item.id)?.toString();
+      if (id && pinnedSet.has(id)) {
+        pinnedItems.push(item);
+      } else {
+        regularItems.push(item);
+      }
+    }
+    return [...pinnedItems, ...regularItems];
+  }, [authUser?.pinnedChats]);
 
-  // Sorted lists by recent activity
+  // Sorted lists by recent activity with pre-calculated timestamps
   const sortedRooms = useMemo(() => {
-    return pinFirst([...filteredRooms].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredRooms, lastMessages, authUser?.pinnedChats]);
+    const decorated = filteredRooms.map((r) => ({ r, ts: getChatTimestamp(r) }));
+    decorated.sort((a, b) => b.ts - a.ts);
+    return pinFirst(decorated.map((x) => x.r));
+  }, [filteredRooms, getChatTimestamp, pinFirst]);
 
   const sortedFriends = useMemo(() => {
-    return pinFirst([...filteredFriends].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredFriends, lastMessages, authUser?.pinnedChats]);
+    const decorated = filteredFriends.map((f) => ({ f, ts: getChatTimestamp(f) }));
+    decorated.sort((a, b) => b.ts - a.ts);
+    return pinFirst(decorated.map((x) => x.f));
+  }, [filteredFriends, getChatTimestamp, pinFirst]);
 
   const filteredChannels = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -783,15 +798,16 @@ const Sidebar = ({
   }, [channels, searchQuery]);
 
   const sortedChannels = useMemo(() => {
-    return pinFirst([...filteredChannels].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredChannels, lastMessages, authUser?.pinnedChats]);
+    const decorated = filteredChannels.map((c) => ({ c, ts: getChatTimestamp(c) }));
+    decorated.sort((a, b) => b.ts - a.ts);
+    return pinFirst(decorated.map((x) => x.c));
+  }, [filteredChannels, getChatTimestamp, pinFirst]);
 
   // Unified all chats stream (Groups + Direct combined, sorted by recent messages)
   const allChats = useMemo(() => {
-    const roomItems = filteredRooms.map((r) => ({ ...r, chatType: "room" }));
-    const channelItems = filteredChannels.map((r) => ({ ...r, chatType: "room" }));
-    const friendItems = filteredFriends.map((f) => ({ ...f, chatType: "user" }));
+    const roomItems = filteredRooms.map((r) => ({ ...r, chatType: "room", _ts: getChatTimestamp(r) }));
+    const channelItems = filteredChannels.map((r) => ({ ...r, chatType: "room", _ts: getChatTimestamp(r) }));
+    const friendItems = filteredFriends.map((f) => ({ ...f, chatType: "user", _ts: getChatTimestamp(f) }));
 
     // Add Saved Messages (Self Chat)
     if (authUser && !friendItems.some((f) => f._id?.toString() === authUser._id?.toString())) {
@@ -799,12 +815,14 @@ const Sidebar = ({
         ...authUser,
         chatType: "user",
         isSelfChat: true,
+        _ts: getChatTimestamp(authUser),
       });
     }
 
-    return pinFirst([...roomItems, ...channelItems, ...friendItems].sort((a, b) => getChatTimestamp(b) - getChatTimestamp(a)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredRooms, filteredChannels, filteredFriends, lastMessages, authUser, authUser?.pinnedChats]);
+    const combined = [...roomItems, ...channelItems, ...friendItems];
+    combined.sort((a, b) => b._ts - a._ts);
+    return pinFirst(combined);
+  }, [filteredRooms, filteredChannels, filteredFriends, authUser, getChatTimestamp, pinFirst]);
 
   // Compute Unread lists
   const unreadChats = useMemo(() => {
@@ -815,9 +833,10 @@ const Sidebar = ({
   }, [allChats, unreadCounts]);
 
   const visibleChatsList = useMemo(() => {
+    const archivedSet = new Set((archivedChats || []).map(String));
     return allChats.filter(c => {
       const chatId = (c._id || c.id)?.toString();
-      const isArchived = archivedChats.includes(chatId);
+      const isArchived = chatId && archivedSet.has(chatId);
       if (activeFilter === "archived") {
         if (isArchived && activeLabelFilter) {
           return (chatLabels[chatId] || []).includes(activeLabelFilter);
@@ -2139,11 +2158,13 @@ const Sidebar = ({
         </div>
       </div>
 
-      {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
-      {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
-      {showChannelsModal && (
-        <ChannelsModal onClose={() => setShowChannelsModal(false)} onOpenChannel={openChannelChat} />
-      )}
+      <Suspense fallback={null}>
+        {isLocalCreateGroupOpen && <CreateGroupModal onClose={() => setIsLocalCreateGroupOpen(false)} />}
+        {showLabelsManager && <LabelsManagerModal onClose={() => setShowLabelsManager(false)} />}
+        {showChannelsModal && (
+          <ChannelsModal onClose={() => setShowChannelsModal(false)} onOpenChannel={openChannelChat} />
+        )}
+      </Suspense>
 
       {showOptionsDropdown && typeof document !== "undefined" && createPortal(
         <>

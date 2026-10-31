@@ -43,16 +43,21 @@ public class MainActivity extends BridgeActivity {
             stopService(new android.content.Intent(this, PulseBackgroundService.class));
         } catch (Exception ignored) {}
 
-        // Request exemption from battery optimization so background FCM wakeups arrive when app is closed
+        // Request exemption from battery optimization once on fresh install (state saved so cold starts do not repeatedly prompt)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             try {
-                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
-                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                    android.content.Intent batteryIntent = new android.content.Intent(
-                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                    );
-                    batteryIntent.setData(android.net.Uri.parse("package:" + getPackageName()));
-                    startActivity(batteryIntent);
+                android.content.SharedPreferences sp = getSharedPreferences("pulse_prefs", android.content.Context.MODE_PRIVATE);
+                boolean prompted = sp.getBoolean("battery_opt_prompted", false);
+                if (!prompted) {
+                    android.os.PowerManager pm = (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
+                    if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                        sp.edit().putBoolean("battery_opt_prompted", true).apply();
+                        android.content.Intent batteryIntent = new android.content.Intent(
+                            android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                        );
+                        batteryIntent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                        startActivity(batteryIntent);
+                    }
                 }
             } catch (Exception ignored) {}
         }
@@ -142,15 +147,32 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void dispatchOpenChatToWebView(final String cId, final String cType, final String sName) {
-        final String safeName = sName != null ? sName.replace("'", "\\'") : "";
+        String jsonPayload;
+        try {
+            org.json.JSONObject obj = new org.json.JSONObject();
+            obj.put("chatId", cId != null ? cId : "");
+            obj.put("chatType", cType != null ? cType : "user");
+            obj.put("senderName", sName != null ? sName : "");
+            obj.put("type", "message");
+            jsonPayload = obj.toString();
+        } catch (Exception e) {
+            jsonPayload = "{\"chatId\":\"" + (cId != null ? cId : "") + "\",\"chatType\":\"" + (cType != null ? cType : "user") + "\",\"type\":\"message\"}";
+        }
+
         final String js = "(function() {" +
-            "var d = { chatId: '" + cId + "', chatType: '" + cType + "', senderName: '" + safeName + "', type: 'message' };" +
+            "var d = " + jsonPayload + ";" +
             "window.__PULSE_PENDING_OPEN_CHAT__ = d;" +
-            "if (typeof window.pulseOpenChat === 'function') { window.pulseOpenChat(d.chatId, d.chatType, d); }" +
-            "window.dispatchEvent(new CustomEvent('pulse:open-chat', { detail: d }));" +
+            "if (window.__PULSE_ACTIVE_OPEN_CHAT__ === d.chatId && (Date.now() - (window.__PULSE_ACTIVE_OPEN_TIME__ || 0)) < 3000) { return; }" +
+            "if (typeof window.pulseOpenChat === 'function') {" +
+            "  window.__PULSE_ACTIVE_OPEN_CHAT__ = d.chatId;" +
+            "  window.__PULSE_ACTIVE_OPEN_TIME__ = Date.now();" +
+            "  window.pulseOpenChat(d.chatId, d.chatType, d);" +
+            "} else {" +
+            "  window.dispatchEvent(new CustomEvent('pulse:open-chat', { detail: d }));" +
+            "}" +
             "})();";
 
-        long[] delays = new long[]{100, 300, 600, 1000, 1800, 3000, 5000};
+        long[] delays = new long[]{100, 300, 600, 1200, 2400};
         for (long delay : delays) {
             runOnUiThread(() -> {
                 try {
@@ -167,12 +189,23 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void dispatchOpenCallToWebView(final String callerId, final String callType) {
+        String jsonPayload;
+        try {
+            org.json.JSONObject obj = new org.json.JSONObject();
+            obj.put("callerId", callerId != null ? callerId : "");
+            obj.put("callType", callType != null ? callType : "video");
+            obj.put("type", "call");
+            jsonPayload = obj.toString();
+        } catch (Exception e) {
+            jsonPayload = "{\"callerId\":\"" + (callerId != null ? callerId : "") + "\",\"callType\":\"" + (callType != null ? callType : "video") + "\",\"type\":\"call\"}";
+        }
+
         final String js = "(function() {" +
-            "var d = { callerId: '" + callerId + "', callType: '" + callType + "', type: 'call' };" +
+            "var d = " + jsonPayload + ";" +
             "window.dispatchEvent(new CustomEvent('pulse:open-call-from', { detail: d }));" +
             "})();";
 
-        long[] delays = new long[]{150, 400, 800, 1500, 2500, 4000};
+        long[] delays = new long[]{150, 400, 800, 1500, 2500};
         for (long delay : delays) {
             runOnUiThread(() -> {
                 try {

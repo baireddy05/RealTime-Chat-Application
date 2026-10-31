@@ -41,6 +41,8 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
     public static final String CHANNEL_MESSAGE_ID = "pulse_v5_messages";
     public static final String CHANNEL_CALL_ID = "pulse_calls_v2";
     private static final String PREF_STACKS = "pulse_msg_stacks";
+    private static volatile boolean channelsInitialized = false;
+    private static volatile Bitmap cachedCircularLargeIcon = null;
 
     private static final java.util.Map<String, Long> processedMessageCache =
         java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String, Long>(50, 0.75f, true) {
@@ -51,7 +53,10 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         });
 
     public static void ensureNotificationChannel(Context ctx) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (channelsInitialized) return;
+        synchronized (PulseFirebaseMessagingService.class) {
+            if (channelsInitialized) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
                 // High importance message channels with sound, vibration, lights
@@ -104,20 +109,24 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                 }
             }
         }
+        channelsInitialized = true;
     }
+}
 
     public static void clearStackForChat(Context ctx, String chatId) {
-        if (chatId == null || chatId.isEmpty()) return;
+        if (chatId == null) return;
+        final String trimmed = chatId.trim();
+        if (trimmed.isEmpty()) return;
         try {
-            int notifId = Math.abs(chatId.hashCode());
+            int notifId = Math.abs(trimmed.hashCode());
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
-                nm.cancel("chat_" + chatId, notifId);
+                nm.cancel("chat_" + trimmed, notifId);
                 nm.cancel(notifId);
             }
             SharedPreferences stackPrefs = ctx.getSharedPreferences(PREF_STACKS, Context.MODE_PRIVATE);
-            stackPrefs.edit().remove(chatId).apply();
-            Log.d(TAG, "Cleared notification stack for chat: " + chatId);
+            stackPrefs.edit().remove(trimmed).apply();
+            Log.d(TAG, "Cleared notification stack for chat: " + trimmed);
         } catch (Exception e) {
             Log.w(TAG, "clearStackForChat error: " + e.getMessage());
         }
@@ -357,39 +366,50 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     private Bitmap getNotificationLargeIcon() {
-        try {
-            Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.ic_notification_large);
-            if (bmp != null) {
-                return getCircularBitmap(bmp);
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to decode ic_notification_large: " + t.getMessage());
+        if (cachedCircularLargeIcon != null && !cachedCircularLargeIcon.isRecycled()) {
+            return cachedCircularLargeIcon;
         }
+        synchronized (PulseFirebaseMessagingService.class) {
+            if (cachedCircularLargeIcon != null && !cachedCircularLargeIcon.isRecycled()) {
+                return cachedCircularLargeIcon;
+            }
+            try {
+                Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.ic_notification_large);
+                if (bmp != null) {
+                    cachedCircularLargeIcon = getCircularBitmap(bmp);
+                    return cachedCircularLargeIcon;
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to decode ic_notification_large: " + t.getMessage());
+            }
 
-        try {
-            Drawable drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher_round);
-            if (drawable == null) {
-                drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher);
+            try {
+                Drawable drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher_round);
+                if (drawable == null) {
+                    drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher);
+                }
+                if (drawable == null) {
+                    drawable = getPackageManager().getApplicationIcon(getPackageName());
+                }
+                if (drawable instanceof BitmapDrawable) {
+                    cachedCircularLargeIcon = getCircularBitmap(((BitmapDrawable) drawable).getBitmap());
+                    return cachedCircularLargeIcon;
+                }
+                if (drawable != null) {
+                    int width = drawable.getIntrinsicWidth() > 0 ? drawable.getIntrinsicWidth() : 192;
+                    int height = drawable.getIntrinsicHeight() > 0 ? drawable.getIntrinsicHeight() : 192;
+                    Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                    Canvas canvas = new Canvas(bitmap);
+                    drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+                    drawable.draw(canvas);
+                    cachedCircularLargeIcon = getCircularBitmap(bitmap);
+                    return cachedCircularLargeIcon;
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to load notification large icon: " + t.getMessage());
             }
-            if (drawable == null) {
-                drawable = getPackageManager().getApplicationIcon(getPackageName());
-            }
-            if (drawable instanceof BitmapDrawable) {
-                return getCircularBitmap(((BitmapDrawable) drawable).getBitmap());
-            }
-            if (drawable != null) {
-                int width = drawable.getIntrinsicWidth() > 0 ? drawable.getIntrinsicWidth() : 192;
-                int height = drawable.getIntrinsicHeight() > 0 ? drawable.getIntrinsicHeight() : 192;
-                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                Canvas canvas = new Canvas(bitmap);
-                drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-                drawable.draw(canvas);
-                return getCircularBitmap(bitmap);
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to load notification large icon: " + t.getMessage());
+            return null;
         }
-        return null;
     }
 
     private Bitmap getCircularBitmap(Bitmap bitmap) {

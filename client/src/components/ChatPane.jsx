@@ -6,16 +6,22 @@ import { useThemeStore } from "../store/useThemeStore";
 import { useCallStore } from "../store/useCallStore";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import MessageInput from "./MessageInput";
-import ImageModal from "./ImageModal";
-import ForwardModal from "./ForwardModal";
-import StarredDrawer from "./StarredDrawer";
-import TasksDrawer from "./TasksDrawer";
-import GroupInfoModal from "./GroupInfoModal";
-import ContactInfoModal from "./ContactInfoModal";
-// Reaction picker is code-split: emoji-picker-react is ~200KB and only needed
-// when the user opens "More reactions".
 import { lazyWithRetry } from "../lib/lazyWithRetry";
+// Modals and secondary drawers are code-split to keep ChatPane initial mount fast and lean
+const ImageModal = lazyWithRetry(() => import("./ImageModal"));
+const ForwardModal = lazyWithRetry(() => import("./ForwardModal"));
+const StarredDrawer = lazyWithRetry(() => import("./StarredDrawer"));
+const TasksDrawer = lazyWithRetry(() => import("./TasksDrawer"));
+const GroupInfoModal = lazyWithRetry(() => import("./GroupInfoModal"));
+const ContactInfoModal = lazyWithRetry(() => import("./ContactInfoModal"));
 const EmojiPicker = lazyWithRetry(() => import("emoji-picker-react"));
+const QuickNotesDrawer = lazyWithRetry(() => import("./QuickNotesDrawer"));
+const ScheduledMessagesModal = lazyWithRetry(() => import("./ScheduledMessagesModal"));
+const ChatThemeModal = lazyWithRetry(() => import("./ChatThemeModal"));
+const ThreadDrawer = lazyWithRetry(() => import("./ThreadDrawer"));
+const MessageInfoModal = lazyWithRetry(() => import("./MessageInfoModal"));
+const RemindModal = lazyWithRetry(() => import("./RemindModal"));
+
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
 import { 
@@ -26,13 +32,7 @@ import {
   Clock, Palette,
   StickyNote, FileCode, FileText
 } from "lucide-react";
-import QuickNotesDrawer from "./QuickNotesDrawer";
-import ScheduledMessagesModal from "./ScheduledMessagesModal";
-import ChatThemeModal from "./ChatThemeModal";
 import { resolveThemeStyles, CHAT_DOODLE_SVG } from "../lib/chatThemes";
-import ThreadDrawer from "./ThreadDrawer";
-import MessageInfoModal from "./MessageInfoModal";
-import RemindModal from "./RemindModal";
 import GroupCallModal from "./GroupCallModal";
 import MessageBubble from "./MessageBubble";
 import ChatLockGate from "./ChatLockGate";
@@ -554,19 +554,18 @@ const ChatPane = ({ onBack }) => {
   };
 
   const displayedMessages = useMemo(() => {
-    // Stable chronological sort: invalid/missing dates (NaN) used to make the
-    // comparator return NaN, scrambling order so recent messages could render
-    // mid-list. Undated items go last with insertion-order tiebreak.
-    const withIdx = messages.map((m, i) => ({ m, i }));
+    // Stable chronological sort with O(N) pre-computed timestamps.
+    // Pre-calculating timestamp once per item prevents O(N log N) new Date() object allocations
+    // inside the comparator, saving thousands of allocations and GC pauses on mobile devices.
+    const withIdx = messages.map((m, i) => {
+      const raw = m?.createdAt ? new Date(m.createdAt).getTime() : NaN;
+      return { m, i, t: isNaN(raw) ? -1 : raw };
+    });
     withIdx.sort((a, b) => {
-      const ta = new Date(a.m.createdAt).getTime();
-      const tb = new Date(b.m.createdAt).getTime();
-      const aBad = isNaN(ta);
-      const bBad = isNaN(tb);
-      if (aBad && bBad) return a.i - b.i;
-      if (aBad) return 1;
-      if (bBad) return -1;
-      return ta - tb || a.i - b.i;
+      if (a.t === -1 && b.t === -1) return a.i - b.i;
+      if (a.t === -1) return 1;
+      if (b.t === -1) return -1;
+      return a.t - b.t || a.i - b.i;
     });
     const sorted = withIdx.map((x) => x.m);
     if (showAnnouncementsOnly) return sorted.filter((m) => m.isAnnouncement && !m.isDeleted);
@@ -1723,35 +1722,37 @@ const ChatPane = ({ onBack }) => {
         </div>
       )}
 
-      {forwardingMessage && <ForwardModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />}
-      {bulkForwardMessages && (
-        <ForwardModal
-          messages={bulkForwardMessages}
-          onClose={() => {
-            setBulkForwardMessages(null);
-            setSelectedMessageIds([]);
-          }}
-        />
-      )}
-      {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
-      {isGroupInfoOpen && selectedChat.type === "room" && (
-        <GroupInfoModal group={selectedChat} onClose={() => setIsGroupInfoOpen(false)} onSelectUser={(userChat) => setSelectedChat(userChat)} />
-      )}
-      {contactInfoUserId && selectedChat.type === "user" && (
-        <ContactInfoModal userId={contactInfoUserId} onClose={() => setContactInfoUserId(null)} />
-      )}
-      {isScheduledOpen && <ScheduledMessagesModal isOpen={isScheduledOpen} onClose={() => setIsScheduledOpen(false)} />}
-      {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
-      {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
-      {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
-      {remindMessage && <RemindModal message={remindMessage} onClose={() => setRemindMessage(null)} />}
-      {isTasksOpen && (
-        <TasksDrawer
-          onClose={() => { setIsTasksOpen(false); setTaskPrefill(null); }}
-          prefill={taskPrefill}
-          onClearPrefill={() => setTaskPrefill(null)}
-        />
-      )}
+      <Suspense fallback={null}>
+        {forwardingMessage && <ForwardModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />}
+        {bulkForwardMessages && (
+          <ForwardModal
+            messages={bulkForwardMessages}
+            onClose={() => {
+              setBulkForwardMessages(null);
+              setSelectedMessageIds([]);
+            }}
+          />
+        )}
+        {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
+        {isGroupInfoOpen && selectedChat.type === "room" && (
+          <GroupInfoModal group={selectedChat} onClose={() => setIsGroupInfoOpen(false)} onSelectUser={(userChat) => setSelectedChat(userChat)} />
+        )}
+        {contactInfoUserId && selectedChat.type === "user" && (
+          <ContactInfoModal userId={contactInfoUserId} onClose={() => setContactInfoUserId(null)} />
+        )}
+        {isScheduledOpen && <ScheduledMessagesModal isOpen={isScheduledOpen} onClose={() => setIsScheduledOpen(false)} />}
+        {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
+        {isThreadOpen && <ThreadDrawer onClose={() => closeThread()} />}
+        {infoModalMessage && <MessageInfoModal message={infoModalMessage} onClose={() => setInfoModalMessage(null)} />}
+        {remindMessage && <RemindModal message={remindMessage} onClose={() => setRemindMessage(null)} />}
+        {isTasksOpen && (
+          <TasksDrawer
+            onClose={() => { setIsTasksOpen(false); setTaskPrefill(null); }}
+            prefill={taskPrefill}
+            onClearPrefill={() => setTaskPrefill(null)}
+          />
+        )}
+      </Suspense>
 
       {/* Full Reaction Emoji Picker Modal */}
       {fullReactionPickerMsgId && (

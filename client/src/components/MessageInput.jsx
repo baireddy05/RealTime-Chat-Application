@@ -26,8 +26,8 @@ import {
   AudioLines,
 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
-import ImageModal from "./ImageModal";
 import { lazyWithRetry } from "../lib/lazyWithRetry";
+const ImageModal = lazyWithRetry(() => import("./ImageModal"));
 const GifPicker = lazyWithRetry(() => import("./GifPicker"));
 const EmojiPicker = lazyWithRetry(() => import("emoji-picker-react"));
 // Heavy composer modals are code-split: their chunks load only on first open,
@@ -1702,10 +1702,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       )}
 
       {previewModalImage && (
-        <ImageModal
-          imageUrl={previewModalImage}
-          onClose={() => setPreviewModalImage(null)}
-        />
+        <Suspense fallback={null}>
+          <ImageModal
+            imageUrl={previewModalImage}
+            onClose={() => setPreviewModalImage(null)}
+          />
+        </Suspense>
       )}
 
       {showContactModal && (
