@@ -211,15 +211,18 @@ const ChatPane = ({ onBack }) => {
   useEffect(() => {
     if (!showChatOptions) return;
     const handlePointerDown = (e) => {
-      if (chatOptionsRef.current && !chatOptionsRef.current.contains(e.target)) {
+      if (
+        chatOptionsRef.current &&
+        !chatOptionsRef.current.contains(e.target) &&
+        chatOptionsMenuRef.current &&
+        !chatOptionsMenuRef.current.contains(e.target)
+      ) {
         setShowChatOptions(false);
       }
     };
-    document.addEventListener("mousedown", handlePointerDown, true);
-    document.addEventListener("touchstart", handlePointerDown, true);
+    document.addEventListener("mousedown", handlePointerDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown, true);
-      document.removeEventListener("touchstart", handlePointerDown, true);
+      document.removeEventListener("mousedown", handlePointerDown);
     };
   }, [showChatOptions]);
 
@@ -227,6 +230,7 @@ const ChatPane = ({ onBack }) => {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const chatOptionsRef = useRef(null);
+  const chatOptionsMenuRef = useRef(null);
   const isAtBottomRef = useRef(true);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
   const [unreadBelowCount, setUnreadBelowCount] = useState(0);
@@ -1200,13 +1204,18 @@ const ChatPane = ({ onBack }) => {
                 <>
                   <div
                     className="fixed inset-0 z-[99998] bg-black/40 backdrop-blur-[2px]"
-                    onTouchStart={(e) => { e.stopPropagation(); setShowChatOptions(false); }}
-                    onClick={() => setShowChatOptions(false)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowChatOptions(false);
+                    }}
                   />
                   <div
+                    ref={chatOptionsMenuRef}
                     className="rounded-2xl bg-[#0a1812] text-white border border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn smooth-gpu text-[13px] overflow-hidden"
                     style={{ ...getChatOptionsStyle(), backgroundColor: "var(--glass-heavy-opaque, #0a1812)" }}
                     onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
                   >
                   {selectedChat.type === "room" && (
                     <button

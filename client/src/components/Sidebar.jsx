@@ -200,6 +200,7 @@ const Sidebar = ({
   const [showLabelsManager, setShowLabelsManager] = useState(false);
   const searchInputRef = useRef(null);
   const optionsDropdownRef = useRef(null);
+  const optionsMenuRef = useRef(null);
   const chatMenuRef = useRef(null);
   const tabsRef = useRef(null);
   const [tabsAtStart, setTabsAtStart] = useState(true);
@@ -332,15 +333,18 @@ const Sidebar = ({
   useEffect(() => {
     if (!showOptionsDropdown) return;
     const handlePointerDown = (e) => {
-      if (optionsDropdownRef.current && !optionsDropdownRef.current.contains(e.target)) {
+      if (
+        optionsDropdownRef.current &&
+        !optionsDropdownRef.current.contains(e.target) &&
+        optionsMenuRef.current &&
+        !optionsMenuRef.current.contains(e.target)
+      ) {
         setShowOptionsDropdown(false);
       }
     };
-    document.addEventListener("mousedown", handlePointerDown, true);
-    document.addEventListener("touchstart", handlePointerDown, true);
+    document.addEventListener("mousedown", handlePointerDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown, true);
-      document.removeEventListener("touchstart", handlePointerDown, true);
+      document.removeEventListener("mousedown", handlePointerDown);
     };
   }, [showOptionsDropdown]);
 
@@ -2145,12 +2149,17 @@ const Sidebar = ({
         <>
           <div
             className="fixed inset-0 z-[99998] bg-black/40 backdrop-blur-[2px]"
-            onClick={() => setShowOptionsDropdown(false)}
-            onTouchStart={(e) => { e.stopPropagation(); setShowOptionsDropdown(false); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowOptionsDropdown(false);
+            }}
           />
           <div
+            ref={optionsMenuRef}
             style={{ ...getOptionsDropdownStyle(), backgroundColor: "var(--glass-heavy-opaque, #0a1812)" }}
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             className="rounded-2xl bg-[#0a1812] text-white border border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px] overflow-hidden"
           >
             {onOpenProfile && (
@@ -2270,7 +2279,6 @@ const Sidebar = ({
         <>
           <div
             className="fixed inset-0 z-[9998] bg-transparent"
-            onPointerDown={closeChatMenu}
             onClick={closeChatMenu}
           />
           <div
