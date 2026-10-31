@@ -869,7 +869,7 @@ const Sidebar = ({
         onTouchMove={cancelCardLongPress}
         onTouchEnd={cancelCardLongPress}
         onTouchCancel={cancelCardLongPress}
-        className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+        className={`group relative flex items-center gap-3 px-3 sm:px-4 py-2.5 md:rounded-2xl cursor-pointer transition-all duration-150 ${
           isSelected
             ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
             : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
@@ -1013,7 +1013,7 @@ const Sidebar = ({
         onTouchMove={cancelCardLongPress}
         onTouchEnd={cancelCardLongPress}
         onTouchCancel={cancelCardLongPress}
-        className={`group relative flex items-center gap-3 p-2.5 rounded-2xl cursor-pointer transition-all duration-150 ${
+        className={`group relative flex items-center gap-3 px-3 sm:px-4 py-2.5 md:rounded-2xl cursor-pointer transition-all duration-150 ${
           isSelected
             ? "bg-zinc-900 text-white dark:bg-white dark:text-[#0d0c11] shadow-lg font-semibold border border-transparent"
             : "hover:bg-black/5 text-zinc-800 hover:text-zinc-950 dark:hover:bg-white/5 dark:text-zinc-300 dark:hover:text-white border border-transparent"
@@ -1043,13 +1043,11 @@ const Sidebar = ({
                 : friend.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.username)}&background=27272a&color=ffffff`
             }
           />
-          <span
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 ${
-              isOnline
-                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
-                : "bg-zinc-400 dark:bg-zinc-600"
-            }`}
-          />
+          {isOnline && (
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+            />
+          )}
         </div>
 
         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
@@ -1334,11 +1332,14 @@ const Sidebar = ({
   return (
     <section
       aria-label="Chats List"
-      className="h-full flex flex-col p-3 text-on-surface select-none overflow-hidden transition-colors duration-200 bg-transparent"
+      className="h-full flex flex-col p-0 md:p-3 text-on-surface select-none overflow-hidden transition-colors duration-200 bg-transparent"
     >
       {/* 1. Sleek Top Header Bar with Actions */}
-      <div className="flex flex-col gap-2 pb-2">
-        <div className="flex items-center justify-between px-1 pt-1">
+      <div
+        className="flex flex-col gap-2 pb-2 px-3 sm:px-4 border-b border-[var(--glass-border)] md:border-b-0 bg-[var(--glass-header)] md:bg-transparent backdrop-blur-2xl md:backdrop-blur-none"
+        style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 10px)" }}
+      >
+        <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2.5">
             {onOpenProfile && (
               <button
@@ -1530,7 +1531,7 @@ const Sidebar = ({
         </div>
 
         {/* Search Bar with ⌘K — Chats tab only on mobile */}
-        <div className={`relative items-center w-full mt-1 ${mobileTab === "chats" ? "flex" : "hidden"}`}>
+        <div className={`relative items-center w-full px-3 sm:px-4 mt-1 ${mobileTab === "chats" ? "flex" : "hidden"}`}>
           <span className="material-symbols-outlined absolute left-3 text-zinc-400 dark:text-zinc-500 pointer-events-none text-base">
             search
           </span>
@@ -1559,7 +1560,7 @@ const Sidebar = ({
         </div>
 
         {/* Category Filter Tabs: All, Unread, Requests, Groups, Direct — Chats tab only on mobile */}
-        <div className={`relative select-none ${mobileTab === "chats" ? "" : "hidden"}`}>
+        <div className={`relative select-none px-3 sm:px-4 ${mobileTab === "chats" ? "" : "hidden"}`}>
           <div ref={tabsRef} className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1.5 pb-1">
             <button
               onClick={() => setActiveFilter("all")}
@@ -2038,25 +2039,7 @@ const Sidebar = ({
       )}
 
       {/* 4. Conversation List - desktop single pane, true swipeable pager on mobile */}
-      {/* Mobile pager position dots (tap to jump) */}
-      <div className="md:hidden flex items-center justify-center gap-1.5 pt-1 pb-0.5">
-        {MOBILE_TABS.map((t, i) => (
-          <button
-            key={t}
-            type="button"
-            aria-label={`Go to ${t}`}
-            onClick={() => {
-              if (i !== mobileTabIndex) {
-                setSearchQuery("");
-                setMobileTab(t);
-              }
-            }}
-            className={`h-1 rounded-full transition-all duration-300 ${
-              mobileTab === t ? "w-5 bg-zinc-900 dark:bg-white" : "w-1 bg-zinc-300 dark:bg-zinc-700"
-            }`}
-          />
-        ))}
-      </div>
+
       <div
         ref={pagerViewportRef}
         onTouchStart={handlePagerTouchStart}
@@ -2451,8 +2434,8 @@ const Sidebar = ({
           Tapping switches the inline page — swiping the list above does the same. */}
       <nav
         aria-label="Primary"
-        className="md:hidden shrink-0 -mx-3 -mb-3 mt-2 border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 10px)" }}
+        className="md:hidden shrink-0 w-full border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4 z-30"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 12px)" }}
       >
         <button
           type="button"

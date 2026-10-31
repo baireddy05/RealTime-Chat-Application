@@ -24,8 +24,8 @@ function App() {
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
-      StatusBar.setBackgroundColor({ color: "#09090b" }).catch(() => {});
-      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: "#00000000" }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
       SplashScreen.hide().catch(() => {});
       notificationManager.initNative().then(() => {
         notificationManager.requestPermission().catch(() => {});

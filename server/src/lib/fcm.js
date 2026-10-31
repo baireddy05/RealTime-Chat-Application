@@ -103,33 +103,16 @@ export const sendFcm = async (userId, { title, body, data = {} }) => {
     ])
   );
 
-  // WhatsApp-style FCM architecture:
-  // WhatsApp and Telegram NEVER send a root "notification" payload on Android.
-  // If an FCM message has a "notification" block, Google Play Services intercepts
-  // it and BYPASSES onMessageReceived() when the app is in background or closed.
-  // When bypassed, custom Java code cannot run, messages CANNOT be stacked (InboxStyle),
-  // and each new message replaces the previous one.
-  // A pure DATA payload with priority: "high" wakes up PulseFirebaseMessagingService
+  // Pure DATA payload with priority: "high" wakes up PulseFirebaseMessagingService
   // even when the app is swiped away from recent apps, executing onMessageReceived()
   // to dynamically stack all unread messages per chat into an InboxStyle notification.
+  // We NEVER include a root "notification" block; doing so causes Google Play Services
+  // to post an un-stacked duplicate notification in addition to our service.
   const message = {
     tokens: tokens.map((t) => t.token),
-    notification: {
-      title: title || "Pulse Messenger",
-      body: body || "New activity",
-    },
     data: stringData,
     android: {
       priority: "high",
-      notification: {
-        channelId: "pulse_v5_messages",
-        sound: "default",
-        defaultSound: true,
-        defaultVibrateTimings: true,
-        priority: "max",
-        visibility: "public",
-        color: "#00E5FF",
-      },
     },
   };
 

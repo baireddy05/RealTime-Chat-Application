@@ -889,6 +889,13 @@ img.emoji {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
   }
+
+  /* On mobile phones, panels must be flush edge-to-edge without floating card borders or clipped corners */
+  .glass-panel {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
 }
 
 /* Device safe area inset utilities for notched phones and mobile displays */

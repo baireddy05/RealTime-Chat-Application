@@ -18,8 +18,8 @@
     },
     "StatusBar": {
       "style": "DARK",
-      "backgroundColor": "#09090b",
-      "overlaysWebView": false
+      "backgroundColor": "#00000000",
+      "overlaysWebView": true
     },
     "Keyboard": {
       "resize": "body",

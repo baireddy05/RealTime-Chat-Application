@@ -7,6 +7,11 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -16,6 +21,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -31,6 +37,14 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
     public static final String CHANNEL_MESSAGE_ID = "pulse_v5_messages";
     public static final String CHANNEL_CALL_ID = "pulse_calls_v2";
     private static final String PREF_STACKS = "pulse_msg_stacks";
+
+    private static final java.util.Map<String, Long> processedMessageCache =
+        java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String, Long>(50, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(java.util.Map.Entry<String, Long> eldest) {
+                return size() > 50;
+            }
+        });
 
     public static void ensureNotificationChannel(Context ctx) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -119,6 +133,23 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         super.onMessageReceived(remoteMessage);
         Log.i(TAG, "FCM message received from: " + remoteMessage.getFrom());
 
+        Map<String, String> data = remoteMessage.getData();
+
+        // De-duplicate: ignore duplicate deliveries of the same message within 15 seconds
+        String messageId = remoteMessage.getMessageId();
+        if (data != null && data.containsKey("messageId")) {
+            messageId = data.get("messageId");
+        }
+        if (messageId != null && !messageId.isEmpty()) {
+            Long lastProcessed = processedMessageCache.get(messageId);
+            long now = System.currentTimeMillis();
+            if (lastProcessed != null && (now - lastProcessed) < 15000) {
+                Log.i(TAG, "Duplicate FCM message ignored: " + messageId);
+                return;
+            }
+            processedMessageCache.put(messageId, now);
+        }
+
         // Always forward to Capacitor plugin safely (never crash onMessageReceived)
         try {
             PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
@@ -126,7 +157,6 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
             Log.w(TAG, "Capacitor push forward skipped: " + t.getMessage());
         }
 
-        Map<String, String> data = remoteMessage.getData();
         String type = data != null ? data.get("type") : "message";
 
         if ("call".equals(type)) {
@@ -233,6 +263,11 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE);
 
+            Bitmap largeIcon = getNotificationLargeIcon();
+            if (largeIcon != null) {
+                builder.setLargeIcon(largeIcon);
+            }
+
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
                 nm.notify("chat_" + chatId, notifId, builder.build());
@@ -279,6 +314,11 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setDefaults(NotificationCompat.DEFAULT_ALL);
 
+            Bitmap largeIcon = getNotificationLargeIcon();
+            if (largeIcon != null) {
+                builder.setLargeIcon(largeIcon);
+            }
+
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
                 nm.notify(notifId, builder.build());
@@ -287,6 +327,39 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         } catch (Exception e) {
             Log.e(TAG, "Error displaying call notification: " + e.getMessage(), e);
         }
+    }
+
+    private Bitmap getNotificationLargeIcon() {
+        try {
+            Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.ic_notification_large);
+            if (bmp != null) {
+                return bmp;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to decode ic_notification_large: " + t.getMessage());
+        }
+
+        try {
+            Drawable drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher);
+            if (drawable == null) {
+                drawable = getPackageManager().getApplicationIcon(getPackageName());
+            }
+            if (drawable instanceof BitmapDrawable) {
+                return ((BitmapDrawable) drawable).getBitmap();
+            }
+            if (drawable != null) {
+                int width = drawable.getIntrinsicWidth() > 0 ? drawable.getIntrinsicWidth() : 192;
+                int height = drawable.getIntrinsicHeight() > 0 ? drawable.getIntrinsicHeight() : 192;
+                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(bitmap);
+                drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+                drawable.draw(canvas);
+                return bitmap;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to load notification large icon: " + t.getMessage());
+        }
+        return null;
     }
 }
 

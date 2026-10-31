@@ -399,7 +399,7 @@ const HomePage = () => {
   return (
     <>
       <div
-        className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200 safe-top"
+        className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200"
         style={{
           "--sidebar-width": `${sidebarWidth}px`,
         }}

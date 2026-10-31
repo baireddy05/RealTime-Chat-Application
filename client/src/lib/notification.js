@@ -253,8 +253,10 @@ class UnifiedNotificationManager {
 
     // 2. Schedule native notification
     if (this.isNative) {
-      // If user is actively looking at this conversation right now in the foreground, skip tray notification
-      if (!force && typeof document !== "undefined" && !document.hidden) {
+      // If user is inside the app in the foreground, we already showed the in-app banner above.
+      // Do not duplicate by posting to the Android system tray.
+      // Remote push (PulseFirebaseMessagingService) handles background/closed-app notifications.
+      if (!isCall && typeof document !== "undefined" && !document.hidden) {
         return true;
       }
 

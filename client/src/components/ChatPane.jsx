@@ -624,7 +624,10 @@ const ChatPane = ({ onBack }) => {
   if (isChatLockedAnywhere(selectedChat?.id, authUser?.chatPreferences, unlockedChats)) {
     return (
       <div className="h-full w-full flex flex-col overflow-hidden relative text-on-surface bg-transparent">
-        <div className="flex items-center gap-2.5 px-3 sm:px-4 py-2.5 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] z-30 flex-shrink-0">
+        <div
+          className="flex items-center gap-2.5 px-3 sm:px-4 py-2.5 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] z-30 flex-shrink-0"
+          style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 10px)" }}
+        >
           {onBack && (
             <button
               onClick={onBack}
@@ -988,7 +991,10 @@ const ChatPane = ({ onBack }) => {
       )}
       {/* Monochromatic Glass Chat Header */}
       {/* Monochromatic Glass Chat Header */}
-      <div className="flex items-center justify-between px-3 sm:px-4 xl:px-6 py-2.5 sm:py-3 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] shadow-sm z-30 flex-shrink-0 relative">
+      <div
+        className="flex items-center justify-between px-3 sm:px-4 xl:px-6 py-2.5 sm:py-3 bg-[var(--glass-header)] backdrop-blur-2xl border-b border-[var(--glass-border)] shadow-sm z-30 flex-shrink-0 relative"
+        style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 10px)" }}
+      >
         {isSearchOpen ? (
           <div className="flex items-center gap-2 w-full animate-fadeIn">
             <button
@@ -1079,7 +1085,9 @@ const ChatPane = ({ onBack }) => {
                     alt={selectedChat.name || selectedChat.username || "Chat"}
                     className="w-full h-full rounded-full object-cover shadow-sm border border-black/10 dark:border-white/10"
                   />
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 ${isUserOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-zinc-400 dark:bg-zinc-600"}`} />
+                  {isUserOnline && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full ring-2 ring-white dark:ring-[#121117] z-10 bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+                  )}
                 </div>
               )}
               <div className="flex flex-col min-w-0">
