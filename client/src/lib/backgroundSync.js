@@ -42,3 +42,12 @@ export async function openAutostartSettings() {
   }
 }
 
+export async function setActiveNativeChat(chatId) {
+  if (!Capacitor.isNativePlatform() || !PulseBackground) return;
+  try {
+    await PulseBackground.setActiveChat({ chatId: chatId ? String(chatId) : "" });
+  } catch (e) {
+    console.warn("[Pulse Background Sync] setActiveChat error:", e);
+  }
+}
+

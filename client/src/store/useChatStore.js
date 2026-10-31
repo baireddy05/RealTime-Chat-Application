@@ -4,6 +4,7 @@ import { useAuthStore } from "./useAuthStore";
 import { useFriendStore } from "./useFriendStore";
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
+import { setActiveNativeChat } from "../lib/backgroundSync";
 import {
   encryptMessage,
   decryptMessage,
@@ -1341,20 +1342,23 @@ export const useChatStore = create((set, get) => ({
               typeof body === "string" ? body : ""
             );
           const chatTitle = selectedChat.type === "room" ? selectedChat.name : senderName;
-          notificationManager.sendNotification({
-            title: mentioned ? `${senderName} mentioned you in ${selectedChat.name}` : title,
-            chatTitle,
-            body,
-            icon: processedMessage.senderId?.profilePic || "/favicon.png",
-            tag: chatId,
-            data: {
-              type: "message",
-              chatType: selectedChat.type,
-              chatId: (selectedChat._id || selectedChat.id || chatId)?.toString(),
-              messageId: processedMessage._id,
-              senderName,
-            },
-          });
+          // When actively inside this chat, suppress notification banner/tray alert if window is visible
+          if (typeof document !== "undefined" && document.hidden) {
+            notificationManager.sendNotification({
+              title: mentioned ? `${senderName} mentioned you in ${selectedChat.name}` : title,
+              chatTitle,
+              body,
+              icon: processedMessage.senderId?.profilePic || "/favicon.png",
+              tag: chatId,
+              data: {
+                type: "message",
+                chatType: selectedChat.type,
+                chatId: (selectedChat._id || selectedChat.id || chatId)?.toString(),
+                messageId: processedMessage._id,
+                senderName,
+              },
+            });
+          }
           window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
         } else {
           soundManager.playSendSound();
@@ -2287,10 +2291,14 @@ export const useChatStore = create((set, get) => ({
     const current = get().selectedChat;
     const socket = useAuthStore.getState().socket;
     const unread = { ...get().unreadCounts };
+    const activeId = chat ? (chat.id || chat._id)?.toString() || null : null;
     if (chat?.id) unread[chat.id] = 0;
-    if (chat?.id || chat?._id) {
-      notificationManager.clearNotification(chat.id || chat._id);
+    if (activeId) {
+      unread[activeId] = 0;
+      notificationManager.clearNotification(activeId);
     }
+    notificationManager.setActiveChat(activeId);
+    setActiveNativeChat(activeId);
 
     if (socket) {
       const prevRoom = current?.type === "room" ? current?.id?.toString() : null;

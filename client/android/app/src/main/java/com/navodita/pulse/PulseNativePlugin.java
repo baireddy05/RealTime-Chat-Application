@@ -58,6 +58,18 @@ public class PulseNativePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void setActiveChat(PluginCall call) {
+        String chatId = call.getString("chatId", null);
+        if (chatId != null && !chatId.trim().isEmpty()) {
+            MainActivity.activeChatId = chatId.trim();
+            PulseFirebaseMessagingService.clearStackForChat(getContext(), MainActivity.activeChatId);
+        } else {
+            MainActivity.activeChatId = null;
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
     public void requestBatteryOptimization(PluginCall call) {
         Context ctx = getContext();
         try {

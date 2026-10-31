@@ -164,6 +164,15 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
             return;
         }
 
+        // Suppress tray notification if the app is currently open in the foreground
+        // and the user is actively viewing this exact chat!
+        String chatId = (data != null && data.containsKey("chatId")) ? data.get("chatId") : null;
+        if (MainActivity.isAppInForeground && chatId != null && MainActivity.activeChatId != null
+                && chatId.trim().equalsIgnoreCase(MainActivity.activeChatId.trim())) {
+            Log.i(TAG, "User currently in active chat " + chatId + " in foreground — skipping system notification");
+            return;
+        }
+
         handleMessageNotification(remoteMessage, data);
     }
 

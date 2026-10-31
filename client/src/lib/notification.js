@@ -98,6 +98,7 @@ class UnifiedNotificationManager {
     this.swRegistration = null;
     this.nativeInitialized = false;
     this._messageStacks = loadStoredStacks();
+    this.activeChatId = null;
 
     if (this.isNative) {
       this.initNative().catch((err) => {
@@ -219,6 +220,10 @@ class UnifiedNotificationManager {
     return this.permission === "granted";
   }
 
+  setActiveChat(chatId) {
+    this.activeChatId = chatId ? String(chatId) : null;
+  }
+
   async sendNotification({
     title,
     chatTitle = null,
@@ -231,6 +236,20 @@ class UnifiedNotificationManager {
     force = false,
   }) {
     const isCall = data?.type === "call";
+    const targetChatId = data?.chatId ? String(data.chatId) : tag ? String(tag) : null;
+
+    // If user is currently looking at this active chat and window/app is visible, suppress notification & banner!
+    if (
+      !force &&
+      !isCall &&
+      this.activeChatId &&
+      targetChatId &&
+      this.activeChatId === targetChatId &&
+      typeof document !== "undefined" &&
+      !document.hidden
+    ) {
+      return false;
+    }
 
     // 1. If inside app and document is visible, show in-app banner with haptic vibration!
     if (typeof document !== "undefined" && !document.hidden) {

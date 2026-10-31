@@ -10,6 +10,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     public static volatile boolean isAppInForeground = false;
+    public static volatile String activeChatId = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +79,7 @@ public class MainActivity extends BridgeActivity {
         if (chatId != null && !chatId.isEmpty() && !"default".equals(chatId)) {
             final String cId = chatId;
             final String cType = chatType != null ? chatType : "user";
+            activeChatId = cId;
             PulseFirebaseMessagingService.clearStackForChat(this, cId);
             getBridge().getWebView().postDelayed(() -> {
                 try {
@@ -104,5 +106,6 @@ public class MainActivity extends BridgeActivity {
     public void onDestroy() {
         super.onDestroy();
         isAppInForeground = false;
+        activeChatId = null;
     }
 }
