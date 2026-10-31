@@ -340,12 +340,19 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   // Auto-resize the composer for ANY text change — typing, pasting,
   // dictation, draft restore, or edit prefill. Typing alone used to be the
   // only path that resized, so programmatic sets left long text clipped.
+  const BASE_TEXTAREA_HEIGHT = 36;
   const autoResizeInput = (el) => {
     const target = el || inputRef.current;
     if (!target) return;
     try {
-      target.style.height = "auto";
-      target.style.height = Math.min(target.scrollHeight, 120) + "px";
+      const hasVal = target.value && target.value.trim().length > 0;
+      if (!hasVal) {
+        target.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
+        return;
+      }
+      target.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
+      const scrollH = target.scrollHeight;
+      target.style.height = `${Math.min(Math.max(scrollH, BASE_TEXTAREA_HEIGHT), 120)}px`;
     } catch {}
   };
 
@@ -924,7 +931,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
       setDraft(selectedChat.id, "");
     }
     if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = '36px';
     }
     removeImage();
     removeDocument();
@@ -1013,7 +1020,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const hasContent = text.trim().length > 0 || imagePreview || documentFile;
 
   return (
-    <div className="bg-transparent px-2 sm:px-4 md:px-5 pb-2 sm:pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-2 shrink-0 z-30">
+    <div className="bg-transparent px-2 sm:px-4 md:px-5 pb-1.5 sm:pb-3 pt-1 relative select-none safe-bottom flex flex-col gap-1.5 shrink-0 z-30">
       {/* Replying Banner */}
       {replyingTo && (
         <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[var(--glass-hover)] border-l-2 border-accent-primary border border-[var(--glass-border)] animate-fadeIn">
@@ -1820,8 +1827,8 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSendMessage} className="flex flex-col gap-1.5">
-          <div className={`flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-full glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass capsule-typing-pulse ${
+        <form onSubmit={handleSendMessage} className="flex flex-col gap-1">
+          <div className={`flex items-end gap-1 sm:gap-1.5 px-2 py-1.5 rounded-[26px] glass-heavy border border-[var(--glass-border)] border-t-[var(--glass-border-top)] shadow-glass min-h-[46px] capsule-typing-pulse ${
             isTypingPulse ? "active" : ""
           }`}>
             {/* Attachment Button */}
@@ -1833,7 +1840,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowAttachMenu((prev) => !prev);
                 setShowMediaPicker(false);
               }}
-              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 shrink-0"
+              className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ml-0.5 shrink-0 mb-0.5"
               title="Attach file or media"
             >
               <span className="material-symbols-outlined text-xl">add_circle</span>
@@ -1848,7 +1855,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 setShowMediaPicker((prev) => !prev);
                 setShowAttachMenu(false);
               }}
-              className={`p-1.5 sm:p-2 rounded-full transition-colors shrink-0 ${
+              className={`p-1.5 sm:p-2 rounded-full transition-colors shrink-0 mb-0.5 ${
                 showMediaPicker
                   ? "text-accent-primary bg-accent-primary/15"
                   : "text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10"
@@ -1875,11 +1882,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             />
 
             {/* Text Input Field with Typing Rhythm Indicator - MAX HORIZONTAL WIDTH */}
-            <div className="flex-1 flex items-center px-1.5 sm:px-2 min-w-0 relative">
+            <div className="flex-1 flex items-center px-1.5 sm:px-2 min-w-0 relative py-0.5">
               <textarea
                 ref={inputRef}
                 rows={1}
-                className="w-full bg-transparent py-2 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-[14.5px] leading-snug focus:outline-none resize-none overflow-y-auto max-h-[120px] custom-scrollbar"
+                className="w-full bg-transparent py-1.5 px-1 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-[15px] leading-[21px] focus:outline-none resize-none overflow-y-auto min-h-[24px] max-h-[120px] custom-scrollbar"
+                style={{ height: '36px' }}
                 placeholder={
                   scheduledFor
                     ? "Schedule a message..."
@@ -1918,7 +1926,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
             </div>
 
             {/* In-capsule controls: Timer, Schedule, Video/Audio notes, Dictation & Send */}
-            <div className="flex items-center gap-0.5 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0 mb-0.5">
               {/* Disappearing Timer (shown if active, or on tablet/desktop) */}
               <button
                 ref={timerBtnRef}
@@ -1958,12 +1966,12 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
                 <Clock size={15} />
               </button>
 
-              {/* Video Memo: visible on mobile only when text is empty */}
+              {/* Video Memo: hidden on mobile to prevent clutter, visible on tablet/desktop */}
               <button
                 type="button"
                 onClick={startVideoRecording}
                 className={`p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors ${
-                  hasContent || editingMessage ? "hidden sm:flex" : "flex"
+                  hasContent || editingMessage ? "hidden" : "hidden sm:flex"
                 }`}
                 title="Record Video Note"
               >

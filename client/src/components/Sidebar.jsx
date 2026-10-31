@@ -2435,7 +2435,7 @@ const Sidebar = ({
       <nav
         aria-label="Primary"
         className="md:hidden shrink-0 w-full border-t border-[var(--glass-border)] bg-[var(--glass-header)] backdrop-blur-2xl px-2 pt-1.5 grid grid-cols-4 z-30"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 12px)" }}
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 18px)" }}
       >
         <button
           type="button"

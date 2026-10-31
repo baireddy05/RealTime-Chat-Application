@@ -903,7 +903,7 @@ img.emoji {
   padding-top: max(env(safe-area-inset-top, 0px), 0px);
 }
 .safe-bottom {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
 }
 .call-safe-bottom {
   margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);

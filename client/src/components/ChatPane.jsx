@@ -1152,7 +1152,7 @@ const ChatPane = ({ onBack }) => {
               </button>
               <button
                 onClick={() => setIsQuickNotesOpen(true)}
-                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                className="hidden sm:flex p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
                 title="Scratchpad & Notes"
                 type="button"
               >
@@ -1160,7 +1160,7 @@ const ChatPane = ({ onBack }) => {
               </button>
               <button
                 onClick={() => setIsTasksOpen(true)}
-                className="p-1.5 sm:p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
+                className="hidden sm:flex p-2 rounded-xl bg-black/[0.03] text-zinc-700 hover:text-zinc-950 hover:bg-black/[0.08] border border-black/5 dark:bg-white/5 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/10 dark:border-white/5 transition-all"
                 title="Tasks for this chat"
                 type="button"
               >
@@ -1209,6 +1209,24 @@ const ChatPane = ({ onBack }) => {
                     className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors"
                   >
                     <Search size={14} className="text-theme-muted" /> Find in Chat
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsQuickNotesOpen(true);
+                      setShowChatOptions(false);
+                    }}
+                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors sm:hidden"
+                  >
+                    <StickyNote size={14} className="text-amber-500" /> Scratchpad & Notes
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsTasksOpen(true);
+                      setShowChatOptions(false);
+                    }}
+                    className="w-full px-3.5 py-2.5 text-left hover:bg-[var(--glass-hover)] flex items-center gap-2.5 text-theme-main hover:text-accent-primary transition-colors sm:hidden"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-accent-primary">task_alt</span> Tasks
                   </button>
 
                   <div className="h-px bg-[var(--glass-border)] my-1" />

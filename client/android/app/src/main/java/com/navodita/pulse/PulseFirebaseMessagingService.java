@@ -10,6 +10,10 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.AudioAttributes;
@@ -356,19 +360,22 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         try {
             Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.ic_notification_large);
             if (bmp != null) {
-                return bmp;
+                return getCircularBitmap(bmp);
             }
         } catch (Throwable t) {
             Log.w(TAG, "Failed to decode ic_notification_large: " + t.getMessage());
         }
 
         try {
-            Drawable drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher);
+            Drawable drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher_round);
+            if (drawable == null) {
+                drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher);
+            }
             if (drawable == null) {
                 drawable = getPackageManager().getApplicationIcon(getPackageName());
             }
             if (drawable instanceof BitmapDrawable) {
-                return ((BitmapDrawable) drawable).getBitmap();
+                return getCircularBitmap(((BitmapDrawable) drawable).getBitmap());
             }
             if (drawable != null) {
                 int width = drawable.getIntrinsicWidth() > 0 ? drawable.getIntrinsicWidth() : 192;
@@ -377,12 +384,41 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                 Canvas canvas = new Canvas(bitmap);
                 drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
                 drawable.draw(canvas);
-                return bitmap;
+                return getCircularBitmap(bitmap);
             }
         } catch (Throwable t) {
             Log.w(TAG, "Failed to load notification large icon: " + t.getMessage());
         }
         return null;
+    }
+
+    private Bitmap getCircularBitmap(Bitmap bitmap) {
+        if (bitmap == null) return null;
+        try {
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            int diameter = Math.min(width, height);
+
+            Bitmap output = Bitmap.createBitmap(diameter, diameter, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(output);
+
+            final Paint paint = new Paint();
+            final Rect srcRect = new Rect((width - diameter) / 2, (height - diameter) / 2, (width + diameter) / 2, (height + diameter) / 2);
+            final Rect destRect = new Rect(0, 0, diameter, diameter);
+
+            paint.setAntiAlias(true);
+            paint.setFilterBitmap(true);
+            paint.setDither(true);
+            canvas.drawARGB(0, 0, 0, 0);
+            canvas.drawCircle(diameter / 2f, diameter / 2f, diameter / 2f, paint);
+            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+            canvas.drawBitmap(bitmap, srcRect, destRect, paint);
+
+            return output;
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to mask circular icon: " + t.getMessage());
+            return bitmap;
+        }
     }
 }
 
