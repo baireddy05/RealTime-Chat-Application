@@ -1180,7 +1180,15 @@ const ChatPane = ({ onBack }) => {
               <span className="material-symbols-outlined text-lg">more_vert</span>
             </button>
             {showChatOptions && (
-                <div className="absolute right-0 top-10 z-50 bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] rounded-2xl overflow-hidden shadow-glass py-1.5 w-56 animate-scaleIn smooth-gpu text-[13px]">
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]"
+                    onClick={() => setShowChatOptions(false)}
+                  />
+                  <div
+                    className="absolute right-0 top-10 z-50 bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 rounded-2xl overflow-hidden shadow-2xl py-1.5 w-56 animate-scaleIn smooth-gpu text-[13px]"
+                    style={{ backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
+                  >
                   {selectedChat.type === "room" && (
                     <button
                       onClick={() => {
@@ -1359,6 +1367,7 @@ const ChatPane = ({ onBack }) => {
                     </>
                   )}
                 </div>
+              </>
             )}
           </div>
         </div>

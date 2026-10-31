@@ -1,4 +1,6 @@
 import { memo, useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Ticket } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -1416,7 +1418,15 @@ const Sidebar = ({
               </button>
 
               {showOptionsDropdown && (
-                <div className="absolute right-0 top-9 z-50 w-56 max-w-[calc(100vw-1rem)] rounded-2xl overflow-hidden bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px]">
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]"
+                    onClick={() => setShowOptionsDropdown(false)}
+                  />
+                  <div
+                    className="absolute right-0 top-9 z-50 w-56 max-w-[calc(100vw-1rem)] rounded-2xl overflow-hidden bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px]"
+                    style={{ backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
+                  >
                   {onOpenProfile && (
                     <button
                       onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
@@ -1465,7 +1475,7 @@ const Sidebar = ({
                     <span className="material-symbols-outlined text-[16px] text-accent-primary">label</span>
                     <span>Chat Labels</span>
                   </button>
-                  {handleInstallPWA && (
+                  {!Capacitor.isNativePlatform() && handleInstallPWA && (
                     <button
                       onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
@@ -1479,7 +1489,7 @@ const Sidebar = ({
                       onClick={() => { onOpenJoinGroup(); setShowOptionsDropdown(false); }}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-accent-primary">ticket</span>
+                      <Ticket size={16} className="text-accent-primary shrink-0" />
                       <span>Join Group with Code</span>
                     </button>
                   )}
@@ -1525,6 +1535,7 @@ const Sidebar = ({
                     </>
                   )}
                 </div>
+              </>
               )}
             </div>
           </div>
@@ -2243,9 +2254,9 @@ const Sidebar = ({
           />
           <div
             ref={chatMenuRef}
-            style={getChatMenuStyle()}
+            style={{ ...getChatMenuStyle(), backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
             onClick={(e) => e.stopPropagation()}
-            className="rounded-2xl bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-glass py-1.5 animate-scaleIn select-none text-[13px] max-w-[calc(100vw-24px)]"
+            className="rounded-2xl bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px] max-w-[calc(100vw-24px)]"
           >
             <div className="px-3.5 pt-2 pb-1.5">
               <p className="text-xs font-bold text-theme-main truncate">{openMenuChat.name}</p>

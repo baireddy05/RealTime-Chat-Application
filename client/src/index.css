@@ -107,6 +107,7 @@ img.emoji {
   --glass-hover: rgba(255, 255, 255, 0.08);
   --glass-active: rgba(255, 255, 255, 0.12);
   --modal-backdrop: rgba(10, 9, 14, 0.82);
+  --glass-heavy-opaque: #0c1613;
 
   /* Liquid Glass Pill Active / Inactive (Matching Reference White Pill) */
   --pill-active-bg: #ffffff;

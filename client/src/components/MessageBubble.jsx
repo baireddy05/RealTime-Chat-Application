@@ -1236,8 +1236,8 @@ const MessageBubble = memo(({
                           onTouchStart={(e) => e.stopPropagation()}
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => e.stopPropagation()}
-                          style={getMenuPositionStyle()}
-                          className="w-[220px] p-1.5 rounded-2xl bg-[rgb(var(--bg-surface-rgb))] border border-[var(--glass-border)] shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-24px)]"
+                          style={{ ...getMenuPositionStyle(), backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
+                          className="w-[220px] p-1.5 rounded-2xl bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-24px)]"
                         >
                           {/* Quick Reactions row */}
                           <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-white/5 rounded-xl border border-white/5">
