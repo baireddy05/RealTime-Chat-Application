@@ -75,26 +75,22 @@ export async function disableWebPush() {
   }
 }
 
-/** Navigate to a push target. Full reload when the app isn't running;
- *  in-app event when it is (HomePage listens for it). */
+/** Open chat or call directly from push or notification action */
 export function handlePushAction(data) {
   const d = data || {};
   try {
-    let url = null;
-    if (d.type === "message" && d.chatId) {
-      url = `/?chat=${encodeURIComponent(`${d.chatType || "user"}:${d.chatId}`)}`;
-    } else if (d.type === "call" && d.callerId) {
-      url = `/?callFrom=${encodeURIComponent(d.callerId)}`;
+    const chatId = d.chatId || d.callerId || d.userId;
+    const chatType = d.chatType || (d.type === "call" ? "user" : "user");
+    if (chatId) {
+      import("../store/useChatStore").then(({ useChatStore }) => {
+        useChatStore.getState().openChatById(chatId, chatType, d);
+      }).catch(() => {});
     }
-    if (!url) return;
-    if (typeof document !== "undefined" && !document.hidden && window.location.pathname === "/") {
-      const ev = d.type === "call"
-        ? new CustomEvent("pulse:open-call-from", { detail: d })
-        : new CustomEvent("pulse:open-chat", { detail: d });
-      window.dispatchEvent(ev);
-    } else {
-      window.location.href = url;
-    }
+
+    const ev = d.type === "call"
+      ? new CustomEvent("pulse:open-call-from", { detail: d })
+      : new CustomEvent("pulse:open-chat", { detail: d });
+    window.dispatchEvent(ev);
   } catch (err) {
     console.warn("[Push] action handling failed:", err?.message || err);
   }

@@ -167,8 +167,12 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
         // Suppress tray notification if the app is currently open in the foreground
         // and the user is actively viewing this exact chat!
         String chatId = (data != null && data.containsKey("chatId")) ? data.get("chatId") : null;
-        if (MainActivity.isAppInForeground && chatId != null && MainActivity.activeChatId != null
-                && chatId.trim().equalsIgnoreCase(MainActivity.activeChatId.trim())) {
+        SharedPreferences activePrefs = getSharedPreferences("pulse_active_chat", Context.MODE_PRIVATE);
+        boolean isFg = MainActivity.isAppInForeground || activePrefs.getBoolean("is_foreground", false);
+        String activeId = MainActivity.activeChatId != null ? MainActivity.activeChatId : activePrefs.getString("active_chat_id", null);
+
+        if (isFg && chatId != null && activeId != null
+                && chatId.trim().equalsIgnoreCase(activeId.trim())) {
             Log.i(TAG, "User currently in active chat " + chatId + " in foreground — skipping system notification");
             return;
         }
@@ -243,17 +247,20 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
             }
 
             // Clicking notification launches MainActivity with chat details
+            int notifId = Math.abs(chatId.hashCode());
+            String safeSenderName = senderName != null ? senderName : "";
+
             Intent launchIntent = new Intent(this, MainActivity.class);
             launchIntent.setAction(Intent.ACTION_VIEW);
-            launchIntent.setData(Uri.parse("pulse://chat/" + chatType + "/" + chatId));
+            launchIntent.setData(Uri.parse("pulse://chat/" + chatType + "/" + chatId + "?senderName=" + Uri.encode(safeSenderName)));
+            launchIntent.setPackage(getPackageName());
             launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             launchIntent.putExtra("chatId", chatId);
             launchIntent.putExtra("chatType", chatType);
-            launchIntent.putExtra("senderName", senderName);
+            launchIntent.putExtra("senderName", safeSenderName);
             launchIntent.putExtra("title", notifTitle);
             launchIntent.putExtra("type", "message");
-
-            int notifId = Math.abs(chatId.hashCode());
+            launchIntent.putExtra("google.message_id", String.valueOf(notifId));
 
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
@@ -299,16 +306,18 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
             String callType = data != null ? data.get("callType") : "video";
             String label = "audio".equals(callType) ? "Voice" : "Video";
 
+            int notifId = Math.abs(("call_" + callerId).hashCode());
+
             Intent callIntent = new Intent(this, MainActivity.class);
             callIntent.setAction(Intent.ACTION_VIEW);
             callIntent.setData(Uri.parse("pulse://call/" + callerId));
+            callIntent.setPackage(getPackageName());
             callIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             callIntent.putExtra("callerId", callerId);
             callIntent.putExtra("callerName", callerName);
             callIntent.putExtra("callType", callType);
             callIntent.putExtra("type", "call");
-
-            int notifId = Math.abs(("call_" + callerId).hashCode());
+            callIntent.putExtra("google.message_id", String.valueOf(notifId));
 
             PendingIntent pi = PendingIntent.getActivity(
                 this,

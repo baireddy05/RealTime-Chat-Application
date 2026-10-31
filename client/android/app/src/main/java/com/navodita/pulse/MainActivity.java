@@ -83,7 +83,7 @@ public class MainActivity extends BridgeActivity {
         String senderName = intent.getStringExtra("senderName");
         String type = intent.getStringExtra("type");
 
-        // Inspect Uri data if passed like pulse://chat/user/123 or pulse://call/123
+        // Inspect Uri data if passed like pulse://chat/user/123?senderName=rithwik or pulse://call/123
         Uri data = intent.getData();
         if (data != null && "pulse".equals(data.getScheme())) {
             java.util.List<String> segments = data.getPathSegments();
@@ -91,9 +91,14 @@ public class MainActivity extends BridgeActivity {
             if ("chat".equals(host) && segments != null && segments.size() >= 2) {
                 chatType = segments.get(0);
                 chatId = segments.get(1);
+                String qSender = data.getQueryParameter("senderName");
+                if (qSender != null && !qSender.isEmpty()) {
+                    senderName = qSender;
+                }
             } else if ("call".equals(host) && segments != null && !segments.isEmpty()) {
                 type = "call";
                 dispatchOpenCallToWebView(segments.get(0), "video");
+                intent.setData(null);
                 return;
             }
         }
@@ -102,10 +107,13 @@ public class MainActivity extends BridgeActivity {
         if ("call".equals(type) || (callerId != null && !callerId.isEmpty())) {
             String callType = intent.getStringExtra("callType");
             dispatchOpenCallToWebView(callerId != null ? callerId : "", callType != null ? callType : "video");
+            intent.removeExtra("callerId");
+            intent.removeExtra("type");
             return;
         }
 
         if (chatId != null && !chatId.isEmpty() && !"default".equals(chatId)) {
+            android.util.Log.i("PulseMainActivity", "handleIntent: opening chat " + chatId + " (" + chatType + ")");
             final String cId = chatId;
             final String cType = chatType != null ? chatType : "user";
             final String sName = senderName != null ? senderName : "";
@@ -114,6 +122,19 @@ public class MainActivity extends BridgeActivity {
             pendingChatType = cType;
             pendingSenderName = sName;
             activeChatId = cId;
+
+            try {
+                getSharedPreferences("pulse_active_chat", android.content.Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("pending_chat_id", cId)
+                    .putString("pending_chat_type", cType)
+                    .putString("pending_sender_name", sName)
+                    .apply();
+            } catch (Exception ignored) {}
+
+            // Clear intent data so routine resumes don't re-trigger
+            intent.removeExtra("chatId");
+            intent.setData(null);
 
             PulseFirebaseMessagingService.clearStackForChat(this, cId);
             dispatchOpenChatToWebView(cId, cType, sName);
@@ -125,10 +146,11 @@ public class MainActivity extends BridgeActivity {
         final String js = "(function() {" +
             "var d = { chatId: '" + cId + "', chatType: '" + cType + "', senderName: '" + safeName + "', type: 'message' };" +
             "window.__PULSE_PENDING_OPEN_CHAT__ = d;" +
+            "if (typeof window.pulseOpenChat === 'function') { window.pulseOpenChat(d.chatId, d.chatType, d); }" +
             "window.dispatchEvent(new CustomEvent('pulse:open-chat', { detail: d }));" +
             "})();";
 
-        long[] delays = new long[]{150, 400, 800, 1500, 2500, 4000};
+        long[] delays = new long[]{100, 300, 600, 1000, 1800, 3000, 5000};
         for (long delay : delays) {
             runOnUiThread(() -> {
                 try {
@@ -170,12 +192,28 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         isAppInForeground = true;
+        try {
+            getSharedPreferences("pulse_active_chat", android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("is_foreground", true)
+                .apply();
+        } catch (Exception ignored) {}
+
+        if (getIntent() != null && (getIntent().hasExtra("chatId") || getIntent().getData() != null)) {
+            handleIntent(getIntent());
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
         isAppInForeground = false;
+        try {
+            getSharedPreferences("pulse_active_chat", android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("is_foreground", false)
+                .apply();
+        } catch (Exception ignored) {}
     }
 
     @Override

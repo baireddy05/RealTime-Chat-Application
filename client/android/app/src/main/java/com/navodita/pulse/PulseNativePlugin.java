@@ -61,11 +61,14 @@ public class PulseNativePlugin extends Plugin {
     @PluginMethod
     public void setActiveChat(PluginCall call) {
         String chatId = call.getString("chatId", null);
+        SharedPreferences sp = getContext().getSharedPreferences("pulse_active_chat", Context.MODE_PRIVATE);
         if (chatId != null && !chatId.trim().isEmpty()) {
             MainActivity.activeChatId = chatId.trim();
+            sp.edit().putString("active_chat_id", chatId.trim()).apply();
             PulseFirebaseMessagingService.clearStackForChat(getContext(), MainActivity.activeChatId);
         } else {
             MainActivity.activeChatId = null;
+            sp.edit().remove("active_chat_id").apply();
         }
         call.resolve();
     }
@@ -73,13 +76,19 @@ public class PulseNativePlugin extends Plugin {
     @PluginMethod
     public void getPendingChat(PluginCall call) {
         JSObject ret = new JSObject();
-        if (MainActivity.pendingChatId != null) {
-            ret.put("chatId", MainActivity.pendingChatId);
-            ret.put("chatType", MainActivity.pendingChatType != null ? MainActivity.pendingChatType : "user");
-            ret.put("senderName", MainActivity.pendingSenderName != null ? MainActivity.pendingSenderName : "");
+        SharedPreferences sp = getContext().getSharedPreferences("pulse_active_chat", Context.MODE_PRIVATE);
+        String pId = MainActivity.pendingChatId != null ? MainActivity.pendingChatId : sp.getString("pending_chat_id", null);
+        String pType = MainActivity.pendingChatType != null ? MainActivity.pendingChatType : sp.getString("pending_chat_type", "user");
+        String pName = MainActivity.pendingSenderName != null ? MainActivity.pendingSenderName : sp.getString("pending_sender_name", "");
+
+        if (pId != null && !pId.isEmpty()) {
+            ret.put("chatId", pId);
+            ret.put("chatType", pType != null ? pType : "user");
+            ret.put("senderName", pName != null ? pName : "");
             MainActivity.pendingChatId = null;
             MainActivity.pendingChatType = null;
             MainActivity.pendingSenderName = null;
+            sp.edit().remove("pending_chat_id").remove("pending_chat_type").remove("pending_sender_name").apply();
         }
         call.resolve(ret);
     }
@@ -89,6 +98,10 @@ public class PulseNativePlugin extends Plugin {
         MainActivity.pendingChatId = null;
         MainActivity.pendingChatType = null;
         MainActivity.pendingSenderName = null;
+        try {
+            getContext().getSharedPreferences("pulse_active_chat", Context.MODE_PRIVATE)
+                .edit().remove("pending_chat_id").remove("pending_chat_type").remove("pending_sender_name").apply();
+        } catch (Exception ignored) {}
         call.resolve();
     }
 

@@ -495,6 +495,21 @@ export const useChatStore = create((set, get) => ({
         }
       }));
       set({ users: res.data, unreadCounts: unread, lastMessages: last });
+
+      // If active selectedChat was opened from notification before users finished fetching, enrich it
+      const currentSelected = get().selectedChat;
+      if (currentSelected && currentSelected.type === "user") {
+        const match = res.data.find((x) => (x._id || x.id)?.toString() === currentSelected.id?.toString());
+        if (match && (!currentSelected.profilePic || currentSelected.name === "Chat")) {
+          set({
+            selectedChat: {
+              ...currentSelected,
+              name: match.username || currentSelected.name,
+              profilePic: match.profilePic || currentSelected.profilePic,
+            },
+          });
+        }
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -613,6 +628,23 @@ export const useChatStore = create((set, get) => ({
         }
       }));
       set({ rooms: res.data, unreadCounts: unread, lastMessages: last });
+
+      // If active selectedChat was opened from notification before rooms finished fetching, enrich it
+      const currentSelected = get().selectedChat;
+      if (currentSelected && currentSelected.type === "room") {
+        const match = res.data.find((x) => (x._id || x.id)?.toString() === currentSelected.id?.toString());
+        if (match && (!currentSelected.profilePic || currentSelected.name === "Group Chat")) {
+          set({
+            selectedChat: {
+              ...currentSelected,
+              name: match.name || currentSelected.name,
+              profilePic: match.profilePic || match.avatar || currentSelected.profilePic,
+              members: match.members || currentSelected.members,
+              admins: match.admins || currentSelected.admins,
+            },
+          });
+        }
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -2335,6 +2367,62 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  openChatById: (chatId, chatType = "user", extra = {}) => {
+    if (!chatId) return;
+    const targetId = String(chatId);
+    const type = chatType === "room" ? "room" : "user";
+    const st = get();
+
+    // Ensure mobile view switches to chats/groups
+    set({ mobileTab: type === "room" ? "groups" : "chats" });
+
+    if (type === "room") {
+      const allRooms = [...(st.rooms || []), ...(st.channels || [])];
+      const r = allRooms.find((x) => (x._id || x.id)?.toString() === targetId);
+      get().setSelectedChat({
+        id: targetId,
+        _id: r?._id || targetId,
+        name: r?.name || extra?.senderName || extra?.name || extra?.title || "Group Chat",
+        type: "room",
+        description: r?.description || "",
+        members: r?.members || [],
+        createdBy: r?.createdBy,
+        admins: r?.admins || [],
+        avatar: r?.avatar,
+        profilePic: r?.profilePic,
+        isChannel: !!(r?.isChannel || extra?.isChannel),
+      });
+      return;
+    }
+
+    // Direct User Chat
+    const authUser = useAuthStore.getState().authUser;
+    if (authUser && (authUser._id || authUser.id)?.toString() === targetId) {
+      get().setSelectedChat({
+        id: targetId,
+        _id: targetId,
+        name: "Saved Messages",
+        type: "user",
+        profilePic: authUser.profilePic,
+      });
+      return;
+    }
+
+    const allUsers = [...(st.users || []), ...(useFriendStore.getState().friends || [])];
+    const u = allUsers.find((x) => (x._id || x.id)?.toString() === targetId);
+    get().setSelectedChat({
+      id: targetId,
+      _id: u?._id || targetId,
+      name: u?.username || extra?.senderName || extra?.name || extra?.title || "Chat",
+      type: "user",
+      profilePic: u?.profilePic || extra?.icon || "",
+    });
+
+    if (!u) {
+      st.getUsers?.().catch(() => {});
+    }
+  },
+
   getScheduledMessages: async (chatId, type) => {
     try {
       const res = await axiosInstance.get(`/chat/scheduled/${chatId}?type=${type}`);
@@ -3045,3 +3133,22 @@ export const useChatStore = create((set, get) => ({
   },
   clearGlobalSearch: () => set({ globalSearchResults: [] }),
 }));
+
+// Global permanent notification & deep link dispatcher
+if (typeof window !== "undefined") {
+  window.pulseOpenChat = (chatId, chatType, extra) => {
+    useChatStore.getState().openChatById(chatId, chatType, extra);
+  };
+  window.addEventListener("pulse:open-chat", (e) => {
+    const d = e?.detail || {};
+    if (d.chatId) {
+      useChatStore.getState().openChatById(d.chatId, d.chatType || "user", d);
+    }
+  });
+  window.addEventListener("pulse:open-call-from", (e) => {
+    const d = e?.detail || {};
+    if (d.callerId) {
+      useChatStore.getState().openChatById(d.callerId, "user", d);
+    }
+  });
+}

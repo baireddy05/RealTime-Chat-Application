@@ -240,11 +240,10 @@ class UnifiedNotificationManager {
 
     // If user is currently looking at this active chat and window/app is visible, suppress notification & banner!
     if (
-      !force &&
       !isCall &&
       this.activeChatId &&
       targetChatId &&
-      this.activeChatId === targetChatId &&
+      String(this.activeChatId).toLowerCase() === String(targetChatId).toLowerCase() &&
       typeof document !== "undefined" &&
       !document.hidden
     ) {
@@ -272,10 +271,11 @@ class UnifiedNotificationManager {
 
     // 2. Schedule native notification
     if (this.isNative) {
-      // If user is inside the app in the foreground, we already showed the in-app banner above.
-      // Do not duplicate by posting to the Android system tray.
-      // Remote push (PulseFirebaseMessagingService) handles background/closed-app notifications.
-      if (!isCall && typeof document !== "undefined" && !document.hidden) {
+      // Remote push (PulseFirebaseMessagingService) handles background/closed-app notifications
+      // natively with WhatsApp-style InboxStyle stacking and logo badge.
+      // Calling LocalNotifications for chat messages causes duplicate notifications in the Android tray!
+      // Only voice/video calls need local notification scheduling on native.
+      if (!isCall) {
         return true;
       }
 
