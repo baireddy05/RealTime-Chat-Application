@@ -63,7 +63,11 @@ const SignUpPage = () => {
     try {
       await signup(formData);
     } catch (err) {
-      setErrorMessage(err?.response?.data?.message || "Failed to create account");
+      if (err?.message === "Network Error" || err?.code === "ERR_NETWORK") {
+        setErrorMessage("Network Error: Could not connect to the server. Please check your internet connection and try again.");
+      } else {
+        setErrorMessage(err?.response?.data?.message || err?.message || "Failed to create account");
+      }
     }
   };
 

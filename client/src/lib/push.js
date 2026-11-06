@@ -118,7 +118,7 @@ export async function registerNativePush() {
       axiosInstance.post("/push/device-token", {
         platform: "android",
         token: cachedToken,
-        appVersion: "2.3.0",
+        appVersion: "2.3.1",
       }).catch(() => {});
     }
 
@@ -132,7 +132,7 @@ export async function registerNativePush() {
             await axiosInstance.post("/push/device-token", {
               platform: "android",
               token: token.value,
-              appVersion: "2.3.0",
+              appVersion: "2.3.1",
             });
             localStorage.setItem("pulse_fcm_token", token.value);
             console.log("[FCM] Token registered with server successfully");

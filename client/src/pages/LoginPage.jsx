@@ -58,7 +58,11 @@ const LoginPage = () => {
     try {
       await login({ email: formData.email.trim(), password: formData.password });
     } catch (err) {
-      setErrorMessage(err?.response?.data?.message || err?.message || "Invalid email/username or password");
+      if (err?.message === "Network Error" || err?.code === "ERR_NETWORK") {
+        setErrorMessage("Network Error: Could not connect to the server. Please check your internet connection and try again.");
+      } else {
+        setErrorMessage(err?.response?.data?.message || err?.message || "Invalid email/username or password");
+      }
     }
   };
 

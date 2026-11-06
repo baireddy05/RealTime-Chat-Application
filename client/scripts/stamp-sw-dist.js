@@ -11,7 +11,7 @@ import path from "node:path";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const swPath = path.join(root, "..", "dist", "sw.js");
 
-let buildId = `2.3.0-${Date.now().toString(36)}`;
+let buildId = `2.3.1-${Date.now().toString(36)}`;
 
 try {
   const src = readFileSync(swPath, "utf8");

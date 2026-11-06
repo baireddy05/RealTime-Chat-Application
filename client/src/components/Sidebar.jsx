@@ -2543,7 +2543,7 @@ const Sidebar = ({
             )}
 
             <div className="px-3.5 py-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 font-mono text-center border-t border-black/5 dark:border-white/5 select-none">
-              Pulse v2.3.0 (Build 230)
+              Pulse v2.3.1 (Build 231)
             </div>
           </div>
         </>,
