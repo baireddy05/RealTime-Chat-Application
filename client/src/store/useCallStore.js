@@ -1,3 +1,4 @@
+import { requestNativeCallPermissions } from "../lib/backgroundSync";
 import { create } from "zustand";
 import { soundManager } from "../lib/sound";
 import { notificationManager } from "../lib/notification";
@@ -11,12 +12,68 @@ const ICE_SERVERS = {
     { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun4.l.google.com:19302" },
     { urls: "stun:global.stun.twilio.com:3478" },
+    { urls: "stun:openrelay.metered.ca:80" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
   iceCandidatePoolSize: 10,
 };
 
 let timerInterval = null;
 let pendingIceCandidates = [];
+let iceDisconnectTimeout = null;
+
+const setupIceMonitoring = (pc, get, set) => {
+  pc.oniceconnectionstatechange = () => {
+    const st = pc.iceConnectionState;
+    if (st === "connected" || st === "completed") {
+      if (iceDisconnectTimeout) {
+        clearTimeout(iceDisconnectTimeout);
+        iceDisconnectTimeout = null;
+      }
+      set({ _iceRestarts: 0 });
+    } else if (st === "disconnected") {
+      if (!iceDisconnectTimeout) {
+        iceDisconnectTimeout = setTimeout(() => {
+          if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+            try { soundManager.stopRinging?.(); } catch {}
+            get().cleanupCall();
+          }
+          iceDisconnectTimeout = null;
+        }, 12000);
+      }
+    } else if (st === "failed") {
+      if (iceDisconnectTimeout) clearTimeout(iceDisconnectTimeout);
+      iceDisconnectTimeout = null;
+      try {
+        if (pc.restartIce && get().callState !== "idle") {
+          pc.restartIce();
+        } else {
+          get().cleanupCall();
+        }
+      } catch {
+        get().cleanupCall();
+      }
+    } else if (st === "closed") {
+      if (iceDisconnectTimeout) clearTimeout(iceDisconnectTimeout);
+      iceDisconnectTimeout = null;
+      get().cleanupCall();
+    }
+  };
+};
 
 const getAudioConstraints = () => ({
   echoCancellation: true,
@@ -170,7 +227,7 @@ export const useCallStore = create((set, get) => ({
 
   // Initialize Socket Listeners for incoming calls and signaling
   initSocketListeners: (socket) => {
-    if (!socket || get().activeSocket === socket) return;
+    if (!socket) return;
     set({ activeSocket: socket });
 
     socket.off("incomingCall");
@@ -191,7 +248,11 @@ export const useCallStore = create((set, get) => ({
         return;
       }
 
-      pendingIceCandidates = [];
+      if (iceDisconnectTimeout) {
+      try { clearTimeout(iceDisconnectTimeout); } catch {}
+      iceDisconnectTimeout = null;
+    }
+    pendingIceCandidates = [];
       soundManager.playIncomingRing();
       notificationManager.sendNotification({
         title: `Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
@@ -324,6 +385,7 @@ export const useCallStore = create((set, get) => ({
 
   // Start outgoing call
   startCall: async ({ targetUser, callType = "video" }) => {
+    await requestNativeCallPermissions();
     const socket = get().activeSocket;
     if (!socket || !targetUser) return;
 
@@ -332,6 +394,10 @@ export const useCallStore = create((set, get) => ({
       return;
     }
 
+    if (iceDisconnectTimeout) {
+      try { clearTimeout(iceDisconnectTimeout); } catch {}
+      iceDisconnectTimeout = null;
+    }
     pendingIceCandidates = [];
     soundManager.playOutgoingRing();
     get().checkMultipleCameras();
@@ -405,28 +471,7 @@ export const useCallStore = create((set, get) => ({
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
-      const st = pc.iceConnectionState;
-      if (st === "disconnected" || st === "failed") {
-        const attempts = (get()._iceRestarts || 0) + 1;
-        set({ _iceRestarts: attempts });
-        if (attempts <= 3) {
-          // Backoff: 1s, 2s, 4s — then give up to avoid hot loop.
-          setTimeout(() => {
-            try {
-              if (pc.restartIce && get().callState !== "idle") pc.restartIce();
-            } catch {}
-          }, 1000 * Math.pow(2, attempts - 1));
-        } else {
-          try {
-            soundManager.stopRinging?.();
-          } catch {}
-          get().cleanupCall();
-        }
-      } else if (st === "closed") {
-        get().cleanupCall();
-      }
-    };
+    setupIceMonitoring(pc, get, set);
 
     set({
       callState: "calling",
@@ -474,6 +519,7 @@ export const useCallStore = create((set, get) => ({
 
   // Answer incoming call
   answerCall: async () => {
+    await requestNativeCallPermissions();
     soundManager.stopRinging();
     const { activeSocket, peerUser, incomingSignal, callType } = get();
     if (!activeSocket || !peerUser || !incomingSignal) return;
@@ -569,27 +615,7 @@ export const useCallStore = create((set, get) => ({
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
-      const st = pc.iceConnectionState;
-      if (st === "disconnected" || st === "failed") {
-        const attempts = (get()._iceRestarts || 0) + 1;
-        set({ _iceRestarts: attempts });
-        if (attempts <= 3) {
-          setTimeout(() => {
-            try {
-              if (pc.restartIce && get().callState !== "idle") pc.restartIce();
-            } catch {}
-          }, 1000 * Math.pow(2, attempts - 1));
-        } else {
-          try {
-            soundManager.stopRinging?.();
-          } catch {}
-          get().cleanupCall();
-        }
-      } else if (st === "closed") {
-        get().cleanupCall();
-      }
-    };
+    setupIceMonitoring(pc, get, set);
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(incomingSignal));
@@ -776,6 +802,10 @@ export const useCallStore = create((set, get) => ({
       } catch {}
       timerInterval = null;
     }
+    if (iceDisconnectTimeout) {
+      try { clearTimeout(iceDisconnectTimeout); } catch {}
+      iceDisconnectTimeout = null;
+    }
     pendingIceCandidates = [];
     try {
       soundManager.stopRinging?.();
@@ -808,15 +838,7 @@ export const useCallStore = create((set, get) => ({
         peerConnection.close();
       } catch {}
     }
-    // Detach current socket call listeners so old sockets don't ghost-ring.
-    try {
-      const sock = useAuthStore.getState().socket;
-      sock?.off?.("incomingCall");
-      sock?.off?.("callAccepted");
-      sock?.off?.("callRejected");
-      sock?.off?.("callEnded");
-      sock?.off?.("iceCandidate");
-    } catch {}
+    // Keep persistent socket call listeners attached for subsequent calls
 
     set({
       callState: "idle",

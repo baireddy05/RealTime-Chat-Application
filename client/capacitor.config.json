@@ -22,8 +22,8 @@
       "overlaysWebView": true
     },
     "Keyboard": {
-      "resize": "body",
-      "resizeOnFullScreen": true
+      "resize": "none",
+      "resizeOnFullScreen": false
     },
     "LocalNotifications": {
       "smallIcon": "ic_stat_pulse",

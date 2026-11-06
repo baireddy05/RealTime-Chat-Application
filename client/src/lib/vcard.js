@@ -1,3 +1,5 @@
+import { triggerBlobDownload } from "./download";
+
 /**
  * Utility to generate standard vCard 3.0 format and trigger download
  * Compatible with iOS Contacts, Android Contacts, Google Contacts, Outlook, macOS Contacts
@@ -33,12 +35,5 @@ export const downloadVCard = (contact) => {
   const rawName = contact.fullName || contact.username || contact.name || "contact";
   const filename = `${rawName.trim().replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_")}.vcf`;
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  triggerBlobDownload(blob, filename);
 };

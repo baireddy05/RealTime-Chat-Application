@@ -155,17 +155,15 @@ io.on("connection", (socket) => {
     // (e.g. they tapped an incoming-call push notification and the app just
     // launched). Skipped when other devices are already ringing/connected.
     try {
-      if (userSocketMap[userId] && userSocketMap[userId].size === 1) {
-        for (const pending of pendingCalls.values()) {
-          if (pending?.receiverId === userId && pending?.signalData) {
-            socket.emit("incomingCall", {
-              signal: pending.signalData,
-              from: pending.callerId,
-              callType: pending.callType || "video",
-              callerInfo: pending.callerInfo || { _id: pending.callerId },
-              deviceInfo: pending.deviceInfo || null,
-            });
-          }
+      for (const pending of pendingCalls.values()) {
+        if (pending?.receiverId === userId && pending?.signalData) {
+          socket.emit("incomingCall", {
+            signal: pending.signalData,
+            from: pending.callerId,
+            callType: pending.callType || "video",
+            callerInfo: pending.callerInfo || { _id: pending.callerId },
+            deviceInfo: pending.deviceInfo || null,
+          });
         }
       }
     } catch (err) {
@@ -312,8 +310,8 @@ io.on("connection", (socket) => {
         console.error("Error logging call attempt:", err.message);
       }
     };
+    await startPendingCall();
     if (targetSockets && targetSockets.size > 0) {
-      await startPendingCall();
       io.to(userToCall.toString()).emit("incomingCall", {
         signal: signalData,
         from: userId,
@@ -321,18 +319,16 @@ io.on("connection", (socket) => {
         callerInfo: callerInfo || { _id: userId },
         deviceInfo: deviceInfo || callerInfo?.deviceInfo || null,
       });
-    } else {
-      // Callee is offline: keep ringing server-side (logged as missed if
-      // unanswered) and wake them with a push notification instead of
-      // immediately telling the caller they are offline.
-      await startPendingCall();
-      notifyIncomingCall({
-        callerId: userId,
-        callerName,
-        receiverId: userToCall.toString(),
-        callType: type,
-      });
     }
+    // ALWAYS wake receiver via FCM push notification in addition to socket:
+    // If receiver's device is backgrounded, locked, or socket is idle/suspended,
+    // this ensures a full-screen / heads-up incoming call alert wakes the phone.
+    notifyIncomingCall({
+      callerId: userId,
+      callerName,
+      receiverId: userToCall.toString(),
+      callType: type,
+    });
   });
 
   socket.on("answerCall", async ({ to, signal, deviceInfo }) => {

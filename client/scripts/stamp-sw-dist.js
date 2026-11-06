@@ -11,13 +11,7 @@ import path from "node:path";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const swPath = path.join(root, "..", "dist", "sw.js");
 
-let buildId = null;
-try {
-  buildId = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
-} catch {}
-if (!buildId) {
-  buildId = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-}
+let buildId = `2.3.0-${Date.now().toString(36)}`;
 
 try {
   const src = readFileSync(swPath, "utf8");

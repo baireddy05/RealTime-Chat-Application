@@ -111,29 +111,29 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
   // Portaled to document.body: ancestor backdrop-blur/filter would otherwise
   // hijack `fixed` positioning and clip the modal to the chat pane.
   const modalContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
+      <div className="bg-[var(--glass-heavy-opaque)] border border-[var(--glass-border)] text-theme-main rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
         {/* Header Bar */}
-        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between gap-2 bg-slate-800/40 shrink-0">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between gap-2 bg-[var(--glass-hover)] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center shrink-0">
               <Code2 size={16} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-sm font-bold text-theme-main flex items-center gap-1.5 flex-wrap">
                 <span className="truncate">Share Code Snippet</span>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-primary/20 text-accent-primary uppercase tracking-wider shrink-0">
                   Syntax Highlighted
                 </span>
               </h3>
-              <p className="text-[11px] text-zinc-400 truncate">Paste code with syntax highlighting and line numbers</p>
+              <p className="text-[11px] text-theme-muted truncate">Paste code with syntax highlighting and line numbers</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer shrink-0"
+            className="p-2 rounded-xl text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all cursor-pointer shrink-0"
             title="Close"
           >
             <X size={18} />
@@ -141,20 +141,20 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
         </div>
 
         {/* Options Bar: Language & Optional Filename */}
-        <div className="p-3 sm:p-3.5 border-b border-[var(--glass-border)] bg-slate-800/20 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 shrink-0">
+        <div className="p-3 sm:p-3.5 border-b border-[var(--glass-border)] bg-[var(--glass-hover)] grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 shrink-0">
           {/* Language Selector */}
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-300 mb-1 flex items-center gap-1">
+            <label className="block text-[11px] font-semibold text-theme-main mb-1 flex items-center gap-1">
               <Terminal size={12} className="text-accent-primary" />
               <span>Language:</span>
             </label>
             <select
               value={language}
               onChange={(e) => { setLanguage(e.target.value); setLanguageTouched(true); }}
-              className="w-full bg-slate-950/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-accent-primary transition-colors cursor-pointer"
+              className="w-full bg-[var(--glass-input)] border border-[var(--glass-border)] rounded-xl px-3 py-1.5 text-xs text-theme-main focus:outline-none focus:border-accent-primary transition-colors cursor-pointer"
             >
               {LANGUAGES.map((lang) => (
-                <option key={lang.id} value={lang.id} className="bg-slate-900 text-zinc-200">
+                <option key={lang.id} value={lang.id} className="bg-[var(--bg-secondary)] text-theme-main">
                   {lang.label}
                 </option>
               ))}
@@ -163,7 +163,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
 
           {/* Optional Filename / Title */}
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-300 mb-1 flex items-center gap-1">
+            <label className="block text-[11px] font-semibold text-theme-main mb-1 flex items-center gap-1">
               <FileCode size={12} className="text-accent-secondary" />
               <span>Title / Filename (optional):</span>
             </label>
@@ -172,17 +172,17 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
               placeholder="e.g. authMiddleware.js or Query.sql"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-slate-950/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-accent-secondary transition-colors"
+              className="w-full bg-[var(--glass-input)] border border-[var(--glass-border)] rounded-xl px-3 py-1.5 text-xs text-theme-main placeholder:text-theme-muted focus:outline-none focus:border-accent-secondary transition-colors"
             />
           </div>
         </div>
 
         {/* Code Input Area with synchronized line numbers */}
-        <div className="relative flex bg-[#0d1117] flex-1 min-h-[140px] sm:min-h-[180px] max-h-[380px] overflow-hidden font-mono text-[12px] leading-relaxed select-text border-b border-[var(--glass-border)]">
+        <div className="relative flex bg-slate-950/90 dark:bg-[#0d1117] flex-1 min-h-[140px] sm:min-h-[180px] max-h-[380px] overflow-hidden font-mono text-[12px] leading-relaxed select-text border-b border-[var(--glass-border)]">
           {/* Line Numbers column (Synced scrolling) */}
           <div
             ref={lineNumbersRef}
-            className="w-12 py-3 bg-slate-950/80 text-zinc-600 text-right pr-3 select-none flex-shrink-0 font-mono text-[12px] leading-relaxed border-r border-white/5 overflow-hidden"
+            className="w-12 py-3 bg-black/40 text-zinc-500 text-right pr-3 select-none flex-shrink-0 font-mono text-[12px] leading-relaxed border-r border-white/5 overflow-hidden"
           >
             {Array.from({ length: Math.min(lineCount, 500) }).map((_, i) => (
               <div key={i}>{i + 1}</div>
@@ -203,13 +203,13 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
             spellCheck={false}
             autoCapitalize="off"
             autoComplete="off"
-            className="flex-1 py-3 px-3.5 bg-transparent text-zinc-200 placeholder-zinc-600 resize-none focus:outline-none font-mono text-[12px] leading-relaxed overflow-y-auto custom-scrollbar"
+            className="flex-1 py-3 px-3.5 bg-transparent text-emerald-400 placeholder:text-zinc-600 resize-none focus:outline-none font-mono text-[12px] leading-relaxed overflow-y-auto custom-scrollbar"
           />
         </div>
 
         {/* Footer Actions */}
-        <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-800/40 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between shrink-0">
-          <div className="text-[11px] text-zinc-400 flex items-center gap-2 min-w-0 overflow-hidden whitespace-nowrap">
+        <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[var(--glass-hover)] flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between shrink-0">
+          <div className="text-[11px] text-theme-muted flex items-center gap-2 min-w-0 overflow-hidden whitespace-nowrap">
             <span className="shrink-0">{lineCount} {lineCount === 1 ? "line" : "lines"}</span>
             <span className="shrink-0">•</span>
             <span className={`shrink-0 ${code.length >= MAX_SNIPPET_CHARS ? "text-red-400 font-semibold" : ""}`}>
@@ -225,7 +225,7 @@ const CodeSnippetModal = ({ isOpen, onClose, onSendSnippet }) => {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-2xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-all text-center"
+              className="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-2xl text-xs font-medium text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all text-center"
             >
               Cancel
             </button>

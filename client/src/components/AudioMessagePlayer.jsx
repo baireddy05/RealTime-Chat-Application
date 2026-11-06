@@ -16,7 +16,7 @@ const cacheAudioDuration = (url, dur) => {
     if (audioDurationCache.size >= 200) {
       audioDurationCache.delete(audioDurationCache.keys().next().value);
     }
-    cacheAudioDuration(url, dur);
+    audioDurationCache.set(url, dur);
   } catch {}
 };
 

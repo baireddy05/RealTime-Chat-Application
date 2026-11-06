@@ -13,6 +13,7 @@ import {
   Check
 } from "lucide-react";
 import { soundManager } from "../lib/sound";
+import { triggerBlobDownload } from "../lib/download";
 
 const COLOR_PALETTE = [
   { name: "White", value: "#ffffff" },
@@ -221,10 +222,11 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const a = document.createElement("a");
-    a.download = `pulse-sketch-${Date.now()}.png`;
-    a.href = canvas.toDataURL("image/png");
-    a.click();
+    canvas.toBlob((blob) => {
+      if (blob) {
+        triggerBlobDownload(blob, `pulse-sketch-${Date.now()}.png`);
+      }
+    }, "image/png");
   };
 
   if (!isOpen) return null;
@@ -232,22 +234,22 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
   // Portaled to document.body: ancestor backdrop-blur/filter would otherwise
   // hijack `fixed` positioning and clip the modal to the chat pane.
   const modalContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/75 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900/95 border border-[var(--glass-border)] rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-[var(--modal-backdrop)] backdrop-blur-md animate-fadeIn">
+      <div className="bg-[var(--glass-heavy-opaque)] border border-[var(--glass-border)] text-theme-main rounded-3xl w-full max-w-2xl max-h-[94dvh] shadow-2xl flex flex-col overflow-hidden animate-scaleIn">
         {/* Header Bar */}
-        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40 shrink-0">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-[var(--glass-hover)] shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center">
               <PenTool size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-theme-main flex items-center gap-1.5">
                 <span>Doodle & Sketch</span>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-primary/20 text-accent-primary uppercase tracking-wider">
                   Live Canvas
                 </span>
               </h3>
-              <p className="text-[11px] text-zinc-400">Draw a diagram, doodle, or handwritten note</p>
+              <p className="text-[11px] text-theme-muted">Draw a diagram, doodle, or handwritten note</p>
             </div>
           </div>
 
@@ -255,7 +257,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={handleDownload}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              className="p-2 rounded-xl text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all cursor-pointer"
               title="Download Sketch"
             >
               <Download size={16} />
@@ -263,7 +265,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              className="p-2 rounded-xl text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all cursor-pointer"
               title="Close"
             >
               <X size={18} />
@@ -272,16 +274,16 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
         </div>
 
         {/* Toolbar Controls */}
-        <div className="p-2.5 sm:p-3.5 border-b border-[var(--glass-border)] bg-slate-800/20 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+        <div className="p-2.5 sm:p-3.5 border-b border-[var(--glass-border)] bg-[var(--glass-hover)] flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
           {/* Tool selector */}
-          <div className="flex items-center gap-0.5 bg-slate-950/60 p-0.5 sm:p-1 rounded-2xl border border-white/5">
+          <div className="flex items-center gap-0.5 bg-[var(--glass-input)] p-0.5 sm:p-1 rounded-2xl border border-[var(--glass-border)]">
             <button
               type="button"
               onClick={() => setTool("pen")}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
                 tool === "pen"
                   ? "bg-accent-primary text-white shadow-md font-semibold"
-                  : "text-zinc-400 hover:text-white"
+                  : "text-theme-muted hover:text-theme-main"
               }`}
             >
               <PenTool size={13} />
@@ -293,7 +295,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
                 tool === "highlighter"
                   ? "bg-accent-primary text-white shadow-md font-semibold"
-                  : "text-zinc-400 hover:text-white"
+                  : "text-theme-muted hover:text-theme-main"
               }`}
             >
               <Highlighter size={13} />
@@ -305,7 +307,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
                 tool === "eraser"
                   ? "bg-accent-primary text-white shadow-md font-semibold"
-                  : "text-zinc-400 hover:text-white"
+                  : "text-theme-muted hover:text-theme-main"
               }`}
             >
               <Eraser size={13} />
@@ -314,8 +316,8 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
           </div>
 
           {/* Stroke Size Selector */}
-          <div className="flex items-center gap-1 bg-slate-950/60 px-2 py-1 rounded-2xl border border-white/5">
-            <span className="text-[10px] text-zinc-400 mr-0.5 hidden xs:inline">Size:</span>
+          <div className="flex items-center gap-1 bg-[var(--glass-input)] px-2 py-1 rounded-2xl border border-[var(--glass-border)]">
+            <span className="text-[10px] text-theme-muted mr-0.5 hidden xs:inline">Size:</span>
             {STROKE_SIZES.map((s) => (
               <button
                 key={s.label}
@@ -323,8 +325,8 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
                 onClick={() => setStrokeSize(s.size)}
                 className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
                   strokeSize === s.size
-                    ? "bg-white/20 text-white font-bold"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-black/10 dark:bg-white/20 text-theme-main font-bold"
+                    : "text-theme-muted hover:text-theme-main"
                 }`}
               >
                 {s.label}
@@ -334,7 +336,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
 
           {/* Color Palette */}
           {tool !== "eraser" && (
-            <div className="flex items-center gap-1.5 bg-slate-950/60 px-2 py-1.5 rounded-2xl border border-white/5 overflow-x-auto max-w-[190px] sm:max-w-none no-scrollbar">
+            <div className="flex items-center gap-1.5 bg-[var(--glass-input)] px-2 py-1.5 rounded-2xl border border-[var(--glass-border)] overflow-x-auto max-w-[190px] sm:max-w-none no-scrollbar">
               {COLOR_PALETTE.map((c) => (
                 <button
                   key={c.value}
@@ -342,7 +344,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
                   onClick={() => setColor(c.value)}
                   style={{ backgroundColor: c.value }}
                   className={`w-5 h-5 rounded-full transition-transform active:scale-95 shrink-0 flex items-center justify-center cursor-pointer ${
-                    color === c.value ? "scale-125 ring-2 ring-white shadow-glow" : "opacity-80 hover:opacity-100"
+                    color === c.value ? "scale-125 ring-2 ring-accent-primary shadow-glow" : "opacity-80 hover:opacity-100"
                   }`}
                   title={c.name}
                 >
@@ -360,7 +362,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
               type="button"
               onClick={undo}
               disabled={history.length <= 1}
-              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              className="p-1.5 rounded-xl text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
               title="Undo"
             >
               <RotateCcw size={15} />
@@ -369,7 +371,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
               type="button"
               onClick={clearCanvas}
               disabled={!isCanvasDirty}
-              className="p-1.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              className="p-1.5 rounded-xl text-red-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
               title="Clear Canvas"
             >
               <Trash2 size={15} />
@@ -378,7 +380,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
         </div>
 
         {/* Canvas Area */}
-        <div className="relative w-full flex-1 min-h-[220px] max-h-[420px] bg-[#0f172a] overflow-hidden cursor-crosshair">
+        <div className="relative w-full flex-1 min-h-[220px] max-h-[420px] bg-slate-900 overflow-hidden cursor-crosshair">
           <canvas
             ref={canvasRef}
             onMouseDown={startDrawing}
@@ -393,7 +395,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
           />
 
           {!isCanvasDirty && (
-            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-zinc-600 select-none">
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-zinc-400 select-none">
               <Sparkles size={28} className="mb-2 opacity-50 text-accent-primary" />
               <p className="text-xs font-medium">Draw, write, or sketch anything here</p>
               <p className="text-[11px] opacity-70">Use pen, highlighter, or colors above</p>
@@ -402,8 +404,8 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3.5 border-t border-[var(--glass-border)] bg-slate-800/40 flex items-center justify-between">
-          <span className="text-[11px] text-zinc-400">
+        <div className="px-5 py-3.5 border-t border-[var(--glass-border)] bg-[var(--glass-hover)] flex items-center justify-between">
+          <span className="text-[11px] text-theme-muted">
             {isCanvasDirty ? "Sketch ready to send" : "Canvas is blank"}
           </span>
 
@@ -411,7 +413,7 @@ const DrawSketchModal = ({ isOpen, onClose, onSendSketch }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-2xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+              className="px-4 py-2 rounded-2xl text-xs font-medium text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all"
             >
               Cancel
             </button>

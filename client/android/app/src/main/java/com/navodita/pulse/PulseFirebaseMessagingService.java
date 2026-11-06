@@ -346,6 +346,7 @@ public class PulseFirebaseMessagingService extends FirebaseMessagingService {
                 .setColor(0xFF00E5FF)
                 .setAutoCancel(true)
                 .setContentIntent(pi)
+                .setFullScreenIntent(pi, true)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setDefaults(NotificationCompat.DEFAULT_ALL);

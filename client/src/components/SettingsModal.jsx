@@ -792,7 +792,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] shrink-0">
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+            Pulse v2.3.0 <span className="opacity-60">(Build 230)</span>
+          </div>
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"

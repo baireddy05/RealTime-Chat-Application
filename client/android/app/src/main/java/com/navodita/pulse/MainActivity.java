@@ -24,10 +24,22 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
-        // Explicitly request POST_NOTIFICATIONS permission on Android 13+ (API 33+)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+        // Explicitly request RECORD_AUDIO, CAMERA and POST_NOTIFICATIONS permissions for calls and alerts
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            java.util.List<String> perms = new java.util.ArrayList<>();
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                perms.add(android.Manifest.permission.RECORD_AUDIO);
+            }
+            if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                perms.add(android.Manifest.permission.CAMERA);
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    perms.add(android.Manifest.permission.POST_NOTIFICATIONS);
+                }
+            }
+            if (!perms.isEmpty()) {
+                requestPermissions(perms.toArray(new String[0]), 101);
             }
         }
 
@@ -69,6 +81,56 @@ public class MainActivity extends BridgeActivity {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             getWindow().setStatusBarContrastEnforced(false);
             getWindow().setNavigationBarContrastEnforced(false);
+        }
+
+        // Configure WebRTC & permissions on the WebView
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            android.webkit.WebView webView = getBridge().getWebView();
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+            webView.setWebChromeClient(new PulseWebChromeClient(getBridge()));
+            webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+            webView.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+            webView.setVerticalScrollBarEnabled(false);
+            webView.setHorizontalScrollBarEnabled(false);
+
+            webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
+                try {
+                    android.app.DownloadManager.Request req = new android.app.DownloadManager.Request(Uri.parse(url));
+                    req.setMimeType(mimetype);
+                    String cookies = android.webkit.CookieManager.getInstance().getCookie(url);
+                    req.addRequestHeader("cookie", cookies);
+                    req.addRequestHeader("User-Agent", userAgent);
+                    req.setDescription("Downloading file...");
+                    String filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimetype);
+                    req.setTitle(filename);
+                    req.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    req.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, filename);
+                    android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                    if (dm != null) {
+                        dm.enqueue(req);
+                        android.widget.Toast.makeText(getApplicationContext(), "Downloading " + filename + "...", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Exception e) {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setData(Uri.parse(url));
+                        startActivity(i);
+                    } catch (Exception ignored) {}
+                }
+            });
+
+            webView.post(() -> {
+                try {
+                    android.view.View parent = (android.view.View) webView.getParent();
+                    if (parent != null) {
+                        ViewCompat.setOnApplyWindowInsetsListener(parent, (v, insets) -> {
+                            v.setPadding(0, 0, 0, 0);
+                            return insets;
+                        });
+                        webView.requestApplyInsets();
+                    }
+                } catch (Exception ignored) {}
+            });
         }
 
         handleIntent(getIntent());
@@ -247,6 +309,12 @@ public class MainActivity extends BridgeActivity {
                 .putBoolean("is_foreground", false)
                 .apply();
         } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        PulseWebChromeClient.handlePermissionsResult(this, requestCode, permissions, grantResults);
     }
 
     @Override

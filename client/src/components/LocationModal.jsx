@@ -182,13 +182,13 @@ const LocationModal = ({ location, message, isMine, onClose }) => {
       }}
     >
       <div
-        className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--bg-main)] border border-[var(--glass-border)] shadow-2xl overflow-hidden animate-scale-up"
+        className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--glass-heavy-opaque)] border border-[var(--glass-border)] shadow-2xl overflow-hidden animate-scale-up"
         role="dialog"
         aria-modal="true"
         aria-label="Location Details"
       >
         {/* Top Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--glass-border)] bg-[var(--bg-secondary)]/50 backdrop-blur-sm">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--glass-border)] bg-[var(--glass-surface)]/50 backdrop-blur-sm">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
               isLive
@@ -325,7 +325,7 @@ const LocationModal = ({ location, message, isMine, onClose }) => {
         </div>
 
         {/* Address & Detail Info Section */}
-        <div className="px-4 sm:px-6 py-3.5 bg-[var(--bg-secondary)]/30 border-t border-[var(--glass-border)] flex flex-col gap-1.5">
+        <div className="px-4 sm:px-6 py-3.5 bg-[var(--glass-surface)]/30 border-t border-[var(--glass-border)] flex flex-col gap-1.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs sm:text-sm font-medium text-theme-main break-words">
@@ -360,7 +360,7 @@ const LocationModal = ({ location, message, isMine, onClose }) => {
         </div>
 
         {/* Action Buttons Toolbar */}
-        <div className="px-4 sm:px-6 py-3 border-t border-[var(--glass-border)] bg-[var(--bg-main)] flex flex-wrap items-center justify-between gap-2.5">
+        <div className="px-4 sm:px-6 py-3 border-t border-[var(--glass-border)] bg-[var(--glass-heavy-opaque)] flex flex-wrap items-center justify-between gap-2.5">
           {/* External Navigation Links */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Get Directions (Primary Action) */}

@@ -1,4 +1,16 @@
 import { axiosInstance } from "./axios";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+const PulseBackground = registerPlugin("PulseBackground");
+
+const blobToBase64 = (blob) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
 /**
  * Converts a Base64 data URL to a binary Blob
@@ -25,7 +37,21 @@ const dataUrlToBlob = (dataUrl) => {
  * The blob URL is revoked only after the download has had time to start:
  * revoking too early truncates large/slow downloads (notably Safari/mobile).
  */
-const triggerBlobDownload = (blob, filename) => {
+export const triggerBlobDownload = async (blob, filename) => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const dataUrl = await blobToBase64(blob);
+      await PulseBackground.saveFile({
+        data: dataUrl,
+        filename,
+        mimeType: blob.type || "application/octet-stream",
+      });
+      return;
+    } catch (e) {
+      console.warn("[Download] Native saveFile failed, falling back to anchor:", e);
+    }
+  }
+
   const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.style.display = "none";

@@ -63,6 +63,7 @@ const HomePage = () => {
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
   const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
   const [isStatusStoriesOpen, setIsStatusStoriesOpen] = useState(false);
+  const [statusViewerTarget, setStatusViewerTarget] = useState(null);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isJoinGroupOpen, setIsJoinGroupOpen] = useState(false);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
@@ -263,7 +264,7 @@ const HomePage = () => {
       // Ensure any overlay modals or bottom sheets are closed and correct tab is selected
       setIsProfileOpen(false);
       setIsSetStatusOpen(false);
-      setIsStarredDrawerOpen(false);
+      try { useChatStore.getState().setIsStarredOpen(false); } catch {}
       setMobileTab(type === "room" ? "groups" : "chats");
 
       if (type === "room") {
@@ -451,7 +452,7 @@ const HomePage = () => {
   return (
     <>
       <div
-        className="h-[100dvh] w-screen overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200"
+        className="h-full w-full overflow-hidden flex flex-row p-0 sm:p-2 md:p-3 gap-0 sm:gap-2 md:gap-3 bg-transparent text-on-surface antialiased select-none relative font-sans transition-colors duration-200"
         style={{
           "--sidebar-width": `${sidebarWidth}px`,
         }}
@@ -665,7 +666,18 @@ const HomePage = () => {
           onOpenJoinGroup={() => setIsJoinGroupOpen(true)}
           onOpenBroadcast={() => setIsBroadcastOpen(true)}
           onOpenCalls={() => setIsCallsOpen(true)}
-          onOpenStatus={() => setIsStatusStoriesOpen(true)}
+          onViewStatus={(target) => {
+            setStatusViewerTarget(target);
+            setIsStatusStoriesOpen(true);
+          }}
+          onOpenStatus={(target) => {
+            if (target) {
+              setStatusViewerTarget(target);
+              setIsStatusStoriesOpen(true);
+            } else {
+              setMobileTab("updates");
+            }
+          }}
           onOpenStarred={() => setIsStarredOpen(true)}
           authUser={authUser}
           rawStatus={rawStatus}
@@ -700,7 +712,7 @@ const HomePage = () => {
 
       {/* 3. Zone 3: Master Active Chat Workstation or Command Center */}
       <main
-        className={`flex-1 min-w-0 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-all duration-200 ${
+        className={`flex-1 min-w-0 h-full z-20 overflow-hidden flex flex-col glass-panel sm:rounded-2xl md:rounded-3xl border-x-0 sm:border-x border-y-0 sm:border-y border-[var(--glass-border)] sm:border-t-[var(--glass-border-top)] shadow-none sm:shadow-glass transition-colors duration-200 ${
           !selectedChat ? "hidden md:flex" : "flex"
         }`}
       >
@@ -763,7 +775,7 @@ const HomePage = () => {
 
                 {/* 3. Status Stories */}
                 <button
-                  onClick={() => setIsStatusStoriesOpen(true)}
+                  onClick={() => setMobileTab("updates")}
                   className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/70 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 border border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20 backdrop-blur-xl transition-all duration-200 text-left cursor-pointer shadow-sm hover:scale-[1.02]"
                   type="button"
                 >
@@ -808,7 +820,15 @@ const HomePage = () => {
       {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
       {isSetStatusOpen && <SetStatusModal onClose={() => setIsSetStatusOpen(false)} />}
       {isChatThemeOpen && <ChatThemeModal isOpen={isChatThemeOpen} onClose={() => setIsChatThemeOpen(false)} />}
-      {isStatusStoriesOpen && <StatusModal onClose={() => setIsStatusStoriesOpen(false)} />}
+      {isStatusStoriesOpen && (
+        <StatusModal
+          initialViewer={statusViewerTarget}
+          onClose={() => {
+            setIsStatusStoriesOpen(false);
+            setStatusViewerTarget(null);
+          }}
+        />
+      )}
       {isStarredOpen && <StarredDrawer onClose={() => setIsStarredOpen(false)} />}
       {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
       {isJoinGroupOpen && <JoinGroupModal onClose={() => setIsJoinGroupOpen(false)} />}

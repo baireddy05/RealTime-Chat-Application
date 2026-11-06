@@ -42,6 +42,15 @@ export async function openAutostartSettings() {
   }
 }
 
+export async function requestNativeCallPermissions() {
+  if (!Capacitor.isNativePlatform() || !PulseBackground) return;
+  try {
+    await PulseBackground.requestCallPermissions?.();
+  } catch (e) {
+    console.warn("[Pulse Background Sync] requestCallPermissions error:", e);
+  }
+}
+
 export async function setActiveNativeChat(chatId) {
   if (!Capacitor.isNativePlatform() || !PulseBackground) return;
   try {
@@ -70,4 +79,3 @@ export async function clearPendingNativeChat() {
     await PulseBackground.clearPendingChat();
   } catch {}
 }
-

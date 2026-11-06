@@ -1,11 +1,12 @@
 import { memo, useEffect, useState, useRef, useMemo, useCallback, Suspense } from "react";
 import { Capacitor } from "@capacitor/core";
-import { Ticket } from "lucide-react";
+import { Ticket, X, Plus, Image as ImageIcon, Video, Send, Loader } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import { useCallStore } from "../store/useCallStore";
+import { axiosInstance } from "../lib/axios";
 import { lazyWithRetry } from "../lib/lazyWithRetry";
 const CreateGroupModal = lazyWithRetry(() => import("./CreateGroupModal"));
 const LabelsManagerModal = lazyWithRetry(() => import("./LabelsManagerModal"));
@@ -16,6 +17,14 @@ import { isChatLocked, isChatLockedAnywhere, setChatLocked, hasChatPin } from ".
 import { isStickerUrl, imageSnippet } from "../lib/attachments";
 import { isEncryptedMessage } from "../lib/crypto";
 import { useBackHandler } from "../lib/backNavigation";
+
+const STATUS_BG_COLORS = [
+  "bg-gradient-to-tr from-sky-500 to-indigo-600",
+  "bg-gradient-to-tr from-violet-500 to-fuchsia-600",
+  "bg-gradient-to-tr from-emerald-400 to-teal-600",
+  "bg-gradient-to-tr from-amber-400 to-orange-500",
+  "bg-gradient-to-tr from-cyan-500 to-blue-600",
+];
 
 const ChatLabelDots = memo(({ chatId }) => {
   const labels = useChatStore((s) => s.labels);
@@ -113,6 +122,7 @@ const Sidebar = ({
   onOpenBroadcast,
   onOpenCalls,
   onOpenStatus,
+  onViewStatus,
   onOpenStarred,
   handleInstallPWA,
   logout,
@@ -321,6 +331,98 @@ const Sidebar = ({
   const getCallHistory = useCallStore((s) => s.getCallHistory);
   const clearCallHistory = useCallStore((s) => s.clearCallHistory);
   const startCall = useCallStore((s) => s.startCall);
+
+  const uploadStatus = useChatStore((s) => s.uploadStatus);
+  const [isCreatingStatus, setIsCreatingStatus] = useState(false);
+  const [newStatusText, setNewStatusText] = useState("");
+  const [selectedBg, setSelectedBg] = useState(STATUS_BG_COLORS[0]);
+  const [mediaFile, setMediaFile] = useState(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [mediaPickerType, setMediaPickerType] = useState("image");
+  const mediaInputRef = useRef(null);
+  const mediaFileRef = useRef(null);
+
+  const clearMediaFile = useCallback(() => {
+    try {
+      if (mediaFileRef.current?.preview) URL.revokeObjectURL(mediaFileRef.current.preview);
+    } catch {}
+    mediaFileRef.current = null;
+    setMediaFile(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (mediaFileRef.current?.preview) URL.revokeObjectURL(mediaFileRef.current.preview);
+      } catch {}
+    };
+  }, []);
+
+  const uploadStatusMedia = async (file, type) => {
+    try {
+      const { data } = await axiosInstance.get("/upload/signature");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", data.apiKey);
+      formData.append("timestamp", data.timestamp);
+      formData.append("signature", data.signature);
+      const endpoint =
+        type === "video"
+          ? `https://api.cloudinary.com/v1_1/${data.cloudName}/video/upload`
+          : `https://api.cloudinary.com/v1_1/${data.cloudName}/image/upload`;
+      const res = await fetch(endpoint, { method: "POST", body: formData });
+      const uploadData = await res.json();
+      return uploadData.secure_url || null;
+    } catch (error) {
+      console.error("Status media upload failed", error);
+      return null;
+    }
+  };
+
+  const handleMediaPick = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const type = file.type.startsWith("video/") ? "video" : "image";
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      alert("Please select a photo or video file");
+      return;
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      alert("Status media must be under 30MB");
+      return;
+    }
+    clearMediaFile();
+    const next = { file, preview: URL.createObjectURL(file), type };
+    mediaFileRef.current = next;
+    setMediaFile(next);
+    setIsCreatingStatus(true);
+  };
+
+  const handleCreateStatus = async (e) => {
+    e.preventDefault();
+    if (!newStatusText.trim() && !mediaFile) return;
+
+    setIsUploadingMedia(true);
+    try {
+      let media = null;
+      if (mediaFile) {
+        const mediaUrl = await uploadStatusMedia(mediaFile.file, mediaFile.type);
+        if (!mediaUrl) {
+          setIsUploadingMedia(false);
+          return;
+        }
+        media = { mediaUrl, mediaType: mediaFile.type };
+      }
+      await uploadStatus(newStatusText.trim(), selectedBg, media);
+      setNewStatusText("");
+      clearMediaFile();
+      setIsCreatingStatus(false);
+    } catch (error) {
+      console.error("Failed to upload status", error);
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
 
   useEffect(() => {
     if (mobileTab === "updates") getStatuses?.();
@@ -1173,35 +1275,184 @@ const Sidebar = ({
     <div className="space-y-3 p-1">
       <div className="flex items-center justify-between px-1 pt-1">
         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-900 dark:text-white">Status</span>
-        {onOpenStatus && (
-          <button
-            type="button"
-            onClick={onOpenStatus}
-            className="text-[11px] font-semibold text-accent-primary hover:underline"
-          >
-            View all
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            if ((myStatuses || []).length > 0) {
+              onViewStatus?.({ type: "my", storyIndex: 0 });
+            } else if ((networkStatuses || []).length > 0) {
+              onViewStatus?.({ type: "network", personIndex: 0, storyIndex: 0 });
+            } else {
+              setIsCreatingStatus((prev) => !prev);
+            }
+          }}
+          className="text-[11px] font-semibold text-accent-primary hover:underline cursor-pointer"
+        >
+          {(myStatuses || []).length > 0 || (networkStatuses || []).length > 0 ? "View all" : isCreatingStatus ? "Cancel" : "+ Add"}
+        </button>
       </div>
+
+      {/* My Status Item */}
       <div
-        onClick={onOpenStatus}
+        onClick={() => {
+          if ((myStatuses || []).length > 0) {
+            onViewStatus?.({ type: "my", storyIndex: 0 });
+          } else {
+            setIsCreatingStatus((prev) => !prev);
+          }
+        }}
         className="flex items-center gap-3 p-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/10 cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
       >
         <div className="relative shrink-0">
           <img
             src={authUser?.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "You")}&background=27272a&color=ffffff`}
             alt="My status"
-            className="w-11 h-11 rounded-full object-cover border border-black/10 dark:border-white/10"
+            className={`w-11 h-11 rounded-full object-cover border border-black/10 dark:border-white/10 ${
+              (myStatuses || []).length > 0 ? "ring-2 ring-accent-primary p-0.5" : ""
+            }`}
           />
-          <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center ring-2 ring-white dark:ring-[#121117] text-sm font-bold leading-none">+</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCreatingStatus((prev) => !prev);
+            }}
+            className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-black flex items-center justify-center ring-2 ring-white dark:ring-[#121117] text-sm font-bold leading-none cursor-pointer hover:scale-110 transition-transform"
+            title="Add status update"
+          >
+            +
+          </button>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-zinc-900 dark:text-white">My status</p>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
-            {(myStatuses || []).length > 0 ? `${myStatuses.length} update${myStatuses.length === 1 ? "" : "s"} • Tap to view` : "Tap to add status update"}
+            {(myStatuses || []).length > 0
+              ? `${myStatuses.length} update${myStatuses.length === 1 ? "" : "s"} • Tap to view`
+              : isCreatingStatus
+              ? "Creating status update below…"
+              : "Tap to add status update"}
           </p>
         </div>
+        {(myStatuses || []).length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCreatingStatus((prev) => !prev);
+            }}
+            className="px-2.5 py-1 rounded-xl text-xs font-semibold text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20 transition-colors shrink-0 cursor-pointer"
+            title="Add status update"
+          >
+            {isCreatingStatus ? "Cancel" : "+ Add"}
+          </button>
+        )}
       </div>
+
+      {/* Inline Status Composer (No separate screen opens!) */}
+      {isCreatingStatus && (
+        <form
+          onSubmit={handleCreateStatus}
+          className="bg-black/[0.03] dark:bg-white/[0.05] border border-black/10 dark:border-white/10 p-3.5 rounded-2xl space-y-3 animate-scaleIn select-none"
+        >
+          <input
+            ref={mediaInputRef}
+            type="file"
+            accept={mediaPickerType === "video" ? "video/*" : "image/*"}
+            onChange={handleMediaPick}
+            className="hidden"
+          />
+          {mediaFile && (
+            <div className="relative rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
+              {mediaFile.type === "video" ? (
+                <video src={mediaFile.preview} className="w-full max-h-44 object-cover" muted playsInline />
+              ) : (
+                <img src={mediaFile.preview} alt="Status preview" className="w-full max-h-44 object-cover" />
+              )}
+              <button
+                type="button"
+                onClick={clearMediaFile}
+                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
+                title="Remove media"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          <textarea
+            rows={2}
+            placeholder={mediaFile ? "Add a caption (optional)..." : "Share an update with your contacts..."}
+            value={newStatusText}
+            onChange={(e) => setNewStatusText(e.target.value)}
+            autoFocus={!mediaFile}
+            className="w-full bg-white dark:bg-black/20 rounded-xl p-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-accent-primary border border-black/10 dark:border-white/10 resize-none"
+          />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setMediaPickerType("image");
+                mediaInputRef.current?.click();
+              }}
+              className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-black/10 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <ImageIcon size={13} /> Photo
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMediaPickerType("video");
+                mediaInputRef.current?.click();
+              }}
+              className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-black/10 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <Video size={13} /> Video
+            </button>
+          </div>
+
+          {/* Background color picker for text updates */}
+          {!mediaFile && (
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[10px] text-zinc-500 font-medium">Color:</span>
+              <div className="flex gap-2">
+                {STATUS_BG_COLORS.map((bg, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedBg(bg)}
+                    className={`w-5 h-5 rounded-full ${bg} transition-transform cursor-pointer ${
+                      selectedBg === bg ? "scale-125 ring-2 ring-accent-primary" : "opacity-70 hover:opacity-100"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-2 pt-1 border-t border-black/5 dark:border-white/5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreatingStatus(false);
+                clearMediaFile();
+                setNewStatusText("");
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={(!newStatusText.trim() && !mediaFile) || isUploadingMedia}
+              className="px-4 py-1.5 rounded-xl bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-40 cursor-pointer"
+            >
+              {isUploadingMedia ? <Loader size={12} className="animate-spin" /> : <Send size={12} />}
+              <span>{isUploadingMedia ? "Uploading…" : "Post"}</span>
+            </button>
+          </div>
+        </form>
+      )}
+
       <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
         Recent updates
       </div>
@@ -1211,10 +1462,10 @@ const Sidebar = ({
         </div>
       ) : (
         <div className="space-y-1">
-          {(networkStatuses || []).map((person) => (
+          {(networkStatuses || []).map((person, idx) => (
             <div
               key={person.id}
-              onClick={onOpenStatus}
+              onClick={() => onViewStatus?.({ type: "network", personIndex: idx, storyIndex: 0 })}
               className="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
             >
               <img
@@ -1408,8 +1659,8 @@ const Sidebar = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {/* 24-Hour Status Stories Button (Mobile Only) */}
-            {onOpenStatus && (
+            {/* 24-Hour Status Stories Button (Mobile Only, hidden when already on Updates tab) */}
+            {onOpenStatus && mobileTab !== "updates" && (
               <button
                 onClick={onOpenStatus}
                 className="md:hidden p-2 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-black/5 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
@@ -2181,12 +2432,12 @@ const Sidebar = ({
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            className="rounded-2xl bg-[#0a1812] text-white border border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px] overflow-hidden"
+            className="rounded-2xl bg-white dark:bg-[#0a1812] text-theme-main border border-black/10 dark:border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn select-none text-[13px] overflow-hidden"
           >
             {onOpenProfile && (
               <button
                 onClick={() => { onOpenProfile(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">person</span>
                 <span>My Profile</span>
@@ -2195,7 +2446,7 @@ const Sidebar = ({
             {onOpenStarred && (
               <button
                 onClick={() => { onOpenStarred(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">star</span>
                 <span>Starred Messages</span>
@@ -2204,7 +2455,7 @@ const Sidebar = ({
             {onOpenAddFriend && (
               <button
                 onClick={() => { onOpenAddFriend(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">person_add</span>
                 <span>Contacts ({friends?.length || 0})</span>
@@ -2218,7 +2469,7 @@ const Sidebar = ({
             {onOpenSetStatus && (
               <button
                 onClick={() => { onOpenSetStatus(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">sentiment_satisfied</span>
                 <span>Set Status Mood</span>
@@ -2226,7 +2477,7 @@ const Sidebar = ({
             )}
             <button
               onClick={() => { setShowLabelsManager(true); setShowOptionsDropdown(false); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px] text-accent-primary">label</span>
               <span>Chat Labels</span>
@@ -2234,7 +2485,7 @@ const Sidebar = ({
             {!Capacitor.isNativePlatform() && handleInstallPWA && (
               <button
                 onClick={() => { handleInstallPWA(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">install_desktop</span>
                 <span>Install Pulse PWA</span>
@@ -2243,7 +2494,7 @@ const Sidebar = ({
             {onOpenJoinGroup && (
               <button
                 onClick={() => { onOpenJoinGroup(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <Ticket size={16} className="text-accent-primary shrink-0" />
                 <span>Join Group with Code</span>
@@ -2252,7 +2503,7 @@ const Sidebar = ({
             {onOpenBroadcast && (
               <button
                 onClick={() => { onOpenBroadcast(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">campaign</span>
                 <span>Broadcast Lists</span>
@@ -2261,7 +2512,7 @@ const Sidebar = ({
             {onOpenCalls && (
               <button
                 onClick={() => { onOpenCalls(); setShowOptionsDropdown(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] text-accent-primary">call_log</span>
                 <span>Call History</span>
@@ -2272,7 +2523,7 @@ const Sidebar = ({
                 setIsSettingsOpen(true);
                 setShowOptionsDropdown(false);
               }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-zinc-100 hover:bg-white/10 hover:text-emerald-400 transition-colors text-left text-xs font-medium cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-theme-main hover:bg-[var(--glass-hover)] hover:text-accent-primary transition-colors text-left text-xs font-medium cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px] text-accent-primary">settings</span>
               <span>Settings & Animations</span>
@@ -2290,6 +2541,10 @@ const Sidebar = ({
                 </button>
               </>
             )}
+
+            <div className="px-3.5 py-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 font-mono text-center border-t border-black/5 dark:border-white/5 select-none">
+              Pulse v2.3.0 (Build 230)
+            </div>
           </div>
         </>,
         document.body

@@ -157,13 +157,13 @@ const LocationPickerModal = ({ isOpen, onClose, onSendLocation, onStartLiveShare
       }}
     >
       <div
-        className="w-full max-w-lg rounded-3xl bg-[var(--bg-main)] border border-[var(--glass-border)] shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+        className="w-full max-w-lg rounded-3xl bg-[var(--glass-heavy-opaque)] border border-[var(--glass-border)] shadow-2xl overflow-hidden flex flex-col animate-scale-up"
         role="dialog"
         aria-modal="true"
         aria-label="Share Location"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--glass-border)] bg-[var(--bg-secondary)]/50">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--glass-border)] bg-[var(--glass-surface)]/50">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center">
               <MapPin size={18} />
@@ -188,7 +188,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSendLocation, onStartLiveShare
           {/* Map Preview Area */}
           <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-black/20 shadow-inner">
             {loadingGps ? (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/40 p-4 text-center">
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-[var(--glass-surface)]/40 p-4 text-center">
                 <div className="relative flex items-center justify-center">
                   <span className="w-12 h-12 rounded-full bg-accent-primary/20 animate-ping absolute" />
                   <div className="w-10 h-10 rounded-full bg-accent-primary/30 text-accent-primary flex items-center justify-center relative">
@@ -241,7 +241,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSendLocation, onStartLiveShare
 
           {/* Location Details Strip */}
           {coords && !gpsError && (
-            <div className="p-3 rounded-2xl bg-[var(--bg-secondary)]/60 border border-[var(--glass-border)] flex items-start justify-between gap-3">
+            <div className="p-3 rounded-2xl bg-[var(--glass-surface)]/60 border border-[var(--glass-border)] flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-theme-main truncate">
@@ -268,7 +268,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSendLocation, onStartLiveShare
               className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
                 shareMode === "static"
                   ? "bg-accent-primary/15 border-accent-primary text-theme-main shadow-xs"
-                  : "bg-[var(--bg-secondary)]/30 border-[var(--glass-border)] text-theme-muted hover:border-[var(--glass-border-hover)]"
+                  : "bg-[var(--glass-surface)]/30 border-[var(--glass-border)] text-theme-muted hover:border-[var(--glass-border-hover)]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -291,7 +291,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSendLocation, onStartLiveShare
               className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
                 shareMode === "live"
                   ? "bg-red-500/15 border-red-500 text-theme-main shadow-xs"
-                  : "bg-[var(--bg-secondary)]/30 border-[var(--glass-border)] text-theme-muted hover:border-[var(--glass-border-hover)]"
+                  : "bg-[var(--glass-surface)]/30 border-[var(--glass-border)] text-theme-muted hover:border-[var(--glass-border-hover)]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -350,13 +350,13 @@ const LocationPickerModal = ({ isOpen, onClose, onSendLocation, onStartLiveShare
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Add a note or landmark (optional)..."
               maxLength={200}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-secondary)]/50 border border-[var(--glass-border)] text-xs text-theme-main placeholder-theme-muted focus:outline-none focus:border-accent-primary transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--glass-surface)]/50 border border-[var(--glass-border)] text-xs text-theme-main placeholder-theme-muted focus:outline-none focus:border-accent-primary transition-colors"
             />
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3.5 border-t border-[var(--glass-border)] bg-[var(--bg-secondary)]/40 flex items-center justify-end gap-2.5">
+        <div className="px-5 py-3.5 border-t border-[var(--glass-border)] bg-[var(--glass-surface)]/40 flex items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={onClose}

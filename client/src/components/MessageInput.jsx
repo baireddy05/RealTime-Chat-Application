@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, Suspense } from "react";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useThemeStore } from "../store/useThemeStore";
@@ -38,6 +39,7 @@ const ContactModal = lazyWithRetry(() => import("./ContactModal"));
 const CreatePollModal = lazyWithRetry(() => import("./CreatePollModal"));
 const LocationPickerModal = lazyWithRetry(() => import("./LocationPickerModal"));
 import { reverseGeocode } from "../utils/location";
+import { requestNativeCallPermissions } from "../lib/backgroundSync";
 import { emitPulseShockwave } from "../lib/pulseShockwave";
 import { useBackHandler } from "../lib/backNavigation";
 import { imageSnippet } from "../lib/attachments";
@@ -622,6 +624,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const startRecording = async () => {
     stopPreviousCapture();
     try {
+      await requestNativeCallPermissions();
       audioChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -650,6 +653,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
   const startVideoRecording = async () => {
     stopPreviousCapture();
     try {
+      await requestNativeCallPermissions();
       audioChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: "user" } });
       streamRef.current = stream;
@@ -787,7 +791,26 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
     window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
   };
 
-  const toggleDictation = () => {
+  const toggleDictation = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        setIsDictating(true);
+        const PulseBackground = registerPlugin("PulseBackground");
+        const res = await PulseBackground.startSpeechRecognition();
+        if (res && res.transcript) {
+          setText((prev) => {
+            const separator = prev && !prev.endsWith(" ") ? " " : "";
+            return prev + separator + res.transcript.trim();
+          });
+        }
+      } catch (err) {
+        console.warn("Native speech error or cancelled:", err);
+      } finally {
+        setIsDictating(false);
+      }
+      return;
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert("Voice typing is not supported in this browser. Please try Chrome or Edge.");
@@ -847,7 +870,7 @@ const MessageInput = ({ droppedFile, onClearDroppedFile }) => {
 
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.onstop = async () => {
-        const mimeType = isRecordingVideo ? "video/webm" : "audio/webm";
+        const mimeType = mediaRecorderRef.current?.mimeType || (isRecordingVideo ? "video/webm" : "audio/webm");
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         if (audioBlob.size > 0) {
           setIsUploading(true);

@@ -12,7 +12,7 @@ const STATUS_BG_COLORS = [
   "bg-gradient-to-tr from-cyan-500 to-blue-600",
 ];
 
-const StatusModal = ({ onClose }) => {
+const StatusModal = ({ onClose, initialViewer = null }) => {
   const { authUser } = useAuthStore();
   const { networkStatuses: networkPersons, myStatuses: myStories, uploadStatus, deleteStatus, getStatuses, viewStatus, getStatusViewers, setSelectedChat } = useChatStore();
 
@@ -20,12 +20,23 @@ const StatusModal = ({ onClose }) => {
     getStatuses();
   }, [getStatuses]);
 
-  const [activeViewer, setActiveViewer] = useState(null);
+  const [activeViewer, setActiveViewer] = useState(initialViewer);
   const [storyProgress, setStoryProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isCreatingStatus, setIsCreatingStatus] = useState(false);
   const [newStatusText, setNewStatusText] = useState("");
   const [selectedBg, setSelectedBg] = useState(STATUS_BG_COLORS[0]);
+
+  // If opened directly to view a story, closing or finishing the story closes the modal
+  useEffect(() => {
+    if (!activeViewer || !activeStory) {
+      onClose();
+    }
+  }, [activeViewer, activeStory, onClose]);
+
+  if (!activeViewer || !activePerson || !activeStory) {
+    return null;
+  }
 
   // Photo/video status composer state
   const [mediaFile, setMediaFile] = useState(null); // { file, preview, type: 'image'|'video' }
@@ -580,237 +591,8 @@ const StatusModal = ({ onClose }) => {
               )}
             </div>
           )}
-          </div>
-      ) : (
-        /* Status List & Creator Modal */        <div 
-          className="w-full max-w-md bg-[var(--glass-heavy)] backdrop-blur-2xl border border-[var(--glass-border)] rounded-3xl shadow-glass overflow-hidden flex flex-col max-h-[85vh] animate-scaleIn text-theme-main max-md:max-w-none max-md:h-full max-md:max-h-full max-md:rounded-none max-md:border-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="border-b border-[var(--glass-border)] px-5 py-4 flex items-center justify-between bg-[var(--glass-hover)]">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-status-online" />
-              <h3 className="font-semibold text-sm text-theme-main">Stories & Status</h3>
-            </div>
-            <button
-              onClick={onClose}
-              title="Close"
-              className="p-1.5 rounded-full hover:bg-[var(--glass-hover)] transition-colors text-theme-muted hover:text-theme-main"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Modal Content */}
-          <div className="p-5 overflow-y-auto space-y-5">
-            {/* My Status Section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider">
-                  My Status
-                </span>
-                <button
-                  onClick={() => setIsCreatingStatus(!isCreatingStatus)}
-                  className="text-xs font-medium text-accent-primary hover:underline flex items-center gap-1 transition-colors"
-                >
-                  <Plus size={13} />
-                  <span>{isCreatingStatus ? "Cancel" : myStories.length > 0 ? "Add Status" : "Share"}</span>
-                </button>
-              </div>
-
-              {isCreatingStatus ? (
-                <form onSubmit={handleCreateStatus} className="bg-[var(--glass-surface)] border border-[var(--glass-border)] p-3.5 rounded-2xl space-y-3">
-                  <input
-                    ref={mediaInputRef}
-                    type="file"
-                    accept={mediaPickerType === "video" ? "video/*" : "image/*"}
-                    onChange={handleMediaPick}
-                    className="hidden"
-                  />
-                  {mediaFile && (
-                    <div className="relative rounded-xl overflow-hidden border border-[var(--glass-border)]">
-                      {mediaFile.type === "video" ? (
-                        <video src={mediaFile.preview} className="w-full max-h-44 object-cover" muted playsInline />
-                      ) : (
-                        <img src={mediaFile.preview} alt="Status preview" className="w-full max-h-44 object-cover" />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => clearMediaFile()}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-                        title="Remove media"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  )}
-                  <textarea
-                    rows={2}
-                    placeholder={mediaFile ? "Add a caption (optional)..." : "Share an update with your contacts..."}
-                    value={newStatusText}
-                    onChange={(e) => setNewStatusText(e.target.value)}
-                    autoFocus={!mediaFile}
-                    className="w-full glass-input rounded-xl p-2.5 text-xs text-theme-main placeholder-theme-muted/40 focus:outline-none focus:border-accent-primary/60 border border-[var(--glass-border)] resize-none"
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMediaPickerType("image");
-                        mediaInputRef.current?.click();
-                      }}
-                      className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-[var(--glass-border)] text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all"
-                    >
-                      <ImageIcon size={13} /> Photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMediaPickerType("video");
-                        mediaInputRef.current?.click();
-                      }}
-                      className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-[var(--glass-border)] text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all"
-                    >
-                      <Video size={13} /> Video
-                    </button>
-                  </div>
-
-                  {/* Background Color Picker with Palette */}
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex gap-2">
-                      {STATUS_BG_COLORS.map((bg, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setSelectedBg(bg)}
-                          className={`w-5 h-5 rounded-full ${bg} transition-transform ${
-                            selectedBg === bg ? "scale-125 ring-2 ring-accent-primary" : "opacity-70 hover:opacity-100"
-                          }`}
-                        />
-                      ))}
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={(!newStatusText.trim() && !mediaFile) || isUploadingMedia}
-                      className="px-3.5 py-1.5 rounded-xl bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-medium flex items-center gap-1.5 shadow-md shadow-accent-primary/25 transition-all disabled:opacity-40"
-                    >
-                      {isUploadingMedia ? <Loader size={12} className="animate-spin" /> : <Send size={12} />}
-                      <span>{isUploadingMedia ? "Uploading…" : "Post"}</span>
-                    </button>
-                  </div>
-                </form>
-              ) : myStories.length > 0 ? (
-                <div className="flex items-center justify-between p-2 rounded-2xl bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] transition-colors group">
-                  <div
-                    onClick={() => {
-                      setActiveViewer({ type: "my", personIndex: 0, storyIndex: 0 });
-                      setStoryProgress(0);
-                    }}
-                    className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-                  >
-                    <div className="relative flex-shrink-0">
-                      <img
-                        src={
-                          myStories[0]?.mediaUrl ||
-                          authUser?.profilePic ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`
-                        }
-                        alt="My Status"
-                        className="w-10 h-10 rounded-full object-cover ring-2 ring-accent-primary p-0.5"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-xs text-theme-main">My Story</p>
-                      <p className="text-[10px] text-theme-muted">
-                        {myStories.length} {myStories.length === 1 ? "update" : "updates"} • {myStories[0].time}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setIsCreatingStatus(true)}
-                    className="p-1.5 rounded-xl text-accent-primary hover:bg-accent-primary/20 transition-colors text-xs font-medium flex items-center gap-1"
-                    title="Add another status update"
-                  >
-                    <Plus size={14} />
-                    <span>Add</span>
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setIsCreatingStatus(true)}
-                  className="flex items-center gap-3 p-2 rounded-2xl bg-[var(--glass-surface)] hover:bg-[var(--glass-hover)] cursor-pointer transition-colors"
-                >
-                  <div className="relative">
-                    <img
-                      src={
-                        authUser?.profilePic ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(authUser?.username || "User")}&background=2563eb&color=ffffff`
-                      }
-                      alt="My Avatar"
-                      className="w-10 h-10 rounded-full object-cover border border-[var(--glass-border)]"
-                    />
-                    <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-accent-primary text-white flex items-center justify-center font-bold shadow">
-                      <Plus size={10} strokeWidth={3} />
-                    </span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-xs text-theme-main">My Story</p>
-                    <p className="text-[10px] text-theme-muted">Tap to share an update</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Recent Updates from Network Friends */}
-            <div>
-              <span className="text-[10px] font-medium text-theme-muted uppercase tracking-wider block mb-2">
-                Recent Updates
-              </span>
-
-              {networkPersons && networkPersons.length > 0 ? (
-                <div className="space-y-1">
-                  {networkPersons.map((person, pIdx) => (
-                    <div
-                      key={person.id}
-                      onClick={() => {
-                        setActiveViewer({
-                          type: "network",
-                          personIndex: pIdx,
-                          storyIndex: 0,
-                        });
-                        setStoryProgress(0);
-                      }}
-                      className="flex items-center gap-3 p-2 rounded-2xl hover:bg-[var(--glass-hover)] cursor-pointer transition-colors"
-                    >
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={person.stories[0]?.mediaUrl || person.avatar}
-                          alt={person.user}
-                          className="w-10 h-10 rounded-full object-cover ring-2 ring-accent-secondary p-0.5"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-xs text-theme-main truncate">{person.user}</p>
-                        <p className="text-[10px] text-theme-muted truncate">
-                          {person.stories.length > 1
-                            ? `${person.stories.length} updates • ${person.stories[0].time}`
-                            : person.stories[0].time}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-5 px-4 text-center text-theme-muted text-xs bg-[var(--glass-surface)] rounded-2xl border border-[var(--glass-border)]">
-                  No recent status updates from contacts.
-                </div>
-              )}
-            </div>
-          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

@@ -38,7 +38,7 @@ import MessageBubble from "./MessageBubble";
 import ChatLockGate from "./ChatLockGate";
 import { isChatLockedAnywhere } from "../lib/chatLock";
 import { useBackHandler } from "../lib/backNavigation";
-import { downloadFile } from "../lib/download";
+import { downloadFile, triggerBlobDownload } from "../lib/download";
 import { imageSnippet } from "../lib/attachments";
 import { isEncryptedMessage, getConversationKey, decryptMessage } from "../lib/crypto";
 
@@ -93,6 +93,7 @@ const ChatPane = ({ onBack }) => {
   // pane (header, list, input) on every unrelated store write (tasks, events,
   // statuses, ...).
   const messages = useChatStore((s) => s.messages);
+  const sendMessage = useChatStore((s) => s.sendMessage);
   const getMessages = useChatStore((s) => s.getMessages);
   const isMessagesLoading = useChatStore((s) => s.isMessagesLoading);
   const selectedChat = useChatStore((s) => s.selectedChat);
@@ -138,9 +139,33 @@ const ChatPane = ({ onBack }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(MESSAGE_PAGE_SIZE);
   const [fullReactionPickerMsgId, setFullReactionPickerMsgId] = useState(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const menuOpenedAtRef = useRef(0);
+  const openMenuMessageIdRef = useRef(openMenuMessageId);
+
+  const scrollerElementRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const chatOptionsRef = useRef(null);
+  const chatOptionsMenuRef = useRef(null);
+  const isAtBottomRef = useRef(true);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+  const [unreadBelowCount, setUnreadBelowCount] = useState(0);
+  const [isQuickNotesOpen, setIsQuickNotesOpen] = useState(false);
+  const loadedChatIdRef = useRef(null);
+  const prevSelectedChatIdRef = useRef(selectedChat?.id);
+  const messagesRef = useRef(messages);
+  const dragCounterRef = useRef(0);
+
+  useEffect(() => {
+    openMenuMessageIdRef.current = openMenuMessageId;
+    if (openMenuMessageId) {
+      menuOpenedAtRef.current = Date.now();
+    }
+  }, [openMenuMessageId]);
   const [downloadingFileId, setDownloadingFileId] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
   const [messageToDelete, setMessageToDelete] = useState(null);
@@ -183,7 +208,6 @@ const ChatPane = ({ onBack }) => {
       } catch {}
     }
   };
-  const dragCounterRef = useRef(0);
 
   // Mobile Back Navigation handlers for ChatPane overlays
   useBackHandler(!!activeImage, () => setActiveImage(null), "chat-modal-image");
@@ -226,17 +250,6 @@ const ChatPane = ({ onBack }) => {
     };
   }, [showChatOptions]);
 
-  const scrollerElementRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
-  const chatOptionsRef = useRef(null);
-  const chatOptionsMenuRef = useRef(null);
-  const isAtBottomRef = useRef(true);
-  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
-  const [unreadBelowCount, setUnreadBelowCount] = useState(0);
-  const [isQuickNotesOpen, setIsQuickNotesOpen] = useState(false);
-  const loadedChatIdRef = useRef(null);
-
   useBackHandler(isQuickNotesOpen, () => setIsQuickNotesOpen(false), "chat-quick-notes");
 
   const handleSendNoteToChat = (noteText) => {
@@ -246,8 +259,6 @@ const ChatPane = ({ onBack }) => {
     window.dispatchEvent(new CustomEvent("pulse:scroll-to-bottom"));
     setIsQuickNotesOpen(false);
   };
-  const prevSelectedChatIdRef = useRef(selectedChat?.id);
-  const messagesRef = useRef(messages);
 
   const onlineUsersSet = useMemo(() => new Set(onlineUsers || []), [onlineUsers]);
   const selectedUserId = (selectedChat?.id || selectedChat?._id)?.toString();
@@ -348,16 +359,41 @@ const ChatPane = ({ onBack }) => {
     };
   }, [scrollToBottom]);
 
+  const wasAtBottomOnFocusRef = useRef(true);
+  const isUserTouchScrollingRef = useRef(false);
+
+  useEffect(() => {
+    const onFocusIn = (e) => {
+      if (e.target?.tagName === "TEXTAREA" || e.target?.tagName === "INPUT") {
+        wasAtBottomOnFocusRef.current = isAtBottomRef.current;
+      }
+    };
+    const onFocusOut = (e) => {
+      if (e.target?.tagName === "TEXTAREA" || e.target?.tagName === "INPUT") {
+        setTimeout(() => {
+          wasAtBottomOnFocusRef.current = false;
+        }, 300);
+      }
+    };
+    window.addEventListener("focusin", onFocusIn);
+    window.addEventListener("focusout", onFocusOut);
+    return () => {
+      window.removeEventListener("focusin", onFocusIn);
+      window.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
+
   const handleScroll = useCallback(() => {
     const el = scrollerElementRef.current;
     if (!el) return;
     const threshold = 140;
     const isBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
     isAtBottomRef.current = isBottom;
-    setShowScrollBottomBtn(!isBottom);
     if (isBottom) {
+      wasAtBottomOnFocusRef.current = true;
       setUnreadBelowCount(0);
     }
+    setShowScrollBottomBtn(!isBottom);
   }, []);
 
   // Keep scroll pinned to bottom while content is still settling after a chat
@@ -368,6 +404,7 @@ const ChatPane = ({ onBack }) => {
     if (!container || typeof ResizeObserver === "undefined") return;
 
     const observer = new ResizeObserver(() => {
+      if (openMenuMessageIdRef.current) return;
       if (isAtBottomRef.current || Date.now() < initialPinUntilRef.current) {
         const el = scrollerElementRef.current;
         if (el) {
@@ -432,25 +469,59 @@ const ChatPane = ({ onBack }) => {
     return () => window.removeEventListener("pulse:scroll-to-bottom", handleScrollReq);
   }, [scrollToBottom]);
 
-  // When the mobile keyboard opens/closes the layout resizes: stay pinned to
-  // the latest messages if the user was already at the bottom (WhatsApp-like).
-  // Readers scrolled up in history are left exactly where they were.
+  // Synchronous visualViewport & window resize tracking for smooth mobile keyboard transitions.
+  // Re-anchors message options menu if open, and pins scroll to bottom if at bottom without layout thrashing.
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    if (!vv) return;
-    let raf = 0;
+    let resizeRafId = null;
+
     const handleResize = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        if (isAtBottomRef.current) scrollToBottom("instant");
+      if (resizeRafId) return;
+      resizeRafId = requestAnimationFrame(() => {
+        resizeRafId = null;
+
+        if (openMenuMessageIdRef.current) {
+          const msgEl = document.getElementById(`msg-${openMenuMessageIdRef.current}`);
+          if (msgEl) {
+            const bubble = msgEl.querySelector(".message-bubble-touch") || msgEl;
+            const rect = bubble.getBoundingClientRect();
+            setMenuAnchor((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                top: rect.top,
+                bottom: rect.bottom,
+                left: rect.left,
+                right: rect.right,
+              };
+            });
+          }
+          return;
+        }
+
+        const el = scrollerElementRef.current;
+        if (!el) return;
+        if (isAtBottomRef.current || wasAtBottomOnFocusRef.current) {
+          el.scrollTop = el.scrollHeight;
+        }
       });
     };
-    vv.addEventListener("resize", handleResize);
+
+    if (vv) {
+      vv.addEventListener("resize", handleResize, { passive: true });
+    } else {
+      window.addEventListener("resize", handleResize, { passive: true });
+    }
+
     return () => {
-      vv.removeEventListener("resize", handleResize);
-      cancelAnimationFrame(raf);
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      if (vv) {
+        vv.removeEventListener("resize", handleResize);
+      } else {
+        window.removeEventListener("resize", handleResize);
+      }
     };
-  }, [scrollToBottom]);
+  }, []);
 
   useEffect(() => {
     if (!selectedChat) return;
@@ -491,40 +562,64 @@ const ChatPane = ({ onBack }) => {
 
   const getMenuPositionStyle = useCallback(() => {
     if (!menuAnchor) return {};
-    const menuWidth = 220;
-    const menuHeight = 320;
-    const padding = 12;
+    const menuWidth = 230;
+    const targetMenuHeight = 380;
+    const padding = 10;
     const headerHeight = 65; // Chat header height
-    const winWidth = typeof window !== "undefined" ? window.innerWidth : 400;
-    const winHeight = typeof window !== "undefined" ? window.innerHeight : 700;
+
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const winWidth = vv?.width || (typeof window !== "undefined" ? window.innerWidth : 400);
+    const winHeight = vv?.height || (typeof window !== "undefined" ? window.innerHeight : 700);
 
     // Horizontal alignment
     let left = menuAnchor.isMine ? (menuAnchor.right - menuWidth) : menuAnchor.left;
     left = Math.max(padding, Math.min(left, winWidth - menuWidth - padding));
 
-    // Vertical alignment: check space above header vs space below
-    const spaceBelow = winHeight - menuAnchor.bottom;
-    const spaceAbove = menuAnchor.top - headerHeight;
+    const minTop = headerHeight + 8;
+    const maxBottom = winHeight - 10;
+    const availableHeight = Math.max(260, maxBottom - minTop);
 
-    let top;
-    // Prefer opening downwards if there is ample space below OR if space below is larger than space above
-    if (spaceBelow >= menuHeight + 12 || spaceBelow >= spaceAbove) {
-      top = menuAnchor.bottom + 6;
+    // Dynamic maxHeight that NEVER squashes to 140px
+    const maxHeight = Math.min(targetMenuHeight, availableHeight);
+
+    // Check space below vs space above
+    const spaceBelow = maxBottom - menuAnchor.bottom;
+    const spaceAbove = menuAnchor.top - minTop;
+
+    let idealTop;
+    if (spaceBelow >= maxHeight + 6) {
+      // Ample space below the message bubble
+      idealTop = menuAnchor.bottom + 6;
+    } else if (spaceAbove >= maxHeight + 6) {
+      // Ample space above the message bubble
+      idealTop = menuAnchor.top - maxHeight - 6;
     } else {
-      // Open upwards
-      top = menuAnchor.top - menuHeight - 6;
+      // Message bubble is tall or viewport is tight (e.g. keyboard open):
+      // Overlap the bubble gracefully without overflowing top header or bottom boundary
+      const midPoint = (minTop + maxBottom) / 2;
+      const anchorMid = (menuAnchor.top + menuAnchor.bottom) / 2;
+      if (anchorMid > midPoint) {
+        // Bubble sits in the lower portion of screen: position menu toward the top
+        idealTop = Math.max(minTop, menuAnchor.top - 20);
+      } else {
+        // Bubble sits in the upper portion: position menu toward bottom of bubble
+        idealTop = Math.max(minTop, menuAnchor.bottom - maxHeight + 20);
+      }
     }
 
-    // Final safety clamp: never go above the chat header and never overflow off bottom
-    top = Math.max(headerHeight + 6, Math.min(top, winHeight - menuHeight - 12));
+    // Strict clamping: guarantee top >= minTop and top + maxHeight <= maxBottom
+    const top = Math.max(minTop, Math.min(idealTop, maxBottom - maxHeight));
 
     return {
       position: "fixed",
       left: `${left}px`,
       top: `${top}px`,
+      width: `${menuWidth}px`,
       zIndex: 99999,
-      maxHeight: "calc(100vh - 90px)",
+      maxHeight: `${maxHeight}px`,
       overflowY: "auto",
+      overscrollBehavior: "contain",
+      WebkitOverflowScrolling: "touch",
     };
   }, [menuAnchor]);
 
@@ -575,7 +670,6 @@ const ChatPane = ({ onBack }) => {
   // Message windowing: only the most recent page of bubbles is mounted.
   // Rendering thousands of markdown bubbles at once used to lock the main
   // thread on chat open; earlier history mounts on demand instead.
-  const [visibleCount, setVisibleCount] = useState(MESSAGE_PAGE_SIZE);
   const visibleMessages = useMemo(() => {
     if (searchQuery.trim()) return searchMatches;
     if (displayedMessages.length <= visibleCount) return displayedMessages;
@@ -789,14 +883,7 @@ const ChatPane = ({ onBack }) => {
         })),
       };
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `pulse-chat-${cleanName}-${dateStr}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, `pulse-chat-${cleanName}-${dateStr}.json`);
       return;
     }
 
@@ -857,14 +944,7 @@ const ChatPane = ({ onBack }) => {
 </body>
 </html>`;
       const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `pulse-chat-${cleanName}-${dateStr}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, `pulse-chat-${cleanName}-${dateStr}.html`);
       return;
     }
 
@@ -914,14 +994,7 @@ const ChatPane = ({ onBack }) => {
     lines.push(subDivider);
 
     const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pulse-chat-${cleanName}-${dateStr}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `pulse-chat-${cleanName}-${dateStr}.txt`);
   };
 
   const scrollToMessage = (msgId) => {
@@ -961,7 +1034,7 @@ const ChatPane = ({ onBack }) => {
       {/* 1. Dynamic Wallpaper Backdrop Layer (Custom Image or Gradient) */}
       {themeStyles.customWallpaperUrl ? (
         <div
-          className="absolute inset-0 z-0 bg-cover bg-center pointer-events-none transition-all duration-500"
+          className="absolute inset-0 z-0 bg-cover bg-center pointer-events-none transition-opacity duration-300"
           style={{
             backgroundImage: `url(${themeStyles.customWallpaperUrl})`,
             opacity: themeStyles.wallpaperOpacity ?? 0.3,
@@ -969,7 +1042,7 @@ const ChatPane = ({ onBack }) => {
         />
       ) : themeStyles.wallpaperGradient && themeStyles.wallpaperGradient !== "transparent" ? (
         <div
-          className="absolute inset-0 z-0 pointer-events-none transition-all duration-500"
+          className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-300"
           style={{
             background: themeStyles.wallpaperGradient,
             opacity: 0.85,
@@ -1210,7 +1283,7 @@ const ChatPane = ({ onBack }) => {
                   />
                   <div
                     ref={chatOptionsMenuRef}
-                    className="rounded-2xl bg-[#0a1812] text-white border border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn smooth-gpu text-[13px] overflow-hidden"
+                    className="rounded-2xl bg-white dark:bg-[#0a1812] text-theme-main border border-black/10 dark:border-emerald-500/25 shadow-2xl py-1.5 animate-scaleIn smooth-gpu text-[13px] overflow-hidden"
                     style={{ ...getChatOptionsStyle(), backgroundColor: "var(--glass-heavy-opaque, #0a1812)" }}
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
@@ -1547,9 +1620,20 @@ const ChatPane = ({ onBack }) => {
         ) : (
           <div
             ref={scrollerElementRef}
+            onTouchStart={() => {
+              isUserTouchScrollingRef.current = true;
+            }}
+            onTouchEnd={() => {
+              setTimeout(() => {
+                isUserTouchScrollingRef.current = false;
+              }, 200);
+            }}
+            onTouchCancel={() => {
+              isUserTouchScrollingRef.current = false;
+            }}
             onScroll={(e) => {
               handleScroll(e);
-              if (openMenuMessageId) {
+              if (openMenuMessageId && isUserTouchScrollingRef.current && Date.now() - menuOpenedAtRef.current > 400) {
                 setOpenMenuMessageId(null);
                 setMenuAnchor(null);
               }
@@ -1648,8 +1732,8 @@ const ChatPane = ({ onBack }) => {
                 </div>
               )}
             </div>
-              {/* Scroll bottom sentinel */}
-              <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
+              {/* Scroll bottom sentinel with automatic hardware anchor */}
+              <div ref={messagesEndRef} className="h-2 w-full shrink-0" style={{ overflowAnchor: "auto" }} />
             </div>
           </div>
         )}

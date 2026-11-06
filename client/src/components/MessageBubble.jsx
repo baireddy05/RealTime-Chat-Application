@@ -1,4 +1,4 @@
-import { memo, Fragment, useRef, useState, useEffect } from "react";
+import { memo, Fragment, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Loader, Ban, Clock, Star, Reply, Check, CheckCheck, Pin, Forward, Flame, Plus, MessageCircle, Edit3, Trash2, Copy, ChevronDown, Languages, Volume2, VolumeX, X, EyeOff, MapPin, Navigation } from "lucide-react";
 import FormattedMessageText from "./FormattedMessageText";
@@ -453,6 +453,20 @@ const MessageBubble = memo(({
       ? { ...message, image: null, audio: null }
       : message;
 
+  // Long press handling for touch devices (mobile) & context menu support
+  const bubbleRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const isLongPressTriggeredRef = useRef(false);
+  const menuOpenedTimeRef = useRef(0);
+  const wasInputFocusedRef = useRef(false);
+  const activeInputRef = useRef(null);
+
+  const closeMenu = useCallback(() => {
+    setOpenMenuMessageId(null);
+    setMenuAnchor(null);
+  }, [setOpenMenuMessageId, setMenuAnchor]);
+
   // Double-click / double-tap to reply (laptop-friendly; mirrors swipe-to-reply).
   // Ignores deleted/optimistic messages (same as swipe), selection mode, and
   // double-clicks on interactive elements (links, buttons, media controls).
@@ -465,17 +479,27 @@ const MessageBubble = memo(({
     setReplyingTo(replySafeMessage);
   };
 
-  // Long press handling for touch devices (mobile) & context menu support
-  const bubbleRef = useRef(null);
-  const longPressTimerRef = useRef(null);
-  const touchStartPosRef = useRef({ x: 0, y: 0 });
-  const isLongPressTriggeredRef = useRef(false);
+  const handleBubblePointerDown = (e) => {
+    const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+    const isInput = activeEl && (activeEl.tagName === "TEXTAREA" || activeEl.tagName === "INPUT");
+    if (isInput) {
+      wasInputFocusedRef.current = true;
+      activeInputRef.current = activeEl;
+      if (!e.target.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
+        if (e.pointerType !== "touch") {
+          e.preventDefault();
+        }
+      }
+    }
+  };
 
   const openOptionsMenuAtElement = (element) => {
     if (message.isDeleted) return;
     const targetEl = element || bubbleRef.current;
     if (!targetEl) return;
     const rect = targetEl.getBoundingClientRect();
+    menuOpenedTimeRef.current = Date.now();
+    isLongPressTriggeredRef.current = true;
     setOpenMenuMessageId(message._id);
     setMenuAnchor({
       top: rect.top,
@@ -509,6 +533,11 @@ const MessageBubble = memo(({
     if (e.target.closest("button, a, input, textarea, select, [role='button'], .quick-reaction-btn")) {
       return;
     }
+    const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+    const isInput = activeEl && (activeEl.tagName === "TEXTAREA" || activeEl.tagName === "INPUT");
+    wasInputFocusedRef.current = !!isInput;
+    activeInputRef.current = isInput ? activeEl : null;
+
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     isLongPressTriggeredRef.current = false;
@@ -525,8 +554,16 @@ const MessageBubble = memo(({
         } catch {}
       }
       
+      // Blur any active input so soft keyboard closes cleanly and menu gets full height
+      try {
+        const active = typeof document !== "undefined" ? document.activeElement : null;
+        if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+          active.blur();
+        }
+      } catch {}
+
       openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
-    }, 420);
+    }, 400);
   };
 
   const handleTouchMove = (e) => {
@@ -534,21 +571,26 @@ const MessageBubble = memo(({
     const touch = e.touches[0];
     const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
     const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-    if (dx > 8 || dy > 8) {
+    if (dx > 16 || dy > 16) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
     if (isLongPressTriggeredRef.current) {
+      if (e && e.cancelable) {
+        try {
+          e.preventDefault();
+        } catch {}
+      }
       setTimeout(() => {
         isLongPressTriggeredRef.current = false;
-      }, 350);
+      }, 500);
     }
   };
 
@@ -556,8 +598,20 @@ const MessageBubble = memo(({
     if (message.isDeleted) return;
     e.preventDefault();
     e.stopPropagation();
-    
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    isLongPressTriggeredRef.current = true;
     openOptionsMenuAtElement(bubbleRef.current || e.currentTarget);
+    if (wasInputFocusedRef.current && activeInputRef.current) {
+      try {
+        activeInputRef.current.focus({ preventScroll: true });
+      } catch {}
+    }
+    setTimeout(() => {
+      isLongPressTriggeredRef.current = false;
+    }, 400);
   };
   const prevMessage = index > 0 ? currentList[index - 1] : null;
   const prevSenderId = prevMessage ? (prevMessage.senderId?._id || prevMessage.senderId) : null;
@@ -689,11 +743,13 @@ const MessageBubble = memo(({
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
+                onPointerDown={handleBubblePointerDown}
+                onMouseDown={handleBubblePointerDown}
                 onContextMenu={handleContextMenu}
                 onDoubleClick={handleDoubleClick}
                 title="Double-click to reply"
                 onClickCapture={(e) => {
-                  if (isLongPressTriggeredRef.current) {
+                  if (isLongPressTriggeredRef.current || Date.now() - menuOpenedTimeRef.current < 500) {
                     e.preventDefault();
                     e.stopPropagation();
                     return;
@@ -1215,40 +1271,65 @@ const MessageBubble = memo(({
                 {!message.isDeleted && isMenuOpen && typeof document !== "undefined" && createPortal(
                   <>
                         <div
-                          className="fixed inset-0 z-[9998] bg-transparent"
+                          className="fixed inset-0 z-[9998] bg-black/20 dark:bg-black/40 backdrop-blur-[0.5px] transition-opacity"
                           onTouchStart={(e) => {
+                            if (Date.now() - menuOpenedTimeRef.current < 200) {
+                              if (e.cancelable) e.preventDefault();
+                              return;
+                            }
+                            e.preventDefault();
                             e.stopPropagation();
-                            setOpenMenuMessageId(null);
-                            setMenuAnchor(null);
+                            closeMenu();
+                          }}
+                          onTouchEnd={(e) => {
+                            if (Date.now() - menuOpenedTimeRef.current < 200) {
+                              return;
+                            }
+                            e.preventDefault();
+                            e.stopPropagation();
+                            closeMenu();
                           }}
                           onPointerDown={(e) => {
+                            if (Date.now() - menuOpenedTimeRef.current < 200) {
+                              if (e.cancelable) e.preventDefault();
+                              return;
+                            }
+                            e.preventDefault();
                             e.stopPropagation();
-                            setOpenMenuMessageId(null);
-                            setMenuAnchor(null);
+                            closeMenu();
                           }}
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
-                            setOpenMenuMessageId(null);
-                            setMenuAnchor(null);
+                            if (Date.now() - menuOpenedTimeRef.current < 200) {
+                              return;
+                            }
+                            closeMenu();
                           }}
                         />
                         <div
                           onTouchStart={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
                           onClick={(e) => e.stopPropagation()}
                           style={{ ...getMenuPositionStyle(), backgroundColor: "var(--glass-heavy-opaque, #0c1613)" }}
-                          className="w-[220px] p-1.5 rounded-2xl bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-24px)]"
+                          className="w-[230px] p-1.5 rounded-2xl bg-white dark:bg-[#0c1613] border border-black/10 dark:border-white/15 shadow-2xl animate-scaleIn select-none max-w-[calc(100vw-20px)] custom-scrollbar"
                         >
                           {/* Quick Reactions row */}
-                          <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-white/5 rounded-xl border border-white/5">
+                          <div className="flex items-center justify-between gap-1 px-1.5 py-1 mb-1 bg-[var(--glass-hover)] rounded-xl border border-[var(--glass-border)]">
                             {QUICK_REACTIONS.map((emoji) => (
                               <button
                                 key={emoji}
                                 type="button"
                                 onClick={() => {
                                   reactToMessage(message._id, emoji);
-                                  setOpenMenuMessageId(null);
-                                  setMenuAnchor(null);
+                                  closeMenu();
                                 }}
                                 className="hover:scale-125 transition-transform p-1 rounded-lg hover:bg-white/10 quick-reaction-btn flex items-center justify-center text-sm"
                                 title={`React ${emoji}`}
@@ -1295,8 +1376,7 @@ const MessageBubble = memo(({
                                   if (navigator.clipboard?.writeText) {
                                     navigator.clipboard.writeText(textToCopy);
                                   }
-                                  setOpenMenuMessageId(null);
-                                  setMenuAnchor(null);
+                                  closeMenu();
                                 }}
                                 className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                               >
@@ -1344,8 +1424,7 @@ const MessageBubble = memo(({
                               type="button"
                               onClick={() => {
                                 toggleStarMessage(message._id);
-                                setOpenMenuMessageId(null);
-                                setMenuAnchor(null);
+                                closeMenu();
                               }}
                               className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                             >
@@ -1400,8 +1479,7 @@ const MessageBubble = memo(({
                               type="button"
                               onClick={() => {
                                 togglePinMessage(message._id);
-                                setOpenMenuMessageId(null);
-                                setMenuAnchor(null);
+                                closeMenu();
                               }}
                               className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium text-theme-main hover:bg-[var(--glass-hover)] rounded-xl transition-colors text-left"
                             >

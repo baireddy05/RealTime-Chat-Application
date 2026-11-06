@@ -116,26 +116,26 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
   return (
     <div 
       onClick={onClose}
-      className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fadeIn cursor-pointer"
+      className="fixed inset-0 z-50 flex justify-end bg-[var(--modal-backdrop)] backdrop-blur-sm animate-fadeIn cursor-pointer"
     >
       <div 
-        className="w-full max-w-md h-full bg-slate-900/95 border-l border-[var(--glass-border)] shadow-2xl flex flex-col overflow-hidden animate-slideInRight cursor-default"
+        className="w-full max-w-md h-full bg-[var(--glass-heavy-opaque)] border-l border-[var(--glass-border)] text-theme-main shadow-2xl flex flex-col overflow-hidden animate-slideInRight cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
-        <div className="p-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-slate-800/40">
+        <div className="p-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-[var(--glass-hover)]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center">
               <StickyNote size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-theme-main flex items-center gap-1.5">
                 <span>Scratchpad & Notes</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 uppercase tracking-wider">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-500 uppercase tracking-wider">
                   Local
                 </span>
               </h3>
-              <p className="text-[11px] text-zinc-400">Jot thoughts or draft messages while chatting</p>
+              <p className="text-[11px] text-theme-muted">Jot thoughts or draft messages while chatting</p>
             </div>
           </div>
 
@@ -143,7 +143,7 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
             <button
               type="button"
               onClick={handleCreateNote}
-              className="p-2 rounded-xl text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 transition-all flex items-center gap-1 text-xs font-semibold"
+              className="p-2 rounded-xl text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 transition-all flex items-center gap-1 text-xs font-semibold cursor-pointer"
               title="New Note"
             >
               <Plus size={16} />
@@ -152,7 +152,7 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+              className="p-2 rounded-xl text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all cursor-pointer"
               title="Close Drawer"
             >
               <X size={18} />
@@ -161,7 +161,7 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
         </div>
 
         {/* Note Tabs Carousel */}
-        <div className="px-3 py-2 border-b border-[var(--glass-border)] bg-slate-950/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="px-3 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-hover)] flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {notes.map((note) => (
             <button
               key={note.id}
@@ -170,10 +170,10 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
                 setActiveNoteId(note.id);
                 setIsRenaming(false);
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 note.id === activeNoteId
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent"
+                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 font-semibold shadow-sm"
+                  : "text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] border border-transparent"
               }`}
             >
               <span className="max-w-[110px] truncate">{note.title}</span>
@@ -183,9 +183,9 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
 
         {/* Active Note Content */}
         {activeNote && (
-          <div className="flex-1 flex flex-col min-h-0 bg-[#0c121e]">
+          <div className="flex-1 flex flex-col min-h-0 bg-transparent">
             {/* Note Title Toolbar */}
-            <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between bg-slate-900/40">
+            <div className="px-4 py-2.5 border-b border-[var(--glass-border)] flex items-center justify-between bg-[var(--glass-hover)]">
               {isRenaming ? (
                 <div className="flex items-center gap-2 flex-1 mr-2">
                   <input
@@ -194,12 +194,12 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
                     onChange={(e) => setRenameTitle(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSaveRename()}
                     autoFocus
-                    className="bg-slate-950 px-2 py-1 rounded-lg text-xs text-white border border-amber-500/50 focus:outline-none flex-1"
+                    className="bg-[var(--glass-input)] px-2 py-1 rounded-lg text-xs text-theme-main border border-amber-500/50 focus:outline-none flex-1"
                   />
                   <button
                     type="button"
                     onClick={handleSaveRename}
-                    className="p-1 rounded-lg bg-amber-500 text-black text-xs font-bold"
+                    className="p-1 rounded-lg bg-amber-500 text-black text-xs font-bold cursor-pointer"
                   >
                     <Check size={13} />
                   </button>
@@ -207,11 +207,11 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
               ) : (
                 <div 
                   onClick={handleStartRename}
-                  className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-zinc-200 hover:text-amber-300 group"
+                  className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-theme-main hover:text-amber-500 group"
                   title="Click to rename note"
                 >
                   <span className="truncate max-w-[200px]">{activeNote.title}</span>
-                  <Edit2 size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-400" />
+                  <Edit2 size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-500" />
                 </div>
               )}
 
@@ -219,15 +219,15 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
                 <button
                   type="button"
                   onClick={handleCopyNote}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-all text-xs"
+                  className="p-1.5 rounded-lg text-theme-muted hover:text-theme-main hover:bg-[var(--glass-hover)] transition-all text-xs cursor-pointer"
                   title="Copy Note"
                 >
-                  {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                  {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteNote(activeNote.id)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs"
+                  className="p-1.5 rounded-lg text-theme-muted hover:text-red-500 hover:bg-red-500/10 transition-all text-xs cursor-pointer"
                   title="Delete Note"
                 >
                   <Trash2 size={14} />
@@ -240,14 +240,14 @@ const QuickNotesDrawer = ({ isOpen, onClose, onSendToChat }) => {
               value={activeNote.content}
               onChange={(e) => handleUpdateContent(e.target.value)}
               placeholder="Write your note, checklist, or paste links here...&#10;&#10;Everything is automatically saved to your browser."
-              className="flex-1 w-full p-4 bg-transparent text-zinc-200 placeholder-zinc-600 resize-none focus:outline-none text-xs leading-relaxed font-sans"
+              className="flex-1 w-full p-4 bg-transparent text-theme-main placeholder:text-theme-muted resize-none focus:outline-none text-xs leading-relaxed font-sans"
             />
           </div>
         )}
 
         {/* Footer Actions */}
-        <div className="p-3.5 border-t border-[var(--glass-border)] bg-slate-800/40 flex items-center justify-between">
-          <div className="text-[11px] text-zinc-400">
+        <div className="p-3.5 border-t border-[var(--glass-border)] bg-[var(--glass-hover)] flex items-center justify-between">
+          <div className="text-[11px] text-theme-muted">
             {activeNote?.content ? `${activeNote.content.length} chars` : "Empty note"}
           </div>
 
